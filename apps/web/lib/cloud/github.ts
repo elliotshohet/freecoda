@@ -253,6 +253,28 @@ export async function importRepository(
   };
   return { source, files };
 }
+export function publicationChanges(
+  baseFiles: SourceFile[],
+  files: SourceFile[],
+) {
+  const original = new Map(
+    baseFiles
+      .filter((file) => allowedSource(file.path))
+      .map((file) => [file.path, file]),
+  );
+  const changed = files
+    .filter(
+      (file) =>
+        allowedSource(file.path) &&
+        original.get(file.path)?.content !== file.content,
+    )
+    .sort((a, b) => a.path.localeCompare(b.path));
+  const paths = new Set(files.map((file) => file.path));
+  const deleted = [...original.values()]
+    .filter((file) => !paths.has(file.path))
+    .sort((a, b) => a.path.localeCompare(b.path));
+  return { changed, deleted };
+}
 export async function publishDraft(
   userId: string,
   repository: RepositorySource,
@@ -283,16 +305,7 @@ export async function publishDraft(
       409,
       "The repository changed since import. Reimport and review against the new base before publishing.",
     );
-  const baseMap = new Map(
-    repository.baseFiles.map((file) => [file.path, file.content]),
-  );
-  const changed = files.filter(
-    (file) => baseMap.get(file.path) !== file.content,
-  );
-  const currentPaths = new Set(files.map((file) => file.path));
-  const deleted = repository.baseFiles.filter(
-    (file) => !currentPaths.has(file.path),
-  );
+  const { changed, deleted } = publicationChanges(repository.baseFiles, files);
   if (!changed.length && !deleted.length)
     throw new ApiError(400, "There are no changes to publish.");
   if (

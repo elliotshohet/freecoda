@@ -263,7 +263,7 @@ export async function reserveCompute(userId: string, projectId: string) {
     await db.query("SELECT pg_advisory_xact_lock(hashtext('cloud-compute'))");
     const expired = (
       await db.query(
-        "UPDATE cloud_compute_reservations SET status='settled' WHERE status='active' AND created_at<now()-interval '20 minutes' RETURNING *",
+        "UPDATE cloud_compute_reservations SET status='settled',actual_seconds=seconds,settled_at=now(),settlement_reason='hard_timeout' WHERE status='active' AND created_at<now()-interval '20 minutes' RETURNING *",
       )
     ).rows;
     for (const r of expired)
@@ -319,14 +319,14 @@ export async function settleCompute(id: string) {
   await transaction(async (db) => {
     const r = (
       await db.query(
-        "UPDATE cloud_compute_reservations SET status='settled' WHERE id=$1 AND status='active' RETURNING *",
+        "UPDATE cloud_compute_reservations SET status='settled',actual_seconds=least(seconds,greatest(0,ceil(extract(epoch FROM (now()-created_at)))))::integer,settled_at=now(),settlement_reason='confirmed_stop' WHERE id=$1 AND status='active' RETURNING *",
         [id],
       )
     ).rows[0];
     if (!r) return;
     await db.query(
-      "UPDATE cloud_compute_buckets SET reserved_seconds=greatest(0,reserved_seconds-$4),spent_seconds=spent_seconds+$4 WHERE (scope=$1 AND period=$2) OR (scope='global' AND period=$3)",
-      [r.user_id, r.day, r.month, r.seconds],
+      "UPDATE cloud_compute_buckets SET reserved_seconds=greatest(0,reserved_seconds-$4),spent_seconds=spent_seconds+$5 WHERE (scope=$1 AND period=$2) OR (scope='global' AND period=$3)",
+      [r.user_id, r.day, r.month, r.seconds, r.actual_seconds],
     );
   });
 }
@@ -383,7 +383,7 @@ export async function releaseCompute(id: string) {
   await transaction(async (db) => {
     const row = (
       await db.query(
-        "UPDATE cloud_compute_reservations SET status='settled' WHERE id=$1 AND status='active' RETURNING *",
+        "UPDATE cloud_compute_reservations SET status='settled',actual_seconds=0,settled_at=now(),settlement_reason='no_resource_created' WHERE id=$1 AND status='active' RETURNING *",
         [id],
       )
     ).rows[0];

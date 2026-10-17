@@ -18,7 +18,12 @@ import { encrypt, digest, encryptionReady } from "./crypto";
 import * as store from "./store";
 import * as vm from "./sandbox";
 import { previewPublicKey } from "./preview-proxy";
-import { publishDraft, allowedSource, githubReady } from "./github";
+import {
+  publishDraft,
+  allowedSource,
+  githubReady,
+  publicationChanges,
+} from "./github";
 import type { CloudProject, SourceFile } from "./types";
 export function cloudEnabled() {
   return process.env.CLOUD_WORKSPACES_ENABLED === "true";
@@ -64,13 +69,19 @@ export async function activate(userId: string, id: string) {
   try {
     const sandbox = await vm.ensureProjectSandbox(
       record.project,
-      record.payload.files,
+      record.payload.files.filter((file) => allowedSource(file.path)),
     );
     created = { ...record.project, ...sandbox };
-    return await store.saveProject(userId, id, record.version, record.payload, {
-      ...sandbox,
-      status: "ready",
-    });
+    return await store.saveProject(
+      userId,
+      id,
+      record.version,
+      {
+        ...record.payload,
+        files: record.payload.files.filter((file) => allowedSource(file.path)),
+      },
+      { ...sandbox, status: "ready" },
+    );
   } catch (error) {
     // Unknown creation outcomes retain the full reservation until the VM's
     // hard timeout has elapsed. A known VM must stop before capacity is freed.
@@ -115,11 +126,13 @@ export async function projectFiles(userId: string, id: string) {
   const record = await store.project(userId, id);
   return record.project.sandboxId
     ? vm.listProjectFiles(record.project)
-    : record.payload.files.map((file) => ({
-        path: file.path,
-        bytes: Buffer.byteLength(file.content),
-        hash: digest(file.content),
-      }));
+    : record.payload.files
+        .filter((file) => allowedSource(file.path))
+        .map((file) => ({
+          path: file.path,
+          bytes: Buffer.byteLength(file.content),
+          hash: digest(file.content),
+        }));
 }
 export async function readFile(userId: string, id: string, path: string) {
   if (!allowedSource(path))
@@ -191,18 +204,14 @@ function reviewedDiff(
   files: SourceFile[],
 ) {
   const original = new Map(
-    (record.payload.repository?.baseFiles || []).map((file) => [
-      file.path,
-      file,
-    ]),
+    (record.payload.repository?.baseFiles || [])
+      .filter((file) => allowedSource(file.path))
+      .map((file) => [file.path, file]),
   );
-  const changed = files
-    .filter((file) => original.get(file.path)?.content !== file.content)
-    .sort((a, b) => a.path.localeCompare(b.path));
-  const paths = new Set(files.map((file) => file.path));
-  const deleted = [...original.values()]
-    .filter((file) => !paths.has(file.path))
-    .sort((a, b) => a.path.localeCompare(b.path));
+  const { changed, deleted } = publicationChanges(
+    record.payload.repository?.baseFiles || [],
+    files,
+  );
   const reviewHash = digest(
     JSON.stringify({
       baseSha: record.payload.repository?.baseSha || null,

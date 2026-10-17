@@ -35,9 +35,9 @@ const NETWORK_POLICY = {
   allow: { "registry.npmjs.org": [], "registry.yarnpkg.com": [] },
 };
 const deniedParts =
-  /^(?:\.git|node_modules|\.next|\.nuxt|\.output|\.cache|\.turbo|dist|build|coverage|\.vercel|\.aws|\.ssh|\.gnupg|__pycache__|\.venv|venv|\.data)$/i;
+  /^(?:\.git|node_modules|\.next|\.nuxt|\.output|\.cache|\.turbo|\.swc|dist|build|coverage|\.vercel|\.aws|\.ssh|\.gnupg|__pycache__|\.venv|venv|\.data)$/i;
 const deniedNames =
-  /^(?:\.env(?:\..*)?|\.npmrc|\.netrc|credentials(?:\..*)?|secrets?(?:\..*)?|id_rsa.*|id_ed25519.*|.*\.(?:pem|key|p12|pfx|pyc))$/i;
+  /^(?:\.env(?:\..*)?|\.npmrc|\.netrc|credentials(?:\..*)?|secrets?(?:\..*)?|next-env[.]d[.]ts|id_rsa.*|id_ed25519.*|.*\.(?:pem|key|p12|pfx|pyc))$/i;
 export function validSourcePath(value: string) {
   if (
     !value ||
@@ -45,6 +45,7 @@ export function validSourcePath(value: string) {
     value.includes("\\") ||
     value.includes("\0") ||
     path.posix.isAbsolute(value) ||
+    /(?:^|\/)\.well-known\/workflow\/v1(?:\/|$)/i.test(value) ||
     value
       .split("/")
       .some(
@@ -96,13 +97,14 @@ export const SOURCE_HELPER = String.raw`
 import os,sys,json,hashlib,base64,stat,tempfile,subprocess,selectors,time,signal,fcntl
 LIMIT=104857600
 FILE_LIMIT=1048576
-BAD_DIRS={'.git','node_modules','.next','.nuxt','.output','.cache','.turbo','dist','build','coverage','.vercel','.aws','.ssh','.gnupg','__pycache__','.venv','venv','.data'}
+BAD_DIRS={'.git','node_modules','.next','.nuxt','.output','.cache','.turbo','.swc','dist','build','coverage','.vercel','.aws','.ssh','.gnupg','__pycache__','.venv','venv','.data'}
 import re
-BAD_NAME=re.compile(r'^(?:[.]env(?:[.].*)?|[.]npmrc|[.]netrc|credentials(?:[.].*)?|secrets?(?:[.].*)?|id_rsa.*|id_ed25519.*|.*[.](?:pem|key|p12|pfx|pyc))$',re.I)
+BAD_NAME=re.compile(r'^(?:[.]env(?:[.].*)?|[.]npmrc|[.]netrc|credentials(?:[.].*)?|secrets?(?:[.].*)?|next-env[.]d[.]ts|id_rsa.*|id_ed25519.*|.*[.](?:pem|key|p12|pfx|pyc))$',re.I)
 p=json.load(sys.stdin)
 root=os.path.abspath(p['root'])
 def allowed(rel):
  parts=rel.split('/')
+ if any([p.lower() for p in parts[i:i+3]]==['.well-known','workflow','v1'] for i in range(max(0,len(parts)-2))):return False
  return bool(rel) and len(rel)<=500 and not rel.startswith('/') and chr(92) not in rel and chr(0) not in rel and all(x not in ('','.','..') and x.lower() not in BAD_DIRS and not BAD_NAME.match(x) for x in parts)
 def target(rel,new=False):
  if not allowed(rel):raise ValueError('Source path is excluded or invalid.')
@@ -117,7 +119,7 @@ def target(rel,new=False):
 def scan():
  result=[];total=0;count=0
  for directory,dirs,files in os.walk(root,followlinks=False):
-  dirs[:]=[x for x in dirs if x.lower() not in BAD_DIRS and not BAD_NAME.match(x) and not os.path.islink(os.path.join(directory,x))]
+  dirs[:]=[x for x in dirs if allowed(os.path.relpath(os.path.join(directory,x),root).replace(os.sep,'/')) and not os.path.islink(os.path.join(directory,x))]
   for name in files:
    rel=os.path.relpath(os.path.join(directory,name),root).replace(os.sep,'/')
    if not allowed(rel) or os.path.islink(os.path.join(directory,name)):continue
@@ -612,14 +614,12 @@ export async function startProjectPreview(project: SandboxProjectRef) {
       ? ["dev", "--hostname", "127.0.0.1", "--port", "3001"]
       : ["--host", "127.0.0.1", "--port", "3001", "--strictPort"];
   const resolveInstalledBinary = () =>
-    sandbox
-      .asUser("project")
-      .runCommand({
-        cmd: "node",
-        args: ["-e", resolveBinary + "console.log(binary);"],
-        cwd: directory,
-        timeoutMs: 5000,
-      });
+    sandbox.asUser("project").runCommand({
+      cmd: "node",
+      args: ["-e", resolveBinary + "console.log(binary);"],
+      cwd: directory,
+      timeoutMs: 5000,
+    });
   let installed = await resolveInstalledBinary();
   if (installed.exitCode !== 0) {
     const files = await listProjectFiles(project);

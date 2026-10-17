@@ -133,6 +133,10 @@ test("cloud compute admission is atomic and settlement cannot double charge", as
   );
   const accepted = results.filter((r) => r.status === "fulfilled");
   expect(accepted).toHaveLength(1);
+  await pool.query(
+    "UPDATE cloud_compute_reservations SET created_at=now()-interval '901 seconds' WHERE id=$1",
+    [accepted[0].value],
+  );
   await cloud.settleCompute(accepted[0].value);
   await cloud.settleCompute(accepted[0].value);
   const row = (
@@ -142,6 +146,30 @@ test("cloud compute admission is atomic and settlement cannot double charge", as
   ).rows[0];
   expect(Number(row.reserved_seconds)).toBe(0);
   expect(Number(row.spent_seconds)).toBe(900);
+});
+test("stopping a short session releases unused reserved compute", async () => {
+  const p = await cloud.createProject(userId, "Short session", {
+    files: [],
+    consentAt: new Date().toISOString(),
+  });
+  const id = await cloud.reserveCompute(userId, p.id);
+  await cloud.settleCompute(id);
+  await cloud.settleCompute(id);
+  const usage = (
+    await pool.query(
+      "SELECT reserved_seconds,spent_seconds FROM cloud_compute_buckets WHERE scope='global'",
+    )
+  ).rows[0];
+  const reservation = (
+    await pool.query(
+      "SELECT actual_seconds,settlement_reason FROM cloud_compute_reservations WHERE id=$1",
+      [id],
+    )
+  ).rows[0];
+  expect(Number(usage.reserved_seconds)).toBe(0);
+  expect(Number(usage.spent_seconds)).toBeLessThanOrEqual(10);
+  expect(Number(reservation.actual_seconds)).toBe(Number(usage.spent_seconds));
+  expect(reservation.settlement_reason).toBe("confirmed_stop");
 });
 beforeEach(async () => {
   await pool.query("TRUNCATE cloud_projects,cloud_compute_buckets CASCADE");

@@ -352,3 +352,46 @@ test("concurrent sandbox edits with the same base hash permit only one writer", 
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("generated compiler and Workflow artifacts never enter exported source", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "freecoda-generated-source-"));
+  const generated = [
+    ".swc/cache/binary.wasm",
+    "apps/web/.swc/plugins/cache.bin",
+    "next-env.d.ts",
+    "apps/web/next-env.d.ts",
+    ".well-known/workflow/v1/generated.js",
+    "apps/web/.well-known/workflow/v1/flows/compiled.js",
+  ];
+  const source = [
+    "src/index.ts",
+    ".well-known/security.txt",
+    "apps/web/.well-known/assetlinks.json",
+  ];
+  try {
+    for (const file of [...generated, ...source]) {
+      await mkdir(path.dirname(path.join(root, file)), { recursive: true });
+      await writeFile(path.join(root, file), "fixture source");
+    }
+    for (const file of generated) expect(() => validSourcePath(file)).toThrow();
+    for (const file of source) expect(validSourcePath(file)).toBe(file);
+    for (const op of ["list", "export"]) {
+      const result = Bun.spawnSync(["python3", "-I", "-c", SOURCE_HELPER], {
+        stdin: Buffer.from(JSON.stringify({ root, op })),
+      });
+      const response = JSON.parse(result.stdout.toString());
+      expect(response.ok).toBe(true);
+      expect(
+        response.value.map((file: { path: string }) => file.path).sort(),
+      ).toEqual([...source].sort());
+    }
+    for (const file of generated) {
+      const result = Bun.spawnSync(["python3", "-I", "-c", SOURCE_HELPER], {
+        stdin: Buffer.from(JSON.stringify({ root, op: "read", path: file })),
+      });
+      expect(JSON.parse(result.stdout.toString()).ok).toBe(false);
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
