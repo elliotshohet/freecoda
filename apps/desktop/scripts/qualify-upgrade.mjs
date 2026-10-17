@@ -123,26 +123,36 @@ async function normalClose() {
   if (platform() === 'win32') {
     // Exercise the actual native close confirmation. No IPC/test hooks.
     const script = `
-      Add-Type -AssemblyName UIAutomationClient; Add-Type -AssemblyName UIAutomationTypes;
+      Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class FreecodaNativeClose { [DllImport("user32.dll",CharSet=CharSet.Unicode)] public static extern IntPtr FindWindow(string cls,string title); [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd,out uint pid); [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr hwnd,uint command); [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd); }';
       $w=New-Object -ComObject WScript.Shell;
       if(-not $w.AppActivate(${child.pid})){throw 'Cannot focus Freecoda'};
       Start-Sleep -Milliseconds 400; $w.SendKeys('%{F4}');
-      $condition=[System.Windows.Automation.AndCondition]::new(
-        [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ProcessIdProperty,${child.pid}),
-        [System.Windows.Automation.AndCondition]::new(
-          [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,'Close workspace'),
-          [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Button)
-        )
-      );
-      $deadline=(Get-Date).AddSeconds(10); $button=$null;
-      while((Get-Date) -lt $deadline -and $null -eq $button){
-        $button=[System.Windows.Automation.AutomationElement]::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Descendants,$condition);
-        if($null -eq $button){Start-Sleep -Milliseconds 200}
+      $deadline=(Get-Date).AddSeconds(10); $dialog=[IntPtr]::Zero;
+      while((Get-Date) -lt $deadline){
+        $candidate=[FreecodaNativeClose]::FindWindow($null,'Close Freecoda?');
+        if($candidate -ne [IntPtr]::Zero){
+          [uint32]$dialogProcess=0; [uint32]$ownerProcess=0;
+          [void][FreecodaNativeClose]::GetWindowThreadProcessId($candidate,[ref]$dialogProcess);
+          $owner=[FreecodaNativeClose]::GetWindow($candidate,4);
+          [void][FreecodaNativeClose]::GetWindowThreadProcessId($owner,[ref]$ownerProcess);
+          if($dialogProcess -eq ${child.pid} -and $ownerProcess -eq ${child.pid}){$dialog=$candidate; break}
+        };
+        Start-Sleep -Milliseconds 200;
       };
-      if($null -eq $button){throw 'Native Close workspace confirmation was not found'};
-      $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke();
+      if($dialog -eq [IntPtr]::Zero){throw 'Owned native Close Freecoda? dialog was not found'};
+      [void][FreecodaNativeClose]::SetForegroundWindow($dialog);
+      if(-not $w.AppActivate('Close Freecoda?')){throw 'Cannot activate native close confirmation'};
+      Start-Sleep -Milliseconds 200;
+      if([FreecodaNativeClose]::GetForegroundWindow() -ne $dialog){throw 'Native close confirmation does not have focus'};
+      # TaskDialog command links are vertical: observed default Keep working, then Close workspace.
+      $w.SendKeys('{DOWN}{ENTER}');
     `;
-    await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script]);
+    try {
+      await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script]);
+    } catch (error) {
+      diagnostics += '\nNative close diagnostics:\n' + String(error.stdout || '').slice(-12_000);
+      throw error;
+    }
   } else {
     const { stdout } = await run('xdotool', ['search', '--onlyvisible', '--name', '^Freecoda$']);
     const id = stdout.trim().split(/\s+/)[0]; assert(id);
