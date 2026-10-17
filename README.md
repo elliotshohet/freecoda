@@ -8,21 +8,21 @@ A coding workspace for your own projects: edit files, plan and build with an age
 
 ## Downloads
 
-The initial public desktop beta is **0.1.0**. Choose the installer for your operating system and processor:
+The current public desktop beta is **0.1.1**. Choose the installer for your operating system and processor:
 
 | Platform | Download |
 | --- | --- |
-| macOS · Apple silicon (M1 and newer) | [DMG · arm64](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.0/Freecoda-0.1.0-mac-arm64.dmg) |
-| macOS · Intel | [DMG · x64](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.0/Freecoda-0.1.0-mac-x64.dmg) |
-| Windows · 64-bit | [Installer · x64](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.0/Freecoda-0.1.0-win-x64.exe) |
-| Linux · x86_64 | [AppImage](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.0/Freecoda-0.1.0-linux-x86_64.AppImage) |
-| Debian / Ubuntu · amd64 | [DEB package](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.0/Freecoda-0.1.0-linux-amd64.deb) |
+| macOS · Apple silicon (M1 and newer) | [DMG · arm64](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.1/Freecoda-0.1.1-mac-arm64.dmg) |
+| macOS · Intel | [DMG · x64](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.1/Freecoda-0.1.1-mac-x64.dmg) |
+| Windows · 64-bit | [Installer · x64](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.1/Freecoda-0.1.1-win-x64.exe) |
+| Linux · x86_64 | [AppImage](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.1/Freecoda-0.1.1-linux-x86_64.AppImage) |
+| Debian / Ubuntu · amd64 | [DEB package](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.1/Freecoda-0.1.1-linux-amd64.deb) |
 
-These initial installers are **unsigned beta builds**. macOS builds are not notarized and may be blocked by Gatekeeper. Windows may show a SmartScreen warning. Verify your download before opening it. Linux AppImage files may need executable permission before launch.
+These installers are **unsigned beta builds**. macOS builds are not notarized and may be blocked by Gatekeeper. Windows may show a SmartScreen warning. Verify your download before opening it. Linux AppImage files may need executable permission before launch.
 
 ### Verify a download
 
-Compare the SHA-256 hash of your installer with the matching filename in [SHA256SUMS.txt for 0.1.0](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.0/SHA256SUMS.txt). For later versions, use the checksum file attached to that same release.
+Compare the SHA-256 hash of your installer with the matching filename in [SHA256SUMS.txt for 0.1.1](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.1/SHA256SUMS.txt). For later versions, use the checksum file attached to that same release.
 
 On macOS:
 
