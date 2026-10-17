@@ -4,6 +4,10 @@
   "workspaces": {
     "": {
       "name": "freecoda-workspace",
+      "dependencies": {
+        "ai": "7.0.143",
+        "zod": "4.6.7",
+      },
       "devDependencies": {
         "@types/bun": "latest",
         "@types/node": "latest",
@@ -16,9 +20,13 @@
     "apps/web": {
       "name": "@freecoda/web",
       "dependencies": {
+        "@ai-sdk/provider": "4.0.29",
         "@fontsource-variable/manrope": "latest",
         "@fontsource/ibm-plex-mono": "latest",
         "@freecoda/contracts": "workspace:*",
+        "@vercel/analytics": "^2.0.1",
+        "@vercel/oidc": "3.2.0",
+        "@vercel/speed-insights": "^2.0.0",
         "ai": "latest",
         "better-auth": "latest",
         "drizzle-orm": "latest",
@@ -27,7 +35,6 @@
         "pg": "latest",
         "react": "latest",
         "react-dom": "latest",
-        "stripe": "latest",
         "zod": "latest",
       },
     },
@@ -40,9 +47,11 @@
       "dependencies": {
         "@freecoda/contracts": "workspace:*",
         "@freecoda/core": "workspace:*",
+        "ai": "7.0.143",
         "commander": "latest",
         "open": "latest",
         "picocolors": "latest",
+        "zod": "4.6.7",
       },
     },
     "packages/contracts": {
@@ -55,6 +64,7 @@
       "name": "@freecoda/core",
       "dependencies": {
         "@ai-sdk/openai-compatible": "latest",
+        "@ai-sdk/provider": "4.0.29",
         "ai": "latest",
         "diff": "latest",
         "ignore": "latest",
@@ -240,7 +250,11 @@
 
     "@typescript/typescript-win32-x64": ["@typescript/typescript-win32-x64@7.0.2", "", { "os": "win32", "cpu": "x64" }, "sha512-0BQ3HkAHHlKLSp1qRvf3SUhGpGsDuhB/jgFw75guyqbxJqEaS0Cw/VFO8i2nHglJUzQCRtMMR/IBAKE3ETMC4g=="],
 
+    "@vercel/analytics": ["@vercel/analytics@2.0.1", "", { "peerDependencies": { "@remix-run/react": "^2", "@sveltejs/kit": "^1 || ^2", "next": ">= 13", "nuxt": ">= 3", "react": "^18 || ^19 || ^19.0.0-rc", "svelte": ">= 4", "vue": "^3", "vue-router": "^4" }, "optionalPeers": ["@remix-run/react", "@sveltejs/kit", "next", "nuxt", "react", "svelte", "vue", "vue-router"] }, "sha512-MTQG6V9qQrt1tsDeF+2Uoo5aPjqbVPys1xvnIftXSJYG2SrwXRHnqEvVoYID7BTruDz4lCd2Z7rM1BdkUehk2g=="],
+
     "@vercel/oidc": ["@vercel/oidc@3.2.0", "", {}, "sha512-UycprH3T6n3jH0k44NHMa7pnFHGu/N05MjojYr+Mc6I7obkoLIJujSWwin1pCvdy/eOxrI/l3uDLQsmcrOb4ug=="],
+
+    "@vercel/speed-insights": ["@vercel/speed-insights@2.0.0", "", { "peerDependencies": { "@sveltejs/kit": "^1 || ^2", "next": ">= 13", "nuxt": ">= 3", "react": "^18 || ^19 || ^19.0.0-rc", "svelte": ">= 4", "vue": "^3", "vue-router": "^4" }, "optionalPeers": ["@sveltejs/kit", "next", "nuxt", "react", "svelte", "vue", "vue-router"] }, "sha512-jwkNcrTeafWxjmWq4AHBaptSqZiJkYU5adLC9QBSqeim0GcqDMgN5Ievh8OG1rJ6W3A4l1oiP7qr9CWxGuzu3w=="],
 
     "@workflow/serde": ["@workflow/serde@4.1.0", "", {}, "sha512-pav4F2BoirECWR7Nf1TKt+2eETcBj7jj4cBefQ8VXQCA6NPkaKeLfj/zMgi+3zYV5ZIBT4GuUiphsj0/b9hPQQ=="],
 
@@ -355,8 +369,6 @@
     "source-map-js": ["source-map-js@1.2.2", "", {}, "sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw=="],
 
     "split2": ["split2@4.2.0", "", {}, "sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg=="],
-
-    "stripe": ["stripe@23.0.0", "", { "peerDependencies": { "@types/node": ">=20" }, "optionalPeers": ["@types/node"] }, "sha512-MDE2A5ZVVluYURORaZEVghSmnLJc3w6aHAlZSxDQMsOjOb3V0O6ro/CiaeFlJS4N7uIVmsg98ocRsPmUK6YfyA=="],
 
     "styled-jsx": ["styled-jsx@5.1.6", "", { "dependencies": { "client-only": "0.0.1" }, "peerDependencies": { "react": ">= 16.8.0 || 17.x.x || ^18.0.0-0 || ^19.0.0-0" } }, "sha512-qSVyDTeMotdvQYoHWLNGwRFJHC+i+ZvdBRYosOFgC+Wg1vx4frN2/RG/NA7SYqqvKNLf39P2LSRA2pu6n0XYZA=="],
 

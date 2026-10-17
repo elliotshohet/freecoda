@@ -1,5 +1,35 @@
 {
-  "name": "freecoda-workspace", "private": true, "type": "module", "workspaces": ["apps/*", "packages/*"],
-  "scripts": {"dev":"bun --cwd apps/web dev", "build":"bun run build:cli && bun --cwd apps/web build", "build:cli":"bun packages/cli/build.ts", "typecheck":"tsc --noEmit && bun --cwd apps/web typecheck", "test":"bun test tests", "db:migrate":"bun scripts/migrate.ts", "cli":"bun packages/cli/src/index.ts", "models:sync":"bun scripts/sync-models.ts", "eval":"bun scripts/evaluate.ts"},
-  "devDependencies":{"@types/node":"latest","@types/react":"latest","@types/react-dom":"latest","@types/bun":"latest","@types/pg":"latest","typescript":"latest"}
+  "name": "freecoda-workspace",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun --cwd apps/web dev",
+    "build": "bun run build:cli && bun --cwd apps/web build",
+    "build:cli": "bun packages/cli/build.ts",
+    "typecheck": "tsc --noEmit && bun --cwd apps/web typecheck",
+    "test": "bun test tests/core.test.ts tests/agent.test.ts tests/contracts.test.ts",
+    "db:migrate": "bun --env-file=apps/web/.env.local scripts/migrate.ts",
+    "cli": "bun packages/cli/src/index.ts",
+    "models:sync": "bun scripts/sync-models.ts",
+    "eval": "bun scripts/evaluate.ts",
+    "test:integration": "bun --env-file=.env.test.local test tests/db.integration.test.ts",
+    "invite": "bun --env-file=apps/web/.env.local scripts/invite.ts",
+    "campaign": "bun --env-file=apps/web/.env.local scripts/campaign.ts"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@types/bun": "latest",
+    "@types/pg": "latest",
+    "typescript": "latest"
+  },
+  "dependencies": {
+    "ai": "7.0.143",
+    "zod": "4.6.7"
+  }
 }

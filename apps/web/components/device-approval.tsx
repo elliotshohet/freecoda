@@ -1,5 +1,81 @@
-'use client';
-import {useEffect,useState} from 'react';
-import Link from 'next/link';
-import {Terminal,Check} from 'lucide-react';
-export function DeviceApproval(){const [code,setCode]=useState('');const [message,setMessage]=useState('');const [done,setDone]=useState(false);const [busy,setBusy]=useState(false);useEffect(()=>{setCode(new URLSearchParams(window.location.search).get('code')||'')},[]);return <div className="panel" style={{maxWidth:480,margin:'30px auto'}}><div className="empty-icon">{done?<Check size={28}/>:<Terminal size={28}/>}</div><h2>{done?'Your terminal is connected.':'Connect your terminal.'}</h2><p>{done?'You can close this page and return to your terminal.':'Only approve a code shown in a terminal you started. Sign in to your workspace first.'}</p>{!done&&<form onSubmit={async e=>{e.preventDefault();setBusy(true);setMessage('');try{const r=await fetch('/api/v1/device/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});const d=await r.json();if(!r.ok)throw new Error(d.error);setDone(true)}catch(e){setMessage(e instanceof Error?e.message:'Could not approve this device.')}finally{setBusy(false)}}}><label className="field">Code from your terminal<input autoComplete="off" required minLength={9} maxLength={9} value={code} onChange={e=>setCode(e.target.value.toUpperCase())} placeholder="ABCD-EFGH"/></label><button disabled={busy} className="button purple">{busy?'Connecting…':'Approve device'}</button><Link className="text-link" href="/dashboard" style={{marginLeft:20}}>Sign in first</Link></form>}{message&&<p role="alert" className="error">{message}</p>}</div>}
+"use client";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { Terminal, Check } from "lucide-react";
+export function DeviceApproval() {
+  const [code, setCode] = useState("");
+  const [message, setMessage] = useState("");
+  const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    setCode(new URLSearchParams(window.location.search).get("code") || "");
+  }, []);
+  return (
+    <div className="panel" style={{ maxWidth: 480, margin: "30px auto" }}>
+      <div className="empty-icon">
+        {done ? <Check size={28} /> : <Terminal size={28} />}
+      </div>
+      <h2>{done ? "Your terminal is connected." : "Connect your terminal."}</h2>
+      <p>
+        {done
+          ? "You can close this page and return to your terminal."
+          : "Only approve a code shown in a terminal you started. Sign in to your workspace first."}
+      </p>
+      {!done && (
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setBusy(true);
+            setMessage("");
+            try {
+              const r = await fetch("/api/v1/device/approve", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code }),
+              });
+              const d = await r.json();
+              if (!r.ok) throw new Error(d.error);
+              setDone(true);
+            } catch (e) {
+              setMessage(
+                e instanceof Error
+                  ? e.message
+                  : "Could not approve this device.",
+              );
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <label className="field">
+            Code from your terminal
+            <input
+              autoComplete="off"
+              required
+              minLength={9}
+              maxLength={9}
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              placeholder="ABCD-EFGH"
+            />
+          </label>
+          <button disabled={busy} className="button purple">
+            {busy ? "Connecting…" : "Approve device"}
+          </button>
+          <Link
+            className="text-link"
+            href="/dashboard"
+            style={{ marginLeft: 20 }}
+          >
+            Sign in first
+          </Link>
+        </form>
+      )}
+      {message && (
+        <p role="alert" className="error">
+          {message}
+        </p>
+      )}
+    </div>
+  );
+}

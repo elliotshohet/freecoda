@@ -1,0 +1,8 @@
+Freecoda
+Copyright 2026 Freecoda contributors
+
+Includes a modified editing helper from Codebuff, Copyright 2025 Codebuff,
+licensed under Apache License 2.0. See vendor/codebuff/NOTICE and LICENSE.
+Upstream: https://github.com/CodebuffAI/freebuff
+Commit: 645290efd76451a9e15a6924817689946ca06cd4
+Changes: local exact-replacement adapter, with ambiguity rejection.

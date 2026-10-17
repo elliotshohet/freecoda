@@ -1,1 +1,17 @@
-{"name":"@freecoda/core","private":true,"type":"module","exports":"./src/index.ts","dependencies":{"ai":"latest","@ai-sdk/openai-compatible":"latest","zod":"latest","ignore":"latest","diff":"latest"},"devDependencies":{"@types/diff":"latest"}}
+{
+  "name": "@freecoda/core",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "ai": "latest",
+    "@ai-sdk/openai-compatible": "latest",
+    "zod": "latest",
+    "ignore": "latest",
+    "diff": "latest",
+    "@ai-sdk/provider": "4.0.29"
+  },
+  "devDependencies": {
+    "@types/diff": "latest"
+  }
+}

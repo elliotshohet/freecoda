@@ -1,3 +1,93 @@
-import {Install} from '@/components/install';
-export const metadata={title:'Documentation'};
-export default function Docs(){return <main className="page-shell docs-layout" id="main"><nav className="docs-nav" aria-label="Documentation"><a href="#installation">Installation</a><a href="#first-project">Your first project</a><a href="#commands">Commands</a><a href="#byok">Bring your own key</a><a href="#permissions">Permissions</a></nav><article className="prose"><span className="section-kicker">A small guide to getting started</span><h1>Make yourself<br/>at home.</h1><p>Freecoda runs in your terminal, alongside the editor and tools you already use. Start with an existing Git repository on macOS, Linux, or Windows through WSL2.</p><h2 id="installation">Installation</h2><div className="notice">This is a local preview release. The npm package is not published yet. Use the source instructions below until the beta release is available.</div><p>The release install command will be:</p><Install compact/><p>From a checkout of this repository, with Node.js 22+ and Bun installed:</p><pre>{'bun install\nbun run build:cli\nnode packages/cli/dist/index.js --help'}</pre><h2 id="first-project">Your first project</h2><p>Build the CLI, then run it inside the project you want to work on. Review the repository trust prompt before continuing.</p><pre>{'freecoda login\ncd ~/your-project\nfreecoda'}</pre><p>For a source build, substitute <code>node /absolute/path/to/freecoda/packages/cli/dist/index.js</code> for <code>freecoda</code>. Hosted sign-in requires a configured Freecoda server and beta invitation.</p><h2 id="commands">A few useful commands</h2><pre>{'/plan add a settings page\n/review\n/usage\n/new\n/exit'}</pre><p>Use <code>freecoda --resume</code> to reopen your latest local conversation. Use <code>freecoda history clear</code> to delete saved conversations for the current repository. Ctrl+C cancels the current request.</p><h2 id="byok">Bring your own key</h2><p>Your CLI can connect directly to an OpenAI-compatible provider. Supply the provider’s HTTPS API base URL and exact model ID, and enter the key through the hidden prompt. You can also provide it through <code>FREECODA_PROVIDER_KEY</code>.</p><pre>{'freecoda provider configure\nfreecoda'}</pre><p>Keys are saved locally with owner-only permissions when you choose to save them. Freecoda receives neither the key nor the model requests in this mode. Your provider’s pricing and data policies apply. Plain HTTP is supported only for loopback addresses, for local model servers.</p><h2 id="permissions">You stay in the loop</h2><p>Freecoda asks before writing files or running shell commands. You may approve the current action or allow that action category for the session. Shell commands run as your user and can affect your machine; inspect them carefully.</p><p>Repository tools reject paths outside the workspace and respect ignored files. Shell approvals are a separate boundary: approved commands are not an operating-system sandbox. Your conversations stay locally; approved context is sent to the selected AI provider.</p></article></main>}
+import { Install } from "@/components/install";
+export const metadata = { title: "Documentation" };
+export default function Docs() {
+  return (
+    <main className="page-shell docs-layout" id="main">
+      <nav className="docs-nav" aria-label="Documentation">
+        <a href="#installation">Installation</a>
+        <a href="#first-project">Your first project</a>
+        <a href="#commands">Commands</a>
+        <a href="#byok">Bring your own key</a>
+        <a href="#permissions">Permissions</a>
+      </nav>
+      <article className="prose">
+        <span className="section-kicker">A small guide to getting started</span>
+        <h1>
+          Make yourself
+          <br />
+          at home.
+        </h1>
+        <p>
+          Freecoda runs in your terminal, alongside the editor and tools you
+          already use. Start with an existing Git repository on macOS, Linux, or
+          Windows through WSL2.
+        </p>
+        <h2 id="installation">Installation</h2>
+        <div className="notice">
+          This is a beta preview release. The npm package is not published yet.
+          Use the source instructions below until the beta release is available.
+        </div>
+        <p>The release install command will be:</p>
+        <Install compact />
+        <p>
+          From a checkout of this repository, with Node.js 22+ and Bun
+          installed:
+        </p>
+        <pre>
+          {
+            "bun install\nbun run build:cli\nnode packages/cli/dist/index.js --help"
+          }
+        </pre>
+        <h2 id="first-project">Your first project</h2>
+        <p>
+          Build the CLI, then run it inside the project you want to work on.
+          Review the repository trust prompt before continuing.
+        </p>
+        <pre>{"freecoda login\ncd ~/your-project\nfreecoda"}</pre>
+        <p>
+          For a source build, substitute{" "}
+          <code>
+            node /absolute/path/to/freecoda/packages/cli/dist/index.js
+          </code>{" "}
+          for <code>freecoda</code>. Hosted sign-in requires a configured
+          Freecoda server and beta invitation.
+        </p>
+        <h2 id="commands">A few useful commands</h2>
+        <pre>{"/plan add a settings page\n/review\n/usage\n/new\n/exit"}</pre>
+        <p>
+          Use <code>freecoda --resume</code> to reopen your latest local
+          conversation. Use <code>freecoda history clear</code> to delete saved
+          conversations for the current repository. Ctrl+C cancels the current
+          request.
+        </p>
+        <h2 id="byok">Bring your own key</h2>
+        <p>
+          Your CLI can connect directly to an OpenAI-compatible provider. Supply
+          the provider’s HTTPS API base URL and exact model ID, and enter the
+          key through the hidden prompt. You can also provide it through{" "}
+          <code>FREECODA_PROVIDER_KEY</code>.
+        </p>
+        <pre>{"freecoda provider configure\nfreecoda"}</pre>
+        <p>
+          Keys are saved locally with owner-only permissions when you choose to
+          save them. Freecoda receives neither the key nor the model requests in
+          this mode. Your provider’s pricing and data policies apply. Plain HTTP
+          is supported only for loopback addresses, for local model servers.
+        </p>
+        <h2 id="permissions">You stay in the loop</h2>
+        <p>
+          Freecoda asks before writing files or running shell commands. You may
+          approve the current action or allow that action category for the
+          session. Shell commands run as your user and can affect your machine;
+          inspect them carefully.
+        </p>
+        <p>
+          Repository tools reject paths outside the workspace and respect
+          ignored files. Shell approvals are a separate boundary: approved
+          commands are not an operating-system sandbox. Your conversations stay
+          locally; approved context is sent to the selected AI provider.
+        </p>
+      </article>
+    </main>
+  );
+}

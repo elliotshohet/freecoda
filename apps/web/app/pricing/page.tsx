@@ -1,4 +1,87 @@
-import Link from 'next/link';
-import {SponsorCard} from '@/components/sponsor-card';
-export const metadata={title:'Free access & sponsors'};
-export default function Pricing(){return <main className="page-shell" id="main"><div className="page-intro"><span className="section-kicker">You build. Sponsors help cover the compute.</span><h1>Free AI coding.<br/>Clearly labeled ads.</h1><p>No subscription. No credit packs. No payment card required.</p></div><div className="pricing-grid"><article className="price-card featured"><h2>Free beta</h2><div className="price">$0 <span>for users</span></div><p>An invite-only allowance of $0.10 in AI provider usage per UTC day, subject to the shared beta budget.</p><ul><li>Resets at midnight UTC; no rollover</li><li>Requests stop when your allowance runs out</li><li>No automatic charges or paid upgrades</li><li>Clearly labeled sponsor placements</li></ul><Link className="button purple" href="/dashboard">Join the beta →</Link></article><article className="price-card" id="sponsors"><h2>Advertisers fund access</h2><p>Sponsors pay for clearly identified placements. That revenue is intended to cover AI costs and operating expenses.</p><p>This preview has no paid campaigns yet. Free access is covered by a fixed beta budget, and house ads demonstrate where sponsors will appear.</p><p>Advertiser campaign purchasing and billing are not available yet.</p></article><SponsorCard/></div><div className="faq"><h2>A clear deal.</h2><details><summary>Is it unlimited?</summary><p>No. Usage stops at the daily allowance or when the shared budget is exhausted. Watching or clicking an ad does not unlock unlimited usage.</p></details><details><summary>Do advertisers see my code?</summary><p>No source code or conversation content is shared with advertisers. Sponsor cards are separate from agent instructions and answers. No ad tracking is active in this preview.</p></details><details><summary>Can I bring my own key?</summary><p>Yes, as an optional direct-provider mode. Your provider bills you directly; this is separate from Freecoda’s free hosted allowance.</p><Link href="/docs#byok">Read the setup guide →</Link></details></div></main>}
+import Link from "next/link";
+import { Check, ArrowUpRight } from "lucide-react";
+export const metadata = { title: "Free forever" };
+export default function Pricing() {
+  return (
+    <main className="page-shell" id="main">
+      <div className="page-intro">
+        <span className="section-kicker">One plan. More possibility.</span>
+        <h1>
+          Free to start.
+          <br />
+          Free to keep going.
+        </h1>
+        <p>
+          Freecoda is supported by direct sponsors. No subscriptions, credit
+          packs, or card required. Just a little space for the people who help
+          keep it free.
+        </p>
+      </div>
+      <article className="free-plan">
+        <div>
+          <span className="status-badge">The only plan</span>
+          <h2>Freecoda. Free forever.</h2>
+          <div className="free-price">
+            $0<span>/ forever</span>
+          </div>
+          <p>Your next idea shouldn’t need a subscription.</p>
+          <Link className="button purple" href="/docs">
+            Get started <ArrowUpRight size={16} />
+          </Link>
+        </div>
+        <ul>
+          {[
+            "Local coding agent and repository tools",
+            "Plan, build, fix, and review",
+            "Clear approval before changes and commands",
+            "A daily hosted AI allowance during beta",
+            "No ads inside your code or model answers",
+            "No prompt or source-code ad targeting",
+          ].map((f) => (
+            <li key={f}>
+              <Check size={15} />
+              {f}
+            </li>
+          ))}
+        </ul>
+      </article>
+      <div className="faq">
+        <h2>A fair way to keep it free.</h2>
+        <details open>
+          <summary>How do sponsors support Freecoda?</summary>
+          <p>
+            Direct sponsors buy clearly labeled placements on the website and
+            between agent turns in the terminal. Ads are separate from model
+            answers and generated code. We don’t sell your code or
+            conversations, or use them to target ads.
+          </p>
+        </details>
+        <details>
+          <summary>Does free mean unlimited?</summary>
+          <p>
+            No. Hosted AI has fair-use and capacity limits. The invite-only beta
+            has a daily allowance and a shared monthly budget. Your workspace
+            shows the remaining allowance and reset time. If capacity runs out,
+            you can return after the reset; there is no paid upgrade.
+          </p>
+        </details>
+        <details>
+          <summary>What happens when there isn’t a sponsor?</summary>
+          <p>
+            We show a Freecoda announcement, not an invented advertiser. Hosted
+            access stays within the beta’s funded budget, and we expand capacity
+            as sponsorship grows.
+          </p>
+        </details>
+        <details>
+          <summary>Can I sponsor Freecoda?</summary>
+          <p>
+            Yes. <Link href="/advertise">Tell us about your business</Link> to
+            ask about direct placements. Every campaign is reviewed before it
+            goes live.
+          </p>
+        </details>
+      </div>
+    </main>
+  );
+}

@@ -1,0 +1,19 @@
+name: freecoda
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: freecoda
+      POSTGRES_USER: freecoda
+      POSTGRES_PASSWORD: ${FREECODA_DB_PASSWORD:?Set FREECODA_DB_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5439:5432"
+    volumes:
+      - freecoda_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U freecoda -d freecoda"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+volumes:
+  freecoda_postgres:

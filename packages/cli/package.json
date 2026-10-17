@@ -1,1 +1,32 @@
-{"name":"@freecoda/cli","version":"0.1.0","description":"A local coding agent with clear limits and private-by-default workflows","type":"module","license":"Apache-2.0","bin":{"freecoda":"bin/freecoda.js"},"files":["bin","dist","README.md","LICENSE","NOTICE"],"scripts":{"build":"bun build.ts"},"dependencies":{"@freecoda/core":"workspace:*","@freecoda/contracts":"workspace:*","commander":"latest","picocolors":"latest","open":"latest"},"engines":{"node":">=22"}}
+{
+  "name": "@freecoda/cli",
+  "version": "0.1.0",
+  "description": "A local coding agent with clear limits and private-by-default workflows",
+  "type": "module",
+  "license": "Apache-2.0",
+  "bin": {
+    "freecoda": "bin/freecoda.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "bun build.ts"
+  },
+  "dependencies": {
+    "@freecoda/core": "workspace:*",
+    "@freecoda/contracts": "workspace:*",
+    "commander": "latest",
+    "picocolors": "latest",
+    "open": "latest",
+    "ai": "7.0.143",
+    "zod": "4.6.7"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
