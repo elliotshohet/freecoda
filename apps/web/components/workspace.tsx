@@ -149,7 +149,7 @@ export function Workspace() {
                 <p>
                   Sign in to see your daily allowance and connect your CLI.
                   Freecoda has one free plan, supported by direct sponsors.
-                  Hosted access is invite-only during beta.
+                  No API key required. Hosted access is invite-only during beta.
                 </p>
                 <button
                   className="button dark"

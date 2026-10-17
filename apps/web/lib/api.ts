@@ -85,7 +85,7 @@ export async function route(req: Request) {
         services: [
           { label: "Account sign-in", ready: c.auth },
           { label: "Usage database", ready: c.database },
-          { label: "Hosted AI", ready: c.gateway && c.hostedEnabled },
+          { label: "Hosted AI", ready: c.inference && c.hostedEnabled },
           { label: "Sponsor placements", ready: c.ads },
         ],
         ...(user

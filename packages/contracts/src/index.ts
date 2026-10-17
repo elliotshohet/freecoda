@@ -29,6 +29,7 @@ export const inferenceSchema = z
 export type ModelConfig = {
   id: string;
   provider: string;
+  byok?: boolean;
   inputMicrosPerToken: number;
   outputMicrosPerToken: number;
   maxContextTokens: number;

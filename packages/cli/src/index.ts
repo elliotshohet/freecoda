@@ -181,7 +181,7 @@ program
       model = hostedModel(config.server, chosen.id, config.token);
       console.log(
         c.dim(
-          `Hosted model: ${chosen.id} via ${chosen.provider}. Prompt training disallowed.`,
+          `Hosted model: ${chosen.id} via Vercel AI Gateway → ${chosen.provider}${chosen.byok ? " (BYOK)" : ""}. Prompt training disallowed.`,
         ),
       );
     }

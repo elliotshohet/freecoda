@@ -7,6 +7,21 @@ import {
   sponsorInquirySchema,
 } from "../packages/contracts/src";
 import { safeModelOptions, maxRequestCost } from "../apps/web/lib/inference";
+import {
+  hostedProviderModel,
+  generationAccounting,
+  GATEWAY_OPENAI_MODEL,
+  sanitizeProviderResult,
+} from "../apps/web/lib/hosted-provider";
+const byokModel = {
+  id: "openai/gpt-5-mini",
+  provider: "openai",
+  byok: true,
+  inputMicrosPerToken: 0.25,
+  outputMicrosPerToken: 2,
+  maxContextTokens: 400000,
+  approved: true,
+};
 const model = {
   id: "test/model",
   provider: "test",
@@ -144,4 +159,166 @@ test("nested tool result files cannot bypass the text-only gateway boundary", ()
       model,
     ),
   ).not.toThrow();
+});
+
+const fixtureUsage = {
+  inputTokens: {
+    total: 100,
+    noCache: 20,
+    cacheRead: 80,
+    cacheWrite: undefined,
+  },
+  outputTokens: { total: 50, text: 10, reasoning: 40 },
+};
+test("Gateway BYOK includes separately billed cached input and reasoning despite zero Gateway charge", () => {
+  const result = {
+    usage: fixtureUsage,
+    providerMetadata: { gateway: { cost: 0, generationId: "gateway_fixture" } },
+  };
+  expect(generationAccounting(result, byokModel)).toEqual({
+    cost: 125,
+    generationId: "gateway_fixture",
+  });
+  expect(
+    generationAccounting(
+      {
+        ...result,
+        providerMetadata: {
+          gateway: { cost: "0.000200", generationId: "gateway_fixture" },
+        },
+      },
+      byokModel,
+    ).cost,
+  ).toBe(200);
+  expect(
+    generationAccounting(
+      {
+        ...result,
+        usage: {
+          ...fixtureUsage,
+          inputTokens: { ...fixtureUsage.inputTokens, total: undefined },
+        },
+      },
+      byokModel,
+    ).cost,
+  ).toBeUndefined();
+  expect(
+    generationAccounting(
+      {
+        ...result,
+        usage: {
+          ...fixtureUsage,
+          outputTokens: { ...fixtureUsage.outputTokens, total: NaN },
+        },
+      },
+      byokModel,
+    ).cost,
+  ).toBeUndefined();
+  expect(
+    generationAccounting(
+      {
+        ...result,
+        usage: {
+          ...fixtureUsage,
+          outputTokens: { ...fixtureUsage.outputTokens, reasoning: 51 },
+        },
+      },
+      byokModel,
+    ).cost,
+  ).toBeUndefined();
+  expect(
+    generationAccounting({ ...result, providerMetadata: undefined }, byokModel)
+      .cost,
+  ).toBeUndefined();
+  expect(generationAccounting(result, model).cost).toBe(0);
+});
+test("hosted SDK routes through Gateway with server-owned BYOK and never exposes request credentials", async () => {
+  const previous = process.env.OPENAI_API_KEY,
+    previousGateway = process.env.AI_GATEWAY_API_KEY;
+  const fixtureKey = "test-fixture-provider-key-not-real";
+  process.env.OPENAI_API_KEY = fixtureKey;
+  process.env.AI_GATEWAY_API_KEY = "test-fixture-gateway-key-not-real";
+  try {
+    let requestUrl = "",
+      body: Record<string, any> = {},
+      headers: Headers | undefined;
+    const fakeFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      requestUrl = String(input);
+      body = JSON.parse(String(init?.body));
+      headers = new Headers(init?.headers);
+      return Response.json({
+        content: [{ type: "text", text: "Ready" }],
+        finishReason: { unified: "stop", raw: "stop" },
+        usage: fixtureUsage,
+        providerMetadata: {
+          gateway: { cost: 0, generationId: "gateway_fixture" },
+        },
+        warnings: [],
+      });
+    }) as typeof fetch;
+    const options = safeModelOptions(
+      {
+        prompt: [{ role: "user", content: [{ type: "text", text: "Hello" }] }],
+        maxOutputTokens: 100,
+        providerOptions: {
+          openai: { store: true, reasoningEffort: "high" },
+          gateway: {
+            only: ["wrong"],
+            byok: { openai: [{ apiKey: "attacker-key" }] },
+            zeroDataRetention: true,
+          },
+        },
+      },
+      byokModel,
+    );
+    const result = await hostedProviderModel(byokModel, fakeFetch).doGenerate(
+      options,
+    );
+    expect(requestUrl).toBe(
+      "https://ai-gateway.vercel.sh/v4/ai/language-model",
+    );
+    expect(headers?.get("ai-language-model-id")).toBe(GATEWAY_OPENAI_MODEL);
+    expect(headers?.get("Authorization")).toBe(
+      "Bearer test-fixture-gateway-key-not-real",
+    );
+    expect(body.providerOptions.gateway.only).toEqual(["openai"]);
+    expect(body.providerOptions.gateway.disallowPromptTraining).toBe(true);
+    expect(body.providerOptions.gateway.byok).toEqual({
+      openai: [{ apiKey: fixtureKey }],
+    });
+    expect(body.providerOptions.gateway.zeroDataRetention).toBeUndefined();
+    expect(body.providerOptions.openai).toMatchObject({
+      store: false,
+      reasoningEffort: "minimal",
+      serviceTier: "default",
+    });
+    expect(generationAccounting(result, byokModel)).toEqual({
+      cost: 125,
+      generationId: "gateway_fixture",
+    });
+    const publicResult = sanitizeProviderResult({
+      ...result,
+      providerMetadata: {
+        gateway: { byok: { openai: [{ apiKey: fixtureKey }] } },
+        echo: fixtureKey,
+      },
+      content: [{ type: "text", text: `Echoed ${fixtureKey}` }],
+      response: {
+        headers: { Authorization: fixtureKey },
+        body: { apiKey: fixtureKey },
+      },
+    });
+    expect(JSON.stringify(publicResult)).not.toContain(fixtureKey);
+    expect(publicResult).not.toHaveProperty("request");
+    expect(() =>
+      hostedProviderModel({ ...byokModel, inputMicrosPerToken: 0 }),
+    ).toThrow("configuration");
+    delete process.env.OPENAI_API_KEY;
+    expect(() => hostedProviderModel(byokModel)).toThrow("credentials");
+  } finally {
+    if (previous === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = previous;
+    if (previousGateway === undefined) delete process.env.AI_GATEWAY_API_KEY;
+    else process.env.AI_GATEWAY_API_KEY = previousGateway;
+  }
 });

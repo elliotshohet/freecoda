@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { runAgent, directModel } from "../packages/core/src";
@@ -159,6 +159,84 @@ test("plan mode exposes only read tools to the provider", async () => {
       },
     });
     expect(names.sort()).toEqual(["list_files", "read_file", "search"]);
+  } finally {
+    await server.stop(true);
+    await rm(root, { recursive: true, force: true });
+  }
+}, 10000);
+
+test("denied writes cannot repeatedly prompt or bypass through another write tool", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "freecoda-denial-"));
+  const original = "export const answer = 1;";
+  await writeFile(path.join(root, "answer.ts"), original);
+  const calls = [
+    { name: "read_file", args: { path: "answer.ts" } },
+    {
+      name: "replace_text",
+      args: { path: "answer.ts", search: "= 1", replacement: "= 2" },
+    },
+    {
+      name: "replace_text",
+      args: { path: "answer.ts", search: "= 1", replacement: "= 3" },
+    },
+    {
+      name: "write_file",
+      args: { path: "alternate.ts", content: "export const answer = 4;" },
+    },
+  ];
+  let turn = 0,
+    approvals = 0;
+  const server = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    async fetch() {
+      const call = calls[turn++];
+      const delta = call
+        ? {
+            role: "assistant",
+            tool_calls: [
+              {
+                index: 0,
+                id: `denied-${turn}`,
+                type: "function",
+                function: {
+                  name: call.name,
+                  arguments: JSON.stringify(call.args),
+                },
+              },
+            ],
+          }
+        : { role: "assistant", content: "The changes were declined." };
+      return new Response(
+        "data: " +
+          JSON.stringify({
+            id: "denial-fixture",
+            model: "fixture",
+            object: "chat.completion.chunk",
+            choices: [
+              { index: 0, delta, finish_reason: call ? "tool_calls" : "stop" },
+            ],
+          }) +
+          "\n\ndata: [DONE]\n\n",
+        { headers: { "Content-Type": "text/event-stream" } },
+      );
+    },
+  });
+  try {
+    await runAgent({
+      root,
+      model: directModel(`http://127.0.0.1:${server.port}/v1`, "fixture", ""),
+      messages: [{ role: "user", content: "Change the answer." }],
+      approve: async (kind) => {
+        expect(kind).toBe("write");
+        approvals++;
+        return false;
+      },
+    });
+    expect(approvals).toBe(1);
+    expect(turn).toBe(5);
+    expect(await readFile(path.join(root, "answer.ts"), "utf8")).toBe(original);
+    await expect(stat(path.join(root, "alternate.ts"))).rejects.toThrow();
   } finally {
     await server.stop(true);
     await rm(root, { recursive: true, force: true });

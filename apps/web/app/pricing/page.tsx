@@ -35,6 +35,7 @@ export default function Pricing() {
             "Plan, build, fix, and review",
             "Clear approval before changes and commands",
             "A daily hosted AI allowance during beta",
+            "No API key required for hosted access",
             "No ads inside your code or model answers",
             "No prompt or source-code ad targeting",
           ].map((f) => (

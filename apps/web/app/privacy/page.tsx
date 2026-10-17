@@ -27,17 +27,18 @@ export default function Privacy() {
         <p>
           AI inference requires sending your prompt and the relevant source
           excerpts, repository instructions, and tool output to a model
-          provider. Hosted requests pass through Freecoda and Vercel AI Gateway.
-          This is not an offline product. Review your repository trust and tool
-          approval prompts before sharing context.
+          provider. Hosted requests pass through Freecoda and Vercel AI Gateway
+          to OpenAI using our provider credentials. This is not an offline
+          product. Review your repository trust and tool approval prompts before
+          sharing context.
         </p>
         <h2>No training on hosted prompts</h2>
         <p>
-          Hosted requests require gateway routes that disallow prompt training.
-          Requests fail when no compliant provider is available. This
-          restriction is different from zero data retention: infrastructure and
-          providers may retain operational or abuse-prevention data according to
-          their policies.
+          OpenAI API requests use response storage disabled. OpenAI does not
+          train on API inputs or outputs by default; operational and
+          abuse-monitoring retention may still apply. Gateway routes must
+          disallow prompt training. This is different from zero data retention.
+          Review the provider’s data controls before sharing sensitive material.
         </p>
         <h2>Ads and sponsorship</h2>
         <p>
@@ -82,10 +83,10 @@ export default function Privacy() {
         </p>
         <h2>Preview status</h2>
         <p>
-          The hosted service remains closed until provider routing and
-          infrastructure logging are verified. The model and provider shown in
-          the CLI are the ones configured for your session. Privacy changes will
-          be reflected here before new data uses begin.
+          Hosted access is limited to invited beta accounts and available daily
+          capacity. The model and provider shown in the CLI are the ones
+          configured for your session. Privacy changes will be reflected here
+          before new data uses begin.
         </p>
       </article>
     </main>

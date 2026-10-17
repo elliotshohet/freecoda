@@ -1,6 +1,6 @@
 import { getVercelOidcTokenSync } from "@vercel/oidc";
 
-function gatewayConfigured() {
+export function gatewayConfigured() {
   if (process.env.AI_GATEWAY_API_KEY) return true;
   try {
     return Boolean(getVercelOidcTokenSync());
@@ -18,6 +18,7 @@ export const publicConfig = () => ({
     process.env.BETTER_AUTH_SECRET
   ),
   gateway: gatewayConfigured(),
+  inference: gatewayConfigured(),
   hostedEnabled: process.env.HOSTED_INFERENCE_ENABLED === "true",
   ads: !!process.env.DATABASE_URL,
 });

@@ -1,4 +1,9 @@
-import { gateway } from "ai";
+import {
+  hostedProviderModel,
+  generationAccounting,
+  gatewayProviderOptions,
+  sanitizeProviderResult,
+} from "./hosted-provider";
 import type {
   LanguageModelV4CallOptions,
   LanguageModelV4GenerateResult,
@@ -96,14 +101,7 @@ export function safeModelOptions(
   return {
     ...cleaned,
     maxOutputTokens: Number(cleaned.maxOutputTokens || 4096),
-    providerOptions: {
-      gateway: {
-        only: [config.provider],
-        disallowPromptTraining: true,
-        user: "freecoda",
-        tags: ["freecoda", "sponsor-supported"],
-      },
-    },
+    providerOptions: gatewayProviderOptions(config),
   } as unknown as LanguageModelV4CallOptions;
 }
 export function maxRequestCost(
@@ -125,26 +123,8 @@ export function maxRequestCost(
     ),
   );
 }
-function generationMetadata(part: {
-  providerMetadata?: Record<string, unknown>;
-}) {
-  const metadata = part.providerMetadata?.gateway as
-    Record<string, unknown> | undefined;
-  const raw = metadata?.cost;
-  const cost =
-    typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
-  const generationId =
-    typeof metadata?.generationId === "string"
-      ? metadata.generationId
-      : undefined;
-  return {
-    cost:
-      Number.isFinite(cost) && cost >= 0 ? Math.ceil(cost * 1e6) : undefined,
-    generationId,
-  };
-}
 export async function inference(req: Request) {
-  if (!publicConfig().hostedEnabled || !publicConfig().gateway)
+  if (!publicConfig().hostedEnabled || !publicConfig().inference)
     throw new ApiError(
       503,
       "Hosted AI is closed until funding, model evaluation, and privacy checks pass.",
@@ -168,8 +148,8 @@ export async function inference(req: Request) {
   const options = safeModelOptions(body.options, config);
   const bytes = Buffer.byteLength(JSON.stringify(options));
   const maximum = maxRequestCost(config, bytes, options.maxOutputTokens!);
+  const model = hostedProviderModel(config);
   const reservation = await reserve(user.id, config.id, maximum);
-  const model = gateway(config.id);
   const timeout = AbortSignal.timeout(105000);
   options.abortSignal = timeout;
   let generationId: string | undefined;
@@ -178,7 +158,7 @@ export async function inference(req: Request) {
       | LanguageModelV4GenerateResult
       | Extract<LanguageModelV4StreamPart, { type: "finish" }>,
   ) {
-    const meta = generationMetadata(result);
+    const meta = generationAccounting(result, config!);
     generationId = meta.generationId || generationId;
     if (meta.cost === undefined) {
       await uncertain(reservation, generationId);
@@ -195,16 +175,18 @@ export async function inference(req: Request) {
       const result = await model.doGenerate(options);
       await record(result);
       const { request: ignoredRequest, response, ...safe } = result;
-      return json({
-        ...safe,
-        response: response
-          ? {
-              id: response.id,
-              modelId: response.modelId,
-              timestamp: response.timestamp,
-            }
-          : undefined,
-      });
+      return json(
+        sanitizeProviderResult({
+          ...safe,
+          response: response
+            ? {
+                id: response.id,
+                modelId: response.modelId,
+                timestamp: response.timestamp,
+              }
+            : undefined,
+        }),
+      );
     }
     const result = await model.doStream(options);
     let cancelled = false;
@@ -227,7 +209,11 @@ export async function inference(req: Request) {
               throw new Error("Model provider returned an error.");
             if (value.type === "raw") continue;
             if (!cancelled)
-              controller.enqueue(encoder.encode(JSON.stringify(value) + "\n"));
+              controller.enqueue(
+                encoder.encode(
+                  JSON.stringify(sanitizeProviderResult(value)) + "\n",
+                ),
+              );
           }
           if (!finished)
             throw new Error("Provider stream ended without usage.");

@@ -91,8 +91,9 @@ export default function Home() {
             </div>
             <h3>Make yourself at home.</h3>
             <p>
-              Install Freecoda, open a project, and sign in. Or bring your own
-              API key and skip the account.
+              Install Freecoda, open a project, and sign in for your free
+              sponsored allowance. No API key required; beta access and usage
+              limits apply.
             </p>
             <code>cd your-project && freecoda</code>
           </article>

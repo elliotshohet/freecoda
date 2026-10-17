@@ -7,7 +7,7 @@ export default function Docs() {
         <a href="#installation">Installation</a>
         <a href="#first-project">Your first project</a>
         <a href="#commands">Commands</a>
-        <a href="#byok">Bring your own key</a>
+        <a href="#byok">Advanced settings</a>
         <a href="#permissions">Permissions</a>
       </nav>
       <article className="prose">
@@ -50,7 +50,8 @@ export default function Docs() {
             node /absolute/path/to/freecoda/packages/cli/dist/index.js
           </code>{" "}
           for <code>freecoda</code>. Hosted sign-in requires a configured
-          Freecoda server and beta invitation.
+          Freecoda server and beta invitation. The default hosted mode uses your
+          free sponsored allowance; no API key is required.
         </p>
         <h2 id="commands">A few useful commands</h2>
         <pre>{"/plan add a settings page\n/review\n/usage\n/new\n/exit"}</pre>
@@ -60,7 +61,14 @@ export default function Docs() {
           conversations for the current repository. Ctrl+C cancels the current
           request.
         </p>
-        <h2 id="byok">Bring your own key</h2>
+        <details id="byok">
+          <summary>Advanced settings: optional API key</summary>
+          <p>
+            You do not need an API key for the free sponsored plan. Configure a
+            direct provider only if you want to use your own model and account.
+            Your provider bills you directly; this does not add sponsored credits
+            or increase your Freecoda allowance.
+          </p>
         <p>
           Your CLI can connect directly to an OpenAI-compatible provider. Supply
           the provider’s HTTPS API base URL and exact model ID, and enter the
@@ -74,6 +82,11 @@ export default function Docs() {
           this mode. Your provider’s pricing and data policies apply. Plain HTTP
           is supported only for loopback addresses, for local model servers.
         </p>
+        <p>
+          To return to your free hosted allowance, run <code>freecoda hosted</code>
+          and sign in with <code>freecoda login</code> if needed.
+        </p>
+        </details>
         <h2 id="permissions">You stay in the loop</h2>
         <p>
           Freecoda asks before writing files or running shell commands. You may
