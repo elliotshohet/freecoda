@@ -1,0 +1,26 @@
+{
+  "@ai-sdk/provider-utils@5.0.62": {
+    "license": "Apache-2.0",
+    "sourceUrls": [
+      "https://raw.githubusercontent.com/vercel/ai/%40ai-sdk%2Fprovider-utils%405.0.62/LICENSE"
+    ],
+    "note": "Exact upstream LICENSE from the tag matching this package version.",
+    "text": "Copyright 2023 Vercel, Inc.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    http://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License."
+  },
+  "lazy-val@1.0.5": {
+    "license": "MIT",
+    "sourceUrls": [
+      "https://raw.githubusercontent.com/develar/lazy-val/b69ad4119f1b19bdab13c61ee2fcc88d46b89071/package.json",
+      "https://raw.githubusercontent.com/spdx/license-list-data/v3.27.0/text/MIT.txt"
+    ],
+    "note": "Upstream publishes license: MIT and author metadata but no LICENSE or copyright notice at the published version's gitHead. Metadata below is reproduced from that version. The following SPDX MIT text is a canonical license-identifier reference, not an upstream copyright notice; its placeholders are not claims about this package.",
+    "upstreamMetadata": {
+      "name": "lazy-val",
+      "version": "1.0.5",
+      "author": "Vladimir Krivosheev",
+      "license": "MIT",
+      "repository": "develar/lazy-val"
+    },
+    "text": "MIT License\n\nCopyright (c) <year> <copyright holders>\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and\nassociated documentation files (the \"Software\"), to deal in the Software without restriction, including\nwithout limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the\nfollowing conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial\nportions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT\nLIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO\nEVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER\nIN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE\nUSE OR OTHER DEALINGS IN THE SOFTWARE.\n"
+  }
+}

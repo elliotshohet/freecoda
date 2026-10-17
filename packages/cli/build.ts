@@ -1,5 +1,6 @@
 import { mkdir, writeFile, copyFile, chmod } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { writeBundledNotices } from "../../scripts/bundled-notices";
 const root = new URL("./", import.meta.url);
 await mkdir(new URL("dist/", root), { recursive: true });
 const build = await Bun.build({
@@ -14,6 +15,10 @@ if (!build.success) {
   console.error(build.logs);
   process.exit(1);
 }
+await writeBundledNotices({
+  sourceMaps: [fileURLToPath(new URL("dist/index.js.map", root))],
+  outputPath: fileURLToPath(new URL("dist/THIRD_PARTY_NOTICES.txt", root)),
+});
 await mkdir(new URL("bin/", root), { recursive: true });
 await writeFile(
   new URL("bin/freecoda.js", root),

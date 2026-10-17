@@ -7,7 +7,7 @@ A local coding agent with a full-screen terminal workspace, streamed replies, re
 Install the Freecoda CLI with Node.js 22 or newer:
 
 ```sh
-npm install --global freecoda@0.1.1
+npm install --global freecoda@0.1.2
 freecoda --help
 freecoda login
 cd /path/to/project

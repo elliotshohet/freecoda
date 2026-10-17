@@ -12,6 +12,9 @@ on:
       - "bun.lock"
       - ".github/workflows/desktop.yml"
       - "tests/desktop-*.test.ts"
+      - "tests/bundled-notices.test.ts"
+      - "scripts/bundled-notices.ts"
+      - "legal/**"
   pull_request:
     paths:
       - "apps/desktop/**"
@@ -22,6 +25,9 @@ on:
       - "bun.lock"
       - ".github/workflows/desktop.yml"
       - "tests/desktop-*.test.ts"
+      - "tests/bundled-notices.test.ts"
+      - "scripts/bundled-notices.ts"
+      - "legal/**"
 permissions:
   contents: read
 concurrency:
