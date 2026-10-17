@@ -122,7 +122,26 @@ async function launch(executable) {
 async function normalClose() {
   if (platform() === 'win32') {
     // Exercise the actual native close confirmation. No IPC/test hooks.
-    const script = `$w=New-Object -ComObject WScript.Shell; if(-not $w.AppActivate(${child.pid})){throw 'Cannot focus Freecoda'}; Start-Sleep -Milliseconds 400; $w.SendKeys('%{F4}'); Start-Sleep -Seconds 1; $w.SendKeys('{RIGHT}{ENTER}');`;
+    const script = `
+      Add-Type -AssemblyName UIAutomationClient; Add-Type -AssemblyName UIAutomationTypes;
+      $w=New-Object -ComObject WScript.Shell;
+      if(-not $w.AppActivate(${child.pid})){throw 'Cannot focus Freecoda'};
+      Start-Sleep -Milliseconds 400; $w.SendKeys('%{F4}');
+      $condition=[System.Windows.Automation.AndCondition]::new(
+        [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ProcessIdProperty,${child.pid}),
+        [System.Windows.Automation.AndCondition]::new(
+          [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,'Close workspace'),
+          [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Button)
+        )
+      );
+      $deadline=(Get-Date).AddSeconds(10); $button=$null;
+      while((Get-Date) -lt $deadline -and $null -eq $button){
+        $button=[System.Windows.Automation.AutomationElement]::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Descendants,$condition);
+        if($null -eq $button){Start-Sleep -Milliseconds 200}
+      };
+      if($null -eq $button){throw 'Native Close workspace confirmation was not found'};
+      $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke();
+    `;
     await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script]);
   } else {
     const { stdout } = await run('xdotool', ['search', '--onlyvisible', '--name', '^Freecoda$']);
@@ -132,7 +151,12 @@ async function normalClose() {
     const { stdout: dialog } = await run('xdotool', ['search', '--onlyvisible', '--name', 'Close Freecoda']);
     await run('xdotool', ['windowactivate', '--sync', dialog.trim().split(/\s+/)[0], 'key', 'Right', 'Return']);
   }
-  await waitFor('normal application exit', () => child.exitCode === 0, 30_000);
+  await waitFor('normal application exit', () => {
+    assert(!child.signalCode, `Application was terminated by ${child.signalCode}.`);
+    if (child.exitCode === null) return false;
+    assert.equal(child.exitCode, 0, 'Application quit with an error.');
+    return true;
+  }, 30_000);
   ws?.close(); record('Normal close completed with exit code zero.');
 }
 try {
