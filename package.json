@@ -11,7 +11,7 @@
     "build": "bun run build:cli && bun run desktop:build && bun --cwd apps/web build",
     "build:cli": "bun packages/cli/build.ts",
     "typecheck": "tsc --noEmit && bun --cwd apps/web typecheck && bun run desktop:typecheck",
-    "test": "bun test tests/core.test.ts tests/agent.test.ts tests/contracts.test.ts tests/cloud.test.ts tests/cloud-sandbox.test.ts tests/cloud-diff.test.ts tests/desktop-security.test.ts tests/cli-terminal.test.ts tests/desktop-local-agent.test.ts tests/shell-platform.test.ts tests/cli-update.test.ts tests/desktop-updater.test.ts",
+    "test": "bun test tests/core.test.ts tests/agent.test.ts tests/contracts.test.ts tests/cloud.test.ts tests/cloud-sandbox.test.ts tests/cloud-diff.test.ts tests/desktop-security.test.ts tests/cli-terminal.test.ts tests/desktop-local-agent.test.ts tests/shell-platform.test.ts tests/cli-update.test.ts tests/desktop-updater.test.ts tests/desktop-packaging.test.ts",
     "db:migrate": "bun --env-file=apps/web/.env.local scripts/migrate.ts",
     "cli": "bun packages/cli/src/index.ts",
     "models:sync": "bun scripts/sync-models.ts",

@@ -74,10 +74,10 @@ jobs:
           node-version: "24"
       - run: bun install --frozen-lockfile
       - run: bun run desktop:typecheck
-      - run: bun test tests/desktop-security.test.ts tests/desktop-local-agent.test.ts tests/desktop-updater.test.ts tests/shell-platform.test.ts
+      - run: bun test tests/desktop-security.test.ts tests/desktop-local-agent.test.ts tests/desktop-updater.test.ts tests/desktop-packaging.test.ts tests/shell-platform.test.ts
       - run: bun run desktop:build
       - name: Package without publishing
-        run: bun run desktop:package -- --${{ matrix.platform }} ${{ matrix.targets }} --${{ matrix.arch }} --publish never
+        run: bun run desktop:package -- --${{ matrix.platform }} ${{ matrix.targets }} --${{ matrix.arch }}
       - name: Verify requested formats and calculate SHA-256
         run: |
           node --input-type=module <<'NODE'
