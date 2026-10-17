@@ -141,6 +141,8 @@ bun scripts/recovery-restore.ts --archive /private/backup.dump.aesgcm --manifest
 
 The archive key is the original 32-byte binary key. The optional application key file contains the retained 32-byte cloud key, either binary or base64 text. Supply it to verify encrypted application records; omitting it verifies only the database schema and counts. This command authenticates the entire archive before starting PostgreSQL, restores into a new network-isolated PostgreSQL 18 container, compares all table counts and the schema hash, and removes its container. No production database credentials are required and no plaintext dump is written to disk. On October 17, the actual Drive-downloaded archive passed this independent restore with all 25 tables matching and one encrypted application payload decrypted. The private receipt is `.data/recovery-downloaded/independent-restore-receipt.json`. This verifies the saved copy; recurring backup execution, remote expiry and independently recoverable key custody still require configuration.
 
+The restore command ignores `DATABASE_URL` and preserves its input files. Its receipt destination must be new. Never put recovered key values in shell arguments, chat, or the Drive archive folder. An off-site copy is independently recoverable only after both keys can be retrieved separately; another-device iCloud Keychain verification remains an operator check.
+
 Run local recovery expiry as an explicit operator command. It previews by default and deletes only with `--apply`:
 
 ```sh
