@@ -93,6 +93,7 @@ jobs:
           node-version: "24"
       - run: bun install --frozen-lockfile
       - run: bun run desktop:typecheck
+      - run: node --test apps/desktop/scripts/verify-signing.test.mjs
       - run: bun test tests/desktop-security.test.ts tests/desktop-local-agent.test.ts tests/desktop-updater.test.ts tests/desktop-packaging.test.ts tests/shell-platform.test.ts
       - run: bun run desktop:build
       - name: Install native Electron runtime for smoke
@@ -132,6 +133,20 @@ jobs:
             unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
           fi
           bun run desktop:package -- --${{ matrix.platform }} ${{ matrix.targets }} --${{ matrix.arch }} "${signing[@]}"
+      - name: Verify packaged signatures and notarization
+        env:
+          SIGNING_PLATFORM: ${{ matrix.platform }}
+          SIGNING_ARCH: ${{ matrix.arch }}
+          SIGNING_CONFIGURED: ${{ env.CSC_LINK != '' }}
+        run: node apps/desktop/scripts/verify-signing.mjs
+      - name: Preserve signing verification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: signing-verification-${{ matrix.platform }}-${{ matrix.arch }}-${{ github.run_number }}
+          path: apps/desktop/release/signing-verification-*.json
+          if-no-files-found: warn
+          retention-days: 14
       - name: Verify requested formats and calculate SHA-256
         run: |
           node --input-type=module <<'NODE'
