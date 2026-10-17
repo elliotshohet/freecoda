@@ -1,0 +1,61 @@
+name: Qualify published desktop upgrade
+on:
+  workflow_dispatch:
+    inputs:
+      from_version:
+        description: Published version to install
+        required: true
+        default: 0.1.0
+      to_version:
+        description: Expected current stable release version
+        required: true
+        default: 0.1.1
+permissions:
+  contents: read
+concurrency:
+  group: desktop-upgrade-qualification
+  cancel-in-progress: false
+jobs:
+  upgrade:
+    if: github.ref == 'refs/heads/main'
+    name: Installed upgrade (${{ matrix.os }})
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      FROM_VERSION: ${{ inputs.from_version }}
+      TO_VERSION: ${{ inputs.to_version }}
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: bun install --frozen-lockfile
+      - name: Install Linux native display and FUSE dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libfuse2 xvfb openbox xdotool scrot
+      - name: Qualify Windows installed update
+        if: runner.os == 'Windows'
+        run: node apps/desktop/scripts/qualify-upgrade.mjs
+      - name: Qualify Linux AppImage update with Chromium sandbox enabled
+        if: runner.os == 'Linux'
+        run: xvfb-run -a sh -c 'openbox >/tmp/freecoda-openbox.log 2>&1 & exec node apps/desktop/scripts/qualify-upgrade.mjs'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-upgrade-evidence-${{ matrix.os }}-${{ github.run_number }}
+          path: .data/desktop-upgrade-evidence/**
+          if-no-files-found: warn
+          retention-days: 14
