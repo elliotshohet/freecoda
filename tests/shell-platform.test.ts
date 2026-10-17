@@ -82,7 +82,27 @@ test.skipIf(process.platform === "win32")(
         }
         expect(dead).toBe(true);
       } else {
-        expect(() => process.kill(pid!, 0)).toThrow();
+        // macOS launchd can also retain an adopted killed child briefly.
+        // A zombie is dead; PID existence alone cannot distinguish it.
+        const { execFile } = await import("node:child_process");
+        const { promisify } = await import("node:util");
+        let dead = false;
+        try {
+          const { stdout } = await promisify(execFile)("/bin/ps", [
+            "-o",
+            "stat=",
+            "-p",
+            String(pid),
+          ]);
+          dead = stdout.trim().startsWith("Z");
+        } catch {
+          try {
+            process.kill(pid!, 0);
+          } catch {
+            dead = true;
+          }
+        }
+        expect(dead).toBe(true);
       }
     } finally {
       controller.abort();

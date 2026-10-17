@@ -60,6 +60,16 @@
       "category": "Development",
       "maintainer": "Freecoda <hello@freecoda.com>"
     },
-    "executableName": "freecoda"
+    "executableName": "freecoda",
+    "publish": {
+      "provider": "github",
+      "owner": "elliotshohet",
+      "repo": "freecoda-releases",
+      "private": false,
+      "releaseType": "release"
+    }
+  },
+  "dependencies": {
+    "electron-updater": "6.8.10"
   }
 }

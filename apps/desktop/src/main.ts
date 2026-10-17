@@ -1,129 +1,353 @@
-import { app, BrowserWindow, Menu, dialog, ipcMain, net, nativeTheme, protocol, session, shell, type IpcMainInvokeEvent } from "electron";
+import {
+  app,
+  BrowserWindow,
+  Menu,
+  dialog,
+  ipcMain,
+  net,
+  nativeTheme,
+  Notification,
+  protocol,
+  session,
+  shell,
+  type IpcMainInvokeEvent,
+} from "electron";
 import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
 import { APP_URL, assetPath, externalURL, isAppDocument } from "./security";
 import { LocalAgentService } from "./local-agent";
 import type { DesktopEvent } from "./shared";
+import { autoUpdater } from "electron-updater";
+import { DesktopUpdates } from "./updater";
 
-protocol.registerSchemesAsPrivileged([{ scheme: "freecoda", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "freecoda",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
+]);
 app.setName("Freecoda");
 const assetsDirectory = path.join(app.getAppPath(), "dist");
 let window: BrowserWindow | null = null;
 let service: LocalAgentService;
 let quitting = false;
+let closing = false;
+let updates: DesktopUpdates | undefined;
 const hasLock = app.requestSingleInstanceLock();
 if (!hasLock) app.quit();
-app.on("second-instance", () => { if (window?.isMinimized()) window.restore(); window?.show(); window?.focus(); });
-const openExternal = async (value: string) => { await shell.openExternal(externalURL(value)); };
-const emit = (event: DesktopEvent) => { if (window && !window.isDestroyed()) window.webContents.send("desktop:event", event); };
+app.on("second-instance", () => {
+  if (window?.isMinimized()) window.restore();
+  window?.show();
+  window?.focus();
+});
+const openExternal = async (value: string) => {
+  await shell.openExternal(externalURL(value));
+};
+const emit = (event: DesktopEvent) => {
+  if (window && !window.isDestroyed())
+    window.webContents.send("desktop:event", event);
+};
 function validateSender(event: IpcMainInvokeEvent) {
-  if (!window || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || !isAppDocument(event.senderFrame.url))
+  if (
+    !window ||
+    event.sender !== window.webContents ||
+    event.senderFrame !== window.webContents.mainFrame ||
+    !isAppDocument(event.senderFrame.url)
+  )
     throw new Error("Untrusted desktop request.");
 }
 async function chooseFolder() {
   if (!window) return null;
   const current = await service.getState();
-  if (current.running) throw new Error("Stop the active task before changing folders.");
+  if (current.running)
+    throw new Error("Stop the active task before changing folders.");
   if (current.workspace) {
-    const { response } = await dialog.showMessageBox(window, { type: "question", buttons: ["Keep current folder", "Choose another folder"], defaultId: 0, cancelId: 0, message: "Switch project folders?", detail: "Save any unsaved editor changes before switching. Changes in the editor will be discarded." });
+    const { response } = await dialog.showMessageBox(window, {
+      type: "question",
+      buttons: ["Keep current folder", "Choose another folder"],
+      defaultId: 0,
+      cancelId: 0,
+      message: "Switch project folders?",
+      detail:
+        "Save any unsaved editor changes before switching. Changes in the editor will be discarded.",
+    });
     if (response !== 1) return null;
   }
-  const result = await dialog.showOpenDialog(window, { title: "Open a project folder", properties: ["openDirectory"] });
-  return result.canceled || !result.filePaths[0] ? null : service.selectWorkspace(result.filePaths[0]);
+  const result = await dialog.showOpenDialog(window, {
+    title: "Open a project folder",
+    properties: ["openDirectory"],
+  });
+  return result.canceled || !result.filePaths[0]
+    ? null
+    : service.selectWorkspace(result.filePaths[0]);
 }
 function installIPC() {
   const methods = {
     setTheme: (theme: unknown) => {
-      if (theme !== "system" && theme !== "light" && theme !== "dark") throw new Error("Invalid theme.");
+      if (theme !== "system" && theme !== "light" && theme !== "dark")
+        throw new Error("Invalid theme.");
       nativeTheme.themeSource = theme;
-      window?.setBackgroundColor(nativeTheme.shouldUseDarkColors ? "#171522" : "#f6f5fa");
+      window?.setBackgroundColor(
+        nativeTheme.shouldUseDarkColors ? "#171522" : "#f6f5fa",
+      );
     },
     getState: () => service.getState(),
     openFolder: chooseFolder,
-    trustWorkspace: (input: Parameters<LocalAgentService["trustWorkspace"]>[0]) => service.trustWorkspace(input),
+    trustWorkspace: (
+      input: Parameters<LocalAgentService["trustWorkspace"]>[0],
+    ) => service.trustWorkspace(input),
     listFiles: () => service.listFiles(),
     readFile: (input: string) => service.readFile(input),
-    saveFile: (input: Parameters<LocalAgentService["saveFile"]>[0]) => service.saveFile(input),
-    runCommand: (input: Parameters<LocalAgentService["runCommand"]>[0]) => service.runCommand(input),
-    runAgent: (input: Parameters<LocalAgentService["runAgent"]>[0]) => service.runAgent(input),
+    saveFile: (input: Parameters<LocalAgentService["saveFile"]>[0]) =>
+      service.saveFile(input),
+    runCommand: (input: Parameters<LocalAgentService["runCommand"]>[0]) =>
+      service.runCommand(input),
+    runAgent: (input: Parameters<LocalAgentService["runAgent"]>[0]) =>
+      service.runAgent(input),
     cancelRun: () => service.cancelRun(),
-    respondApproval: (input: Parameters<LocalAgentService["respondApproval"]>[0]) => service.respondApproval(input),
-    login: () => service.login(), logout: () => service.logout(), usage: () => service.usage(),
-    clearHistory: () => service.clearHistory(), openCloud: () => openExternal("https://freecoda.com/app"),
+    respondApproval: (
+      input: Parameters<LocalAgentService["respondApproval"]>[0],
+    ) => service.respondApproval(input),
+    login: () => service.login(),
+    logout: () => service.logout(),
+    usage: () => service.usage(),
+    clearHistory: () => service.clearHistory(),
+    openCloud: () => openExternal("https://freecoda.com/app"),
   };
   for (const [name, handler] of Object.entries(methods)) {
     ipcMain.handle(`desktop:${name}`, async (event, input) => {
       validateSender(event);
       // Renderer arguments have a hard transport limit before operation-specific validation.
-      if (JSON.stringify(input ?? null).length > 300_000) throw new Error("Desktop request too large.");
+      if (JSON.stringify(input ?? null).length > 300_000)
+        throw new Error("Desktop request too large.");
       return (handler as (input: unknown) => unknown)(input);
     });
   }
 }
 function createWindow() {
   window = new BrowserWindow({
-    width: 1440, height: 920, minWidth: 900, minHeight: 620, show: false,
-    title: "Freecoda", backgroundColor: nativeTheme.shouldUseDarkColors ? "#171522" : "#f6f5fa", icon: path.join(assetsDirectory, "icon.png"),
+    width: 1440,
+    height: 920,
+    minWidth: 900,
+    minHeight: 620,
+    show: false,
+    title: "Freecoda",
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#171522" : "#f6f5fa",
+    icon: path.join(assetsDirectory, "icon.png"),
     webPreferences: {
-      preload: path.join(assetsDirectory, "preload.cjs"), nodeIntegration: false,
-      contextIsolation: true, sandbox: true, webSecurity: true, webviewTag: false,
-      spellcheck: false, navigateOnDragDrop: false,
+      preload: path.join(assetsDirectory, "preload.cjs"),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      webSecurity: true,
+      webviewTag: false,
+      spellcheck: false,
+      navigateOnDragDrop: false,
     },
   });
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-  window.webContents.on("will-navigate", (event, url) => { if (!isAppDocument(url)) event.preventDefault(); });
-  window.webContents.on("will-attach-webview", (event) => event.preventDefault());
+  window.webContents.on("will-navigate", (event, url) => {
+    if (!isAppDocument(url)) event.preventDefault();
+  });
+  window.webContents.on("will-attach-webview", (event) =>
+    event.preventDefault(),
+  );
   window.on("close", (event) => {
     if (quitting) return;
     event.preventDefault();
-    void dialog.showMessageBox(window!, {
-      type: "question", buttons: ["Keep working", "Close workspace"], defaultId: 0, cancelId: 0,
-      title: "Close Freecoda?", message: "Close this workspace?", detail: "Save any unsaved editor changes first. Active agent work and commands will be cancelled.",
-    }).then(async ({ response }) => {
-      if (response !== 1) return;
-      await service.dispose(); quitting = true; window?.destroy(); window = null; app.quit();
-    });
+    if (closing) return;
+    closing = true;
+    void dialog
+      .showMessageBox(window!, {
+        type: "question",
+        buttons: ["Keep working", "Close workspace"],
+        defaultId: 0,
+        cancelId: 0,
+        title: "Close Freecoda?",
+        message: "Close this workspace?",
+        detail:
+          "Save any unsaved editor changes first. Active agent work and commands will be cancelled.",
+      })
+      .then(async ({ response }) => {
+        if (response !== 1) return;
+        await service.dispose();
+        quitting = true;
+        updates?.dispose();
+        window?.destroy();
+        window = null;
+        app.quit();
+      })
+      .finally(() => {
+        closing = false;
+      });
   });
   window.once("ready-to-show", () => window?.show());
   void window.loadURL(APP_URL);
 }
-app.whenReady().then(async () => {
-  if (!hasLock) return;
-  protocol.handle("freecoda", async (request) => {
-    const asset = assetPath(request.url);
-    if (!asset || request.method !== "GET") return new Response("Not found", { status: 404 });
-    const response = await net.fetch(pathToFileURL(path.join(assetsDirectory, asset)).toString());
-    const headers = new Headers(response.headers);
-    headers.set("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'");
-    headers.set("X-Content-Type-Options", "nosniff");
-    return new Response(response.body, { status: response.status, headers });
+app
+  .whenReady()
+  .then(async () => {
+    if (!hasLock) return;
+    protocol.handle("freecoda", async (request) => {
+      const asset = assetPath(request.url);
+      if (!asset || request.method !== "GET")
+        return new Response("Not found", { status: 404 });
+      const response = await net.fetch(
+        pathToFileURL(path.join(assetsDirectory, asset)).toString(),
+      );
+      const headers = new Headers(response.headers);
+      headers.set(
+        "Content-Security-Policy",
+        "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'",
+      );
+      headers.set("X-Content-Type-Options", "nosniff");
+      return new Response(response.body, { status: response.status, headers });
+    });
+    session.defaultSession.setPermissionRequestHandler(
+      (_contents, _permission, callback) => callback(false),
+    );
+    session.defaultSession.setPermissionCheckHandler(() => false);
+    service = new LocalAgentService({
+      dataDirectory: path.join(app.getPath("userData"), "private"),
+      emit,
+      openExternal,
+    });
+    await service.initialize();
+    installIPC();
+    let unsignedMac = false;
+    if (app.isPackaged && process.platform === "darwin") {
+      try {
+        const codesign = promisify(execFile);
+        const signature = await codesign(
+          "/usr/bin/codesign",
+          ["-dv", "--verbose=2", process.execPath],
+          { timeout: 5000, maxBuffer: 64 * 1024 },
+        );
+        if (!/^Authority=Developer ID Application:/m.test(signature.stderr))
+          throw new Error("Developer ID required");
+        await codesign(
+          "/usr/bin/codesign",
+          ["--verify", "--strict", process.execPath],
+          { timeout: 5000, maxBuffer: 64 * 1024 },
+        );
+      } catch {
+        unsignedMac = true;
+      }
+    }
+    updates = new DesktopUpdates(autoUpdater, {
+      packaged: app.isPackaged,
+      unavailableReason: unsignedMac
+        ? "Automatic updates require a Developer ID-signed macOS build. This build is unsigned. Download the latest installer from freecoda.com/download."
+        : undefined,
+      notify: (body) => {
+        if (Notification.isSupported())
+          new Notification({ title: "Freecoda update", body }).show();
+      },
+      showStatus: async (message, downloaded) => {
+        if (!window || window.isDestroyed()) return;
+        const { response } = await dialog.showMessageBox(window, {
+          type: "info",
+          title: "Freecoda updates",
+          message,
+          buttons: downloaded
+            ? ["Keep working", "Close app to install"]
+            : ["OK"],
+          defaultId: 0,
+          cancelId: 0,
+        });
+        // Normal close always presents the existing unsaved-work/task warning.
+        if (downloaded && response === 1) window?.close();
+        else if (unsignedMac && response === 1)
+          await openExternal("https://freecoda.com/download");
+      },
+    });
+    const menu: Electron.MenuItemConstructorOptions[] = [
+      ...(process.platform === "darwin" ? [{ role: "appMenu" as const }] : []),
+      {
+        label: "File",
+        submenu: [
+          {
+            label: "Open folder…",
+            accelerator: "CmdOrCtrl+O",
+            click: () => void chooseFolder(),
+          },
+          {
+            label: "Cloud workspace",
+            click: () => void openExternal("https://freecoda.com/app"),
+          },
+          { type: "separator" },
+          { role: "quit" },
+        ],
+      },
+      { role: "editMenu" },
+      {
+        label: "View",
+        submenu: [
+          { role: "resetZoom" },
+          { role: "zoomIn" },
+          { role: "zoomOut" },
+          { type: "separator" },
+          { role: "togglefullscreen" },
+        ],
+      },
+      { role: "windowMenu" },
+      {
+        label: "Help",
+        submenu: [
+          {
+            label: "Check for updates…",
+            click: () => void updates?.check(true),
+          },
+          { label: "Update status…", click: () => void updates?.status() },
+          { type: "separator" },
+          {
+            label: "Freecoda documentation",
+            click: () => void openExternal("https://freecoda.com/docs"),
+          },
+          {
+            label: "About Freecoda",
+            click: () =>
+              void dialog.showMessageBox({
+                title: "Freecoda",
+                message: `Freecoda ${app.getVersion()}`,
+                detail:
+                  "Free forever. Supported by direct sponsors.\nLocal coding with explicit approvals.",
+              }),
+          },
+        ],
+      },
+    ];
+    Menu.setApplicationMenu(Menu.buildFromTemplate(menu));
+    createWindow();
+    updates.start();
+  })
+  .catch((error) => {
+    console.error(
+      "Desktop startup failed:",
+      error instanceof Error ? error.message : "Unknown error",
+    );
+    app.quit();
   });
-  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
-  session.defaultSession.setPermissionCheckHandler(() => false);
-  service = new LocalAgentService({ dataDirectory: path.join(app.getPath("userData"), "private"), emit, openExternal });
-  await service.initialize();
-  installIPC();
-  const menu: Electron.MenuItemConstructorOptions[] = [
-    ...(process.platform === "darwin" ? [{ role: "appMenu" as const }] : []),
-    { label: "File", submenu: [
-      { label: "Open folder…", accelerator: "CmdOrCtrl+O", click: () => void chooseFolder() },
-      { label: "Cloud workspace", click: () => void openExternal("https://freecoda.com/app") },
-      { type: "separator" }, { role: "quit" },
-    ] },
-    { role: "editMenu" },
-    { label: "View", submenu: [{ role: "resetZoom" }, { role: "zoomIn" }, { role: "zoomOut" }, { type: "separator" }, { role: "togglefullscreen" }] },
-    { role: "windowMenu" },
-    { label: "Help", submenu: [
-      { label: "Freecoda documentation", click: () => void openExternal("https://freecoda.com/docs") },
-      { label: "About Freecoda", click: () => void dialog.showMessageBox({ title: "Freecoda", message: `Freecoda ${app.getVersion()}`, detail: "Free forever. Supported by direct sponsors.\nLocal coding with explicit approvals." }) },
-    ] },
-  ];
-  Menu.setApplicationMenu(Menu.buildFromTemplate(menu));
-  createWindow();
-}).catch((error) => { console.error("Desktop startup failed:", error instanceof Error ? error.message : "Unknown error"); app.quit(); });
 app.on("before-quit", (event) => {
   if (!service || quitting) return;
   event.preventDefault();
-  void service.dispose().finally(() => { quitting = true; app.quit(); });
+  if (window && !window.isDestroyed()) {
+    window.close();
+    return;
+  }
+  void service.dispose().finally(() => {
+    quitting = true;
+    updates?.dispose();
+    app.quit();
+  });
 });
-app.on("window-all-closed", () => { app.quit(); });
+app.on("window-all-closed", () => {
+  app.quit();
+});

@@ -1,0 +1,68 @@
+name: Prepare public desktop release
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful Desktop packages run ID
+        required: true
+      commit_sha:
+        description: Exact 40-character source commit SHA
+        required: true
+      version:
+        description: Desktop version (for example 0.1.0)
+        required: true
+permissions:
+  actions: read
+  contents: read
+concurrency:
+  group: desktop-public-release
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: desktop-release
+    env:
+      RUN_ID: ${{ inputs.run_id }}
+      SOURCE_SHA: ${{ inputs.commit_sha }}
+      RELEASE_VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate successful source run and download native artifacts
+        run: |
+          python3 - <<'PY'
+          import os,re,json,subprocess,base64
+          def api(path): return json.loads(subprocess.check_output(['gh','api',path]))
+          run_id=os.environ['RUN_ID']; sha=os.environ['SOURCE_SHA']; version=os.environ['RELEASE_VERSION']
+          assert re.fullmatch(r'[0-9]+',run_id), 'Invalid run ID'
+          assert re.fullmatch(r'[0-9a-f]{40}',sha), 'Use the full source SHA'
+          assert re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+',version), 'Stable semver required'
+          repo=os.environ['GITHUB_REPOSITORY']; run=api(f'repos/{repo}/actions/runs/{run_id}')
+          assert run['conclusion']=='success' and run['head_sha']==sha and run['head_branch']=='main' and run['event']=='push', 'Source run must be a successful main push at this exact SHA'
+          assert run['path']=='.github/workflows/desktop.yml', 'Wrong workflow'
+          package=api(f'repos/{repo}/contents/apps/desktop/package.json?ref={sha}')
+          assert json.loads(base64.b64decode(package['content']))['version']==version, 'Version does not match source'
+          for platform,arch in [('linux','x64'),('win','x64'),('mac','x64'),('mac','arm64')]:
+            name=f"freecoda-desktop-{platform}-{arch}-{run['run_number']}"
+            subprocess.run(['gh','run','download',run_id,'--repo',repo,'--name',name,'--dir',f'incoming/{platform}-{arch}'],check=True)
+          PY
+      - run: python3 -m pip install --disable-pip-version-check PyYAML==6.0.2
+      - run: python3 scripts/release/test-prepare-desktop.py
+      - name: Validate payloads and merge architecture metadata
+        run: python3 scripts/release/prepare-desktop.py incoming public-assets
+      - name: Create public binary-only draft
+        env:
+          GH_TOKEN: ${{ secrets.FREECODA_RELEASE_TOKEN }}
+        run: |
+          test -n "$GH_TOKEN" || { echo 'Configure FREECODA_RELEASE_TOKEN with contents-write access only to elliotshohet/freecoda-releases'; exit 1; }
+          tag="v$RELEASE_VERSION"
+          if gh release view "$tag" --repo elliotshohet/freecoda-releases --json isDraft,body > existing-release.json; then
+            python3 -c 'import json,os; r=json.load(open("existing-release.json")); assert r["isDraft"], "Published releases are immutable; use a new version"; assert "Source commit: "+os.environ["SOURCE_SHA"]+"." in r["body"], "Draft belongs to another source commit; use a new version"'
+          else
+            gh release create "$tag" --repo elliotshohet/freecoda-releases --draft --title "Freecoda $RELEASE_VERSION" --notes "Freecoda desktop installers. Source commit: $SOURCE_SHA. Verify SHA256SUMS.txt before installation. macOS and Windows builds are currently unsigned; macOS automatic installation requires Developer ID signing. Linux deb updates use the package manager."
+          fi
+          gh release upload "$tag" public-assets/* --repo elliotshohet/freecoda-releases --clobber
+          echo "Draft prepared: https://github.com/elliotshohet/freecoda-releases/releases"

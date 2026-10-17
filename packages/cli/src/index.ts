@@ -31,10 +31,27 @@ import {
   resolveTerminalTheme,
 } from "./ui";
 import { showSponsor } from "./ads";
+import { CLI_VERSION, checkUpdate, newerVersion, installCommand, installUpdate } from "./update";
 const program = new Command()
   .name("freecoda")
   .description("A local coding agent. Your code, your choices.")
-  .version("0.1.0");
+  .version(CLI_VERSION);
+program.command("update")
+  .description("Check npm for a newer Freecoda CLI")
+  .option("--install", "Explicitly install the latest stable release globally using npm")
+  .action(async (opts) => {
+    const latest = await checkUpdate();
+    if (!newerVersion(latest)) {
+      console.log(`Freecoda ${CLI_VERSION} is up to date (npm: ${latest}).`);
+      return;
+    }
+    console.log(`Freecoda ${latest} is available (installed: ${CLI_VERSION}).`);
+    console.log(installCommand(latest));
+    if (opts.install) {
+      await installUpdate(latest);
+      console.log("Updated. Start a new Freecoda session to use the new version.");
+    }
+  });
 async function api(path: string, body?: unknown) {
   const config = await loadConfig();
   const base = validateBaseURL(config.server);
@@ -289,6 +306,10 @@ program
       }
       notice("Resumed the conversation saved locally for this workspace.");
     }
+    let sessionOpen = true;
+    if (screen) void checkUpdate().then((latest) => {
+      if (sessionOpen && newerVersion(latest)) notice(`Freecoda ${latest} is available. Exit this session, then run freecoda update --install.`);
+    }).catch(() => {});
     if (screen) void showSponsor(config.server, (ad) => screen.showSponsor(ad));
     if (screen)
       screen.onOpenSponsor = (href) => {
@@ -328,9 +349,14 @@ program
           if (opts.prompt) break;
           continue;
         }
+        if (input === "/update" || input.startsWith("/update ")) {
+          notice("Exit this session, then run freecoda update to check or freecoda update --install to install. Updates never replace the CLI during an active session.");
+          if (opts.prompt) break;
+          continue;
+        }
         if (input === "/help") {
           notice(
-            "/plan <task>  Read-only plan\n/review <task>  Read-only code review\n/mode build|plan|review  Set the default mode\n/model [id]  List or select models\n/theme auto|dark|light  Save the terminal palette\n/usage  Hosted allowance and reset time\n/status  Current workspace and provider\n/new  Clear the model conversation\n/clear  Clear the visible transcript\n/exit  Exit Freecoda\n\nEnter sends. Ctrl+J adds a newline. Paste never submits automatically. Up/Down recalls input. PageUp/PageDown scrolls. Escape or Ctrl+C cancels a running request. Approval: y once, s category for this session, n decline.",
+            "/plan <task>  Read-only plan\n/review <task>  Read-only code review\n/mode build|plan|review  Set the default mode\n/model [id]  List or select models\n/theme auto|dark|light  Save the terminal palette\n/update  Check/install instructions (exit session first)\n/usage  Hosted allowance and reset time\n/status  Current workspace and provider\n/new  Clear the model conversation\n/clear  Clear the visible transcript\n/exit  Exit Freecoda\n\nEnter sends. Ctrl+J adds a newline. Paste never submits automatically. Up/Down recalls input. PageUp/PageDown scrolls. Escape or Ctrl+C cancels a running request. Approval: y once, s category for this session, n decline.",
           );
           if (opts.prompt) break;
           continue;
@@ -500,6 +526,7 @@ program
         if (opts.prompt) break;
       }
     } finally {
+      sessionOpen = false;
       screen?.close();
     }
   });

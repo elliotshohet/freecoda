@@ -74,7 +74,7 @@ jobs:
           node-version: "24"
       - run: bun install --frozen-lockfile
       - run: bun run desktop:typecheck
-      - run: bun test tests/desktop-security.test.ts tests/desktop-local-agent.test.ts tests/shell-platform.test.ts
+      - run: bun test tests/desktop-security.test.ts tests/desktop-local-agent.test.ts tests/desktop-updater.test.ts tests/shell-platform.test.ts
       - run: bun run desktop:build
       - name: Package without publishing
         run: bun run desktop:package -- --${{ matrix.platform }} ${{ matrix.targets }} --${{ matrix.arch }} --publish never
@@ -107,6 +107,8 @@ jobs:
             apps/desktop/release/*.exe
             apps/desktop/release/*.AppImage
             apps/desktop/release/*.deb
+            apps/desktop/release/*.yml
+            apps/desktop/release/*.blockmap
             apps/desktop/release/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
