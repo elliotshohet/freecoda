@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     template: "%s · Freecoda",
   },
   description:
-    "A local coding agent for your next big thing. Plan, build, and review in your terminal with free daily usage, clear limits, and clearly labeled sponsor cards.",
+    "Plan, build, and review code in your browser or terminal. Free forever, supported by sponsors, with clear usage limits.",
 };
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (

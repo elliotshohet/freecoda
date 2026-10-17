@@ -20,14 +20,131 @@ import {
 import { selectAd, recordAd, verifyAd } from "../apps/web/lib/ads";
 import { route } from "../apps/web/lib/api";
 import { utcDay, utcMonth } from "../packages/contracts/src";
+import * as cloud from "../apps/web/lib/cloud/store";
+import { randomBytes } from "node:crypto";
 const pool = getPool();
 let userId: string;
 beforeAll(async () => {
+  process.env.CLOUD_ENCRYPTION_KEY = randomBytes(32).toString("base64");
   const { rows } = await pool.query("SELECT current_database() AS name");
   if (rows[0].name !== "freecoda_test")
     throw new Error("Integration tests refuse to run outside freecoda_test.");
 });
+
+test("cloud ownership, expired projects, and encrypted event replay stay private", async () => {
+  const p = await cloud.createProject(userId, "Private fixture", {
+    files: [{ path: "private.ts", content: "private-fixture-content" }],
+    consentAt: new Date().toISOString(),
+  });
+  await expect(cloud.project("other-user", p.id)).rejects.toThrow("not found");
+  const stored = (
+    await pool.query("SELECT payload FROM cloud_projects WHERE id=$1", [p.id])
+  ).rows[0].payload;
+  expect(stored).not.toContain("private-fixture-content");
+  const run = await cloud.createRun(userId, p.id, {
+    prompt: "private task",
+    mode: "plan",
+    consentAt: new Date().toISOString(),
+  });
+  await cloud.event(run.id, "message", { text: "private answer" });
+  await cloud.event(run.id, "status", { message: "done" });
+  const first = await cloud.events(userId, run.id, 0);
+  expect(first.events).toHaveLength(2);
+  expect(
+    (await cloud.events(userId, run.id, first.events[0].id)).events,
+  ).toHaveLength(1);
+  await expect(cloud.events("other-user", run.id, 0)).rejects.toThrow();
+  await pool.query(
+    "UPDATE cloud_projects SET expires_at=now()-interval '1 second' WHERE id=$1",
+    [p.id],
+  );
+  await expect(cloud.events(userId, run.id, 0)).rejects.toThrow();
+});
+
+test("cloud edits reject stale project versions instead of losing newer source", async () => {
+  const p = await cloud.createProject(userId, "Concurrent fixture", {
+    files: [],
+    consentAt: new Date().toISOString(),
+  });
+  const current = await cloud.project(userId, p.id);
+  await cloud.saveProject(userId, p.id, current.version, {
+    ...current.payload,
+    files: [{ path: "new.ts", content: "first editor" }],
+  });
+  await expect(
+    cloud.saveProject(userId, p.id, current.version, {
+      ...current.payload,
+      files: [{ path: "new.ts", content: "stale editor" }],
+    }),
+  ).rejects.toThrow("concurrently");
+  expect((await cloud.project(userId, p.id)).payload.files[0].content).toBe(
+    "first editor",
+  );
+});
+
+test("workflow ID registration cannot move an executing run back to queued", async () => {
+  const p = await cloud.createProject(userId, "Workflow race", {
+    files: [],
+    consentAt: new Date().toISOString(),
+  });
+  const r = await cloud.createRun(userId, p.id, {
+    prompt: "Check source",
+    mode: "plan",
+    consentAt: new Date().toISOString(),
+  });
+  await cloud.runState(r.id, "running");
+  await cloud.runState(r.id, "queued", "wf_fixture");
+  expect((await cloud.run(userId, r.id)).run.status).toBe("running");
+  expect((await cloud.run(userId, r.id)).run.workflowId).toBe("wf_fixture");
+  await cloud.runState(r.id, "completed");
+  await cloud.runState(r.id, "queued", "wf_fixture");
+  expect((await cloud.run(userId, r.id)).run.status).toBe("completed");
+});
+
+test("reviewed publication lock excludes new runs and competing edits", async () => {
+  const p = await cloud.createProject(userId, "Publication lock", {
+    files: [],
+    consentAt: new Date().toISOString(),
+  });
+  await cloud.withProjectOperation(userId, p.id, async () => {
+    await expect(
+      cloud.createRun(userId, p.id, {
+        prompt: "Edit source",
+        mode: "build",
+        consentAt: new Date().toISOString(),
+      }),
+    ).rejects.toThrow();
+    await expect(
+      cloud.withProjectOperation(userId, p.id, async () => true),
+    ).rejects.toThrow("operation");
+  });
+  expect(await cloud.withProjectOperation(userId, p.id, async () => true)).toBe(
+    true,
+  );
+});
+
+test("cloud compute admission is atomic and settlement cannot double charge", async () => {
+  const p = await cloud.createProject(userId, "Compute fixture", {
+    files: [],
+    consentAt: new Date().toISOString(),
+  });
+  const results = await Promise.allSettled(
+    Array.from({ length: 6 }, () => cloud.reserveCompute(userId, p.id)),
+  );
+  const accepted = results.filter((r) => r.status === "fulfilled");
+  expect(accepted).toHaveLength(1);
+  await cloud.settleCompute(accepted[0].value);
+  await cloud.settleCompute(accepted[0].value);
+  const row = (
+    await pool.query(
+      "SELECT reserved_seconds,spent_seconds FROM cloud_compute_buckets WHERE scope='global'",
+    )
+  ).rows[0];
+  expect(Number(row.reserved_seconds)).toBe(0);
+  expect(Number(row.spent_seconds)).toBe(900);
+});
 beforeEach(async () => {
+  await pool.query("TRUNCATE cloud_projects,cloud_compute_buckets CASCADE");
   await pool.query(
     'TRUNCATE ad_events,campaigns,sponsor_inquiries,request_limits,device_requests,devices,profiles,invitations,usage_buckets,reservations,"user" CASCADE',
   );

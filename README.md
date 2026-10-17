@@ -1,6 +1,6 @@
 # Freecoda
 
-A local coding agent with a Next.js account website. One plan: **free forever, supported by direct sponsors**. There are no paid credits, subscriptions, or user checkout. Hosted usage has fair-use limits and an operator spending cap. This monorepo is private during development.
+A coding agent for the browser and terminal. One plan: **free forever, supported by direct sponsors**. There are no paid credits, subscriptions, or user checkout. Hosted usage has fair-use limits and an operator spending cap. This monorepo is private during development.
 
 ## Workspace
 
@@ -113,3 +113,15 @@ The website and account service can be deployed while hosted inference remains c
 See LICENSE, NOTICE, and vendor/codebuff/NOTICE for the selectively reused Apache-2.0 editing helper. No Freebuff hosted services or advertising code are included.
 
 OpenAI BYOK through AI Gateway uses the server-only `OPENAI_API_KEY` environment variable. No API key is delivered to CLI users. Reservations count all input tokens at the uncached rate and all output tokens, including reasoning. Interrupted requests without final usage remain reserved for operator reconciliation.
+
+## Cloud workspace beta
+
+`/app` is the invited browser workspace. Source files and conversations are encrypted in PostgreSQL and expire seven days after activity. Users consent before creating a cloud project. Project deletion revokes access immediately, stops execution, and schedules retryable resource cleanup. Dependency and build caches are excluded from saved source; resuming reinstalls dependencies.
+
+Untrusted project code runs in Vercel Sandbox under a separate Linux user. Model calls, GitHub App credentials, encryption keys, and AI Gateway BYOK stay in the trusted backend. The exposed preview port belongs to a separate trusted proxy; short-lived signed tickets authorize HTTP and WebSocket access on a separate origin. Registry-only egress is intentional: projects requiring other external services are outside this beta.
+
+Configure the cloud variables in `.env.example`, run migrations, and link the Vercel project before enabling `CLOUD_WORKSPACES_ENABLED`. Local Sandbox calls also need a current Vercel OIDC token. Production Secrets cannot be recovered with `vercel env pull`; preserve local development credentials. Workflow orchestration passes opaque project/run IDs, while private content stays in encrypted application storage.
+
+Create a separate GitHub App with **Contents: read/write**, **Pull requests: read/write**, and the mandatory read-only Metadata permission. Set its setup URL to `https://freecoda.com/app` and allow selected repositories. The existing GitHub OAuth App remains responsible for login. Publishing checks repository access, the imported commit, and the reviewed diff, then creates a new branch and draft PR. It never updates the default branch or publishes GitHub workflow files.
+
+Stay on Hobby: at most one active workspace per user, two globally, three saved projects, 100 MB source, two vCPUs, and fifteen minutes per session. Idle workspaces suspend after five minutes. Compute reservations conservatively cap monthly application sessions at 9,000 wall-clock seconds to fit five CPU-hours at two vCPUs; there is no paid upgrade. Platform quotas remain authoritative. Keep the flag disabled until the real sandbox, private preview, import, resume, and reviewed publication checks pass.

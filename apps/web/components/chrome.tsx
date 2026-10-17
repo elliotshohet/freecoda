@@ -20,9 +20,9 @@ export function Header() {
         <Link href="/#how-it-works">How it works</Link>
         <Link href="/pricing">Free access</Link>
         <Link href="/docs">Docs</Link>
-        <Link href="/privacy">Our promise</Link>
+        <Link href="/app">Build in your browser</Link>
       </nav>
-      <Link className="header-cta" href="/dashboard">
+      <Link className="header-cta" href="/app">
         Your workspace <ArrowUpRight size={15} />
       </Link>
     </header>
@@ -46,7 +46,7 @@ export function Footer() {
         <Link href="/pricing">Free access</Link>
       </div>
       <span className="footer-note">
-        <Command size={13} /> Built for the terminal. Made for you.
+        <Command size={13} /> Your browser. Your terminal. Your next big thing.
       </span>
     </footer>
   );

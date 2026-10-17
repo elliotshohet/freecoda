@@ -18,10 +18,35 @@ export default function Privacy() {
         </p>
         <h2>What stays on your machine</h2>
         <p>
-          Your repository, tool execution, and conversation history stay on your
-          machine. When you use your own API key, the key is stored locally with
-          restrictive file permissions. Direct provider requests bypass
-          Freecoda.
+          When you use the local CLI, your repository, tool execution, and
+          conversation history stay on your machine. When you use your own API
+          key, the key is stored locally with restrictive file permissions.
+          Direct provider requests bypass Freecoda.
+        </p>
+        <h2 id="cloud-workspaces">Cloud workspaces</h2>
+        <p>
+          Cloud workspaces are optional and require explicit consent before
+          creating a project or starting an agent run. Project files, chat
+          prompts and responses, diffs, and command output are stored in
+          encrypted cloud records for up to seven days after last activity. Code
+          executes in an isolated cloud sandbox. This content leaves your
+          machine and is sent to the model provider when needed to complete your
+          task.
+        </p>
+        <p>
+          Do not put secrets or private customer data in a cloud project. Only
+          GitHub repositories you select for the Freecoda GitHub App can be
+          imported. GitHub credentials stay on the server and are not provided
+          to the sandbox or agent. A private preview uses short-lived access.
+          Publishing requires reviewing the diff and explicitly confirming a
+          branch and draft pull request; the agent cannot merge or deploy it.
+        </p>
+        <p>
+          Cloud workspaces share the free service’s capacity and may suspend
+          when idle or when limits are reached. Suspending stops compute; it
+          does not immediately delete saved project content. You can delete a
+          cloud project to remove its content and stop its preview. Existing
+          GitHub repositories and pull requests are unaffected.
         </p>
         <h2>What leaves your machine</h2>
         <p>
@@ -59,9 +84,11 @@ export default function Privacy() {
         <p>
           We retain your GitHub identity and email, authorized device records,
           invitation status, and usage metadata to operate the service. The free
-          hosted beta does not collect payment cards or sell credits. We do not
-          persist prompts, responses, source code, or tool output in our
-          application database or application logs.
+          hosted beta does not collect payment cards or sell credits. For local
+          CLI inference, we do not persist prompts, responses, source code, or
+          tool output in our application database or application logs. Optional
+          cloud workspaces retain the project content described above for up to
+          seven days after last activity.
         </p>
         <h2>Sponsor placements</h2>
         <p>

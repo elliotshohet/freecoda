@@ -15,15 +15,21 @@
     "@freecoda/contracts": "workspace:*",
     "@vercel/analytics": "^2.0.1",
     "@vercel/oidc": "3.2.0",
+    "@vercel/sandbox": "^3.8.0",
     "@vercel/speed-insights": "^2.0.0",
     "ai": "latest",
     "better-auth": "latest",
+    "diff": "^9.0.0",
     "drizzle-orm": "latest",
     "lucide-react": "latest",
     "next": "latest",
     "pg": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "workflow": "^5.2.2",
     "zod": "latest"
+  },
+  "devDependencies": {
+    "@types/diff": "^8.0.0"
   }
 }

@@ -170,6 +170,8 @@ export async function route(req: Request) {
           403,
           "Delete your account from the browser workspace.",
         );
+      const { prepareAccountDeletion } = await import('./cloud/lifecycle');
+      await prepareAccountDeletion(user.id);
       await transaction(async (db) => {
         await db.query("DELETE FROM invitations WHERE lower(email)=lower($1)", [
           user.email,
