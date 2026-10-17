@@ -322,3 +322,44 @@ test("hosted SDK routes through Gateway with server-owned BYOK and never exposes
     else process.env.AI_GATEWAY_API_KEY = previousGateway;
   }
 });
+
+test("assistant replay omits only empty reasoning placeholders and empty assistant messages", () => {
+  const text = { type: "text", text: "Keep this answer." };
+  const reasoning = {
+    type: "reasoning",
+    text: "Nonempty reasoning remains intact.",
+  };
+  const toolCall = {
+    type: "tool-call",
+    toolCallId: "call_fixture",
+    toolName: "read_file",
+    input: { path: "file.ts" },
+  };
+  const toolResult = {
+    role: "tool",
+    content: [
+      {
+        type: "tool-result",
+        toolCallId: "call_fixture",
+        toolName: "read_file",
+        output: { type: "text", value: "File contents" },
+      },
+    ],
+  };
+  const prompt = [
+    { role: "user", content: [{ type: "text", text: "Read the file." }] },
+    { role: "assistant", content: [{ type: "reasoning", text: "" }] },
+    {
+      role: "assistant",
+      content: [{ type: "reasoning", text: "" }, text, reasoning, toolCall],
+    },
+    toolResult,
+  ];
+  const options = safeModelOptions({ prompt }, model);
+  expect<unknown>(options.prompt).toEqual([
+    prompt[0],
+    { role: "assistant", content: [text, reasoning, toolCall] },
+    toolResult,
+  ]);
+  expect(prompt[1].content).toEqual([{ type: "reasoning", text: "" }]);
+});

@@ -88,6 +88,19 @@ export function safeModelOptions(
       }
     } else throw new ApiError(400, "Invalid message content.");
   }
+  // Gateway may emit an empty reasoning placeholder without reusable provider
+  // metadata. Exclude only that placeholder when replaying assistant history.
+  cleaned.prompt = prompt.flatMap((message) => {
+    if (message.role !== "assistant" || !Array.isArray(message.content))
+      return [message];
+    const content = message.content.filter(
+      (part: { type: string; text?: string }) =>
+        !(part.type === "reasoning" && part.text === ""),
+    );
+    return content.length ? [{ ...message, content }] : [];
+  });
+  if (!(cleaned.prompt as unknown[]).length)
+    throw new ApiError(400, "Invalid prompt.");
   if (
     Array.isArray(cleaned.tools) &&
     cleaned.tools.some(
