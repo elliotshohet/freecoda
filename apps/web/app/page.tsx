@@ -36,7 +36,7 @@ export default function Home() {
           <div className="platforms">
             <span>macOS</span>
             <span>Linux</span>
-            <span>Windows via WSL2</span>
+            <span>Windows</span>
             <Link href="/docs">
               Get started <ArrowUpRight size={13} />
             </Link>
@@ -53,7 +53,7 @@ export default function Home() {
             <span className="small-check">
               <Check size={12} />
             </span>{" "}
-            Runs on your machine. Always asks before making changes.
+            Runs on your machine. Review changes and commands before approval.
           </div>
         </div>
       </section>
@@ -183,7 +183,7 @@ export default function Home() {
             No card. No paid upgrade.
           </p>
           <Link href="/dashboard">
-            Join the beta <ArrowUpRight size={14} />
+            Check beta access <ArrowUpRight size={14} />
           </Link>
         </div>
       </section>

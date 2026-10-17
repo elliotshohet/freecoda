@@ -21,6 +21,7 @@ import {
 import { usageSnapshot } from "./usage";
 import { selectAd, recordAd } from "./ads";
 import { inference } from "./inference";
+import { publicModelConfig } from "./public-model";
 export async function route(req: Request) {
   return handle(async () => {
     const url = new URL(req.url);
@@ -132,7 +133,7 @@ export async function route(req: Request) {
         "SELECT config FROM model_catalog WHERE config->>'approved'='true' ORDER BY id",
       );
       return json({
-        models: rows.map((r) => r.config),
+        models: rows.map((r) => publicModelConfig(r.config)),
         hostedEnabled: publicConfig().hostedEnabled,
       });
     }
@@ -170,7 +171,7 @@ export async function route(req: Request) {
           403,
           "Delete your account from the browser workspace.",
         );
-      const { prepareAccountDeletion } = await import('./cloud/lifecycle');
+      const { prepareAccountDeletion } = await import("./cloud/lifecycle");
       await prepareAccountDeletion(user.id);
       await transaction(async (db) => {
         await db.query("DELETE FROM invitations WHERE lower(email)=lower($1)", [

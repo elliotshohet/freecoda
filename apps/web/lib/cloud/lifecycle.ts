@@ -219,6 +219,14 @@ export async function prepareAccountDeletion(userId: string) {
   const { transaction } = await import("../db");
   const jobId = randomUUID();
   await transaction(async (db) => {
+    // Use the same lock order as admission so a concurrent resume cannot
+    // create a new lease after the cleanup handles and spending are captured.
+    await db.query("SELECT pg_advisory_xact_lock(hashtext('cloud-compute'))");
+    // Block new admissions while external cleanup runs before user cascade.
+    await db.query(
+      "INSERT INTO profiles(user_id,suspended) VALUES($1,true) ON CONFLICT(user_id) DO UPDATE SET suspended=true",
+      [userId],
+    );
     const rows = (
       await db.query(
         "SELECT sandbox_id,snapshot_id FROM cloud_projects WHERE user_id=$1 FOR UPDATE",
@@ -233,6 +241,21 @@ export async function prepareAccountDeletion(userId: string) {
       "UPDATE cloud_runs SET status='cancelled' WHERE user_id=$1 AND status IN ('queued','running')",
       [userId],
     );
+    // Account deletion cascades these leases. Move their entire reserved
+    // amount into spending first, otherwise global capacity stays reserved
+    // forever with no surviving lease to reconcile. Full charging is safe even
+    // if an external stop fails and the VM runs until its hard timeout.
+    const leases = (
+      await db.query(
+        "UPDATE cloud_compute_reservations SET status='settled',actual_seconds=seconds,settled_at=now(),settlement_reason='hard_timeout' WHERE user_id=$1 AND status='active' RETURNING *",
+        [userId],
+      )
+    ).rows;
+    for (const lease of leases)
+      await db.query(
+        "UPDATE cloud_compute_buckets SET reserved_seconds=greatest(0,reserved_seconds-$4),spent_seconds=spent_seconds+$4 WHERE (scope=$1 AND period=$2) OR (scope='global' AND period=$3)",
+        [userId, lease.day, lease.month, lease.seconds],
+      );
     await db.query(
       "INSERT INTO cloud_resource_cleanup(id,sandbox_ids,snapshot_ids) VALUES($1,$2,$3)",
       [

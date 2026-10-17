@@ -261,6 +261,11 @@ export async function events(userId: string, runId: string, after: number) {
 export async function reserveCompute(userId: string, projectId: string) {
   return transaction(async (db) => {
     await db.query("SELECT pg_advisory_xact_lock(hashtext('cloud-compute'))");
+    const authorized = await db.query(
+      "SELECT p.id FROM cloud_projects p WHERE p.id=$1 AND p.user_id=$2 AND p.status<>'deleted' AND p.expires_at>now() AND NOT EXISTS(SELECT 1 FROM profiles WHERE user_id=$2 AND suspended=true) FOR UPDATE",
+      [projectId, userId],
+    );
+    if (!authorized.rowCount) throw new ApiError(404, "Project not found.");
     const expired = (
       await db.query(
         "UPDATE cloud_compute_reservations SET status='settled',actual_seconds=seconds,settled_at=now(),settlement_reason='hard_timeout' WHERE status='active' AND created_at<now()-interval '20 minutes' RETURNING *",

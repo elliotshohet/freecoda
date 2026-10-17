@@ -78,3 +78,45 @@ test("source import excludes credentials and traversal but allows application so
     expect(allowedSource(path)).toBe(true);
   }
 });
+
+test("manual source edit validation preserves executable mode and rejects archive overflow before mutation", async () => {
+  const { proposedSourceEdit } =
+    await import("../apps/web/lib/cloud/source-edit");
+  const files = [
+    { path: "bin/start", content: "old", mode: "100755" as const },
+  ];
+  expect(proposedSourceEdit(files, "bin/start", "new")[0]).toEqual({
+    path: "bin/start",
+    content: "new",
+    mode: "100755",
+  });
+  const full = Array.from({ length: 10000 }, (_, index) => ({
+    path: `file${index}`,
+    content: "",
+  }));
+  expect(() => proposedSourceEdit(full, "overflow", "x")).toThrow("10,000");
+  expect(full).toHaveLength(10000);
+  expect(files[0].content).toBe("old");
+});
+
+test("public model catalog cannot expose server-only credential or routing fields", async () => {
+  const { publicModelConfig } = await import("../apps/web/lib/public-model");
+  const config = {
+    id: "openai/gpt-5-mini",
+    provider: "openai",
+    byok: true,
+    inputMicrosPerToken: 0.25,
+    outputMicrosPerToken: 2,
+    maxContextTokens: 400000,
+    approved: true,
+    apiKey: "private-secret",
+    providerOptions: {
+      gateway: { byok: { openai: [{ apiKey: "private-secret" }] } },
+    },
+  };
+  const publicValue = publicModelConfig(config);
+  expect(publicValue.id).toBe(config.id);
+  expect(publicValue.byok).toBe(true);
+  expect(JSON.stringify(publicValue)).not.toContain("private-secret");
+  expect(publicValue).not.toHaveProperty("providerOptions");
+});

@@ -25,6 +25,7 @@ import {
   publicationChanges,
 } from "./github";
 import type { CloudProject, SourceFile } from "./types";
+import { proposedSourceEdit } from "./source-edit";
 export function cloudEnabled() {
   return process.env.CLOUD_WORKSPACES_ENABLED === "true";
 }
@@ -166,26 +167,15 @@ async function editFileUnlocked(
     );
   const record = await store.project(userId, id);
   const original = record.payload.files.find((file) => file.path === data.path);
+  const files = proposedSourceEdit(
+    record.payload.files,
+    data.path,
+    data.content,
+  );
   if (record.project.sandboxId) {
     await vm.editProjectFile(record.project, data);
   } else if ((original ? digest(original.content) : null) !== data.expectedHash)
     throw new ApiError(409, "File changed. Refresh before saving.");
-  const files = record.payload.files
-    .filter((file) => file.path !== data.path)
-    .concat({ path: data.path, content: data.content });
-  if (
-    files.length > 10000 ||
-    files.reduce(
-      (sum, file) =>
-        sum +
-        Buffer.byteLength(
-          file.content,
-          file.encoding === "base64" ? "base64" : "utf8",
-        ),
-      0,
-    ) > 100_000_000
-  )
-    throw new ApiError(413, "Project source exceeds 100 MB or 10,000 files.");
   await store.saveProject(userId, id, record.version, {
     ...record.payload,
     files,

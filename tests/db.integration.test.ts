@@ -335,3 +335,142 @@ test("rate limit expiry handles mixed windows without deleting active allowances
     "Too many requests",
   );
 });
+
+test("account deletion settles global compute capacity before reservation cascade", async () => {
+  const { prepareAccountDeletion } =
+    await import("../apps/web/lib/cloud/lifecycle");
+  const project = await cloud.createProject(userId, "Deletion capacity", {
+    files: [],
+    consentAt: new Date().toISOString(),
+  });
+  await cloud.reserveCompute(userId, project.id);
+  await prepareAccountDeletion(userId);
+  await expect(cloud.reserveCompute(userId, project.id)).rejects.toThrow(
+    "not found",
+  );
+  const bucket = (
+    await pool.query(
+      "SELECT reserved_seconds,spent_seconds FROM cloud_compute_buckets WHERE scope='global' AND period=$1",
+      [utcMonth()],
+    )
+  ).rows[0];
+  expect(Number(bucket.reserved_seconds)).toBe(0);
+  expect(Number(bucket.spent_seconds)).toBe(900);
+  const lease = (
+    await pool.query(
+      "SELECT status,actual_seconds,settlement_reason FROM cloud_compute_reservations WHERE user_id=$1",
+      [userId],
+    )
+  ).rows[0];
+  expect(lease.status).toBe("settled");
+  expect(lease.actual_seconds).toBe(900);
+  expect(lease.settlement_reason).toBe("hard_timeout");
+  await pool.query('DELETE FROM "user" WHERE id=$1', [userId]);
+  expect(
+    (
+      await pool.query(
+        "SELECT * FROM cloud_compute_reservations WHERE user_id=$1",
+        [userId],
+      )
+    ).rowCount,
+  ).toBe(0);
+  expect(
+    Number(
+      (
+        await pool.query(
+          "SELECT reserved_seconds FROM cloud_compute_buckets WHERE scope='global' AND period=$1",
+          [utcMonth()],
+        )
+      ).rows[0].reserved_seconds,
+    ),
+  ).toBe(0);
+});
+
+test("daily maintenance requires authorization, retains uncertain BYOK spend, and schedules orphan cleanup", async () => {
+  const { authorizeMaintenance, runMaintenance, maintenanceRoute } =
+    await import("../apps/web/lib/maintenance");
+  const previous = process.env.CRON_SECRET;
+  process.env.CRON_SECRET = "test-cron-secret-at-least-32-characters";
+  try {
+    expect(() =>
+      authorizeMaintenance(new Request("http://localhost/api/maintenance")),
+    ).toThrow("authorization");
+    expect(() =>
+      authorizeMaintenance(
+        new Request("http://localhost/api/maintenance", {
+          headers: { Authorization: "Bearer wrong" },
+        }),
+      ),
+    ).toThrow("authorization");
+    const req = new Request("http://localhost/api/maintenance?status=1", {
+      headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
+    });
+    authorizeMaintenance(req);
+    const project = await cloud.createProject(userId, "Orphan fixture", {
+      files: [],
+      consentAt: new Date().toISOString(),
+    });
+    const cleanupId = randomUUID();
+    await pool.query("INSERT INTO cloud_resource_cleanup(id) VALUES($1)", [
+      cleanupId,
+    ]);
+    await pool.query(
+      "INSERT INTO model_catalog(id,config) VALUES('maintenance-byok',$1) ON CONFLICT(id) DO UPDATE SET config=excluded.config",
+      [JSON.stringify({ byok: true })],
+    );
+    const reservation = await reserve(userId, "maintenance-byok", 100);
+    await uncertain(reservation, "generation-fixture");
+    await pool.query(
+      "UPDATE reservations SET created_at=now()-interval '10 minutes' WHERE id=$1",
+      [reservation],
+    );
+    const scheduledProjects: string[] = [],
+      scheduledAccounts: string[] = [];
+    let reconciled = false;
+    const result = await runMaintenance({
+      cleanup: cleanupExpired,
+      reconcile: async () => {
+        reconciled = true;
+      },
+      project: async (id) => {
+        scheduledProjects.push(id);
+      },
+      account: async (id) => {
+        scheduledAccounts.push(id);
+      },
+    });
+    expect(result.status).toBe("ok");
+    expect(result.counts.manualReview).toBe(1);
+    expect(reconciled).toBe(false);
+    expect(scheduledProjects).toContain(project.id);
+    expect(scheduledAccounts).toContain(cleanupId);
+    expect(
+      (
+        await pool.query("SELECT status FROM reservations WHERE id=$1", [
+          reservation,
+        ])
+      ).rows[0].status,
+    ).toBe("uncertain");
+    const status = await (await maintenanceRoute(req)).json();
+    expect(status.maintenance.status).toBe("ok");
+    expect(JSON.stringify(status)).not.toContain(process.env.CRON_SECRET!);
+    const failed = await runMaintenance({
+      cleanup: async () => {
+        throw new Error("private provider payload");
+      },
+      reconcile: async () => {},
+      project: async () => {},
+      account: async () => {},
+    });
+    expect(failed.status).toBe("failed");
+    expect(failed.counts.failures).toBe(1);
+    expect(JSON.stringify(failed)).not.toContain("private provider");
+    await pool.query("DELETE FROM cloud_resource_cleanup WHERE id=$1", [
+      cleanupId,
+    ]);
+    await pool.query("DELETE FROM model_catalog WHERE id='maintenance-byok'");
+  } finally {
+    if (previous === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = previous;
+  }
+});

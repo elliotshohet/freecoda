@@ -39,5 +39,9 @@
   },
   "trustedDependencies": [
     "electron"
-  ]
+  ],
+  "overrides": {
+    "nanoid": "5.1.16",
+    "global-agent": "4.1.3"
+  }
 }

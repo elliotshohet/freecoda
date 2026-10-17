@@ -3,6 +3,7 @@ import { emitKeypressEvents, type Key } from "node:readline";
 import { PassThrough } from "node:stream";
 import { StringDecoder } from "node:string_decoder";
 import c from "picocolors";
+import { CLI_VERSION } from "./version";
 import type { Approval } from "@freecoda/core";
 import type { ThemePreference } from "./config";
 
@@ -539,7 +540,7 @@ export class TerminalScreen {
     const lines: string[] = [];
     lines.push(
       c.bold(palette.accent("  ▰ freecoda")) +
-        palette.muted("  0.1.0") +
+        palette.muted(`  ${CLI_VERSION}`) +
         palette.muted(clip("  " + this.status, columns - 24)),
     );
     lines.push(palette.muted("  " + clip(this.root, columns - 3)));

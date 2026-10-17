@@ -21,7 +21,10 @@ for platform, arch, extensions, feed in [
     ('mac', 'arm64', ['.dmg', '.zip'], 'latest-mac.yml'),
 ]:
     directory = source / f'{platform}-{arch}'
-    expected = {f'Freecoda-{version}-{platform}-{arch}{extension}' for extension in extensions}
+    expected = {
+        f'Freecoda-{version}-{platform}-{("amd64" if extension == ".deb" else "x86_64") if platform == "linux" else arch}{extension}'
+        for extension in extensions
+    }
     for name in expected:
         file = directory / name
         if not file.is_file() or file.is_symlink():

@@ -1,24 +1,32 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Copy, ArrowUpRight, Terminal } from "lucide-react";
 import Link from "next/link";
+import { CLI_INSTALL_COMMAND, CLI_PUBLISHED } from "@/lib/releases";
 export function Install({ compact = false }: { compact?: boolean }) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
-  const command = "npm install -g @freecoda/cli";
+  const command = CLI_INSTALL_COMMAND;
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
   return (
     <div className={compact ? "install compact" : "install"}>
       <div className="install-command">
         <Terminal size={17} />
         <code>{command}</code>
         <button
-          aria-label="Copy install command"
+          aria-label={
+            CLI_PUBLISHED
+              ? "Copy install command"
+              : "Copy upcoming install command"
+          }
           onClick={async () => {
             try {
               setError("");
               await navigator.clipboard.writeText(command);
               setCopied(true);
-              setTimeout(() => setCopied(false), 1800);
+              clearTimeout(timer.current);
+              timer.current = setTimeout(() => setCopied(false), 1800);
             } catch {
               setCopied(false);
               setError(
@@ -33,11 +41,13 @@ export function Install({ compact = false }: { compact?: boolean }) {
       <span role="status" className="sr-only">
         {copied ? "Install command copied." : error}
       </span>
-      {!compact && (
+      {(!compact || !CLI_PUBLISHED) && (
         <div className="install-note">
-          Local preview release <span>·</span>{" "}
-          <Link href="/docs#installation">
-            Install from source <ArrowUpRight size={12} />
+          {CLI_PUBLISHED ? "Node.js 22+" : "CLI publication processing"}{" "}
+          <span>·</span>{" "}
+          <Link href={CLI_PUBLISHED ? "/docs#installation" : "/app"}>
+            {CLI_PUBLISHED ? "Installation guide" : "Use the browser beta"}{" "}
+            <ArrowUpRight size={12} />
           </Link>
         </div>
       )}

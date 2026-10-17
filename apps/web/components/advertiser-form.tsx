@@ -5,7 +5,7 @@ export function AdvertiserForm() {
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
   return (
-    <section className="panel">
+    <section className="panel" aria-live="polite" aria-busy={busy}>
       {done ? (
         <>
           <h2>Your inquiry is in.</h2>
@@ -24,11 +24,16 @@ export function AdvertiserForm() {
             const form = new FormData(e.currentTarget);
             try {
               const r = await fetch("/api/v1/sponsor/inquiry", {
+                signal: AbortSignal.timeout(15000),
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(Object.fromEntries(form)),
               });
-              const d = await r.json();
+              const d = await r
+                .json()
+                .catch(() => ({
+                  error: "Could not save your inquiry. Please try again.",
+                }));
               if (!r.ok) throw new Error(d.error);
               setDone(true);
             } catch (e) {
@@ -43,11 +48,22 @@ export function AdvertiserForm() {
           <h2>Tell us about your business.</h2>
           <label className="field">
             Business name
-            <input name="business" required maxLength={100} />
+            <input
+              name="business"
+              autoComplete="organization"
+              required
+              maxLength={100}
+            />
           </label>
           <label className="field">
             Work email
-            <input type="email" name="email" required maxLength={200} />
+            <input
+              type="email"
+              autoComplete="email"
+              name="email"
+              required
+              maxLength={200}
+            />
           </label>
           <label className="field">
             Website

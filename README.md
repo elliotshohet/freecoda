@@ -99,7 +99,21 @@ bun --env-file=apps/web/.env.local scripts/cleanup.ts
 bun run invite person@example.com
 ```
 
-Invitations are limited to twenty beta accounts. The invitation script stores permission and sends no email. Reconciliation never guesses a refund; requests without a provider generation ID may need manual investigation. Run reconciliation and cleanup regularly through your operations scheduler.
+Invitations are limited to twenty beta accounts. The invitation script stores permission and sends no email. Reconciliation never guesses a refund; requests without a provider generation ID require investigation. For BYOK requests, Gateway charges can be zero while the upstream provider bills separately: obtain provider billing/usage evidence before an operator settles an interrupted reservation. These reservations remain held until that evidence is available.
+
+### Daily maintenance and monitoring
+
+Apply migrations through `0009_maintenance.sql`, set production `CRON_SECRET` to at least 32 random characters, and deploy `apps/web/vercel.json` with the web project root. The configured daily Vercel Cron calls `/api/maintenance` with `Authorization: Bearer <CRON_SECRET>`; it fits the Hobby daily schedule. Verify the cron registration and first successful invocation in the Vercel dashboard after deployment. Preview deployments do not establish production maintenance coverage.
+
+Maintenance removes expired device/ad/rate-limit records, reconciles up to five older non-BYOK requests with explicit provider evidence, and schedules durable cleanup for expired/orphaned projects and account resources. Limits keep each sweep bounded; durable workflows retry external resource failures. No refund is inferred from a missing generation, missing configuration, or BYOK Gateway charge. Repeated sweeps are serialized. The manual scripts above remain available for recovery and backlog processing.
+
+Authenticated `GET /api/maintenance?status=1` returns the last start/finish timestamps, status, and aggregate counters. Use the same Bearer authorization through your secret manager; never put the secret in a URL. Treat a failed run, a running record older than five minutes, or no completed run in 48 hours as an operations incident. Inspect Vercel cron/workflow failures and database connectivity, run the endpoint again after resolving the cause, and confirm its finished status. The application stores this health record; it does not claim an independently configured pager or alert-delivery service.
+
+### Database recovery and secret rotation
+
+Confirm the actual Neon restore window and backup/export policy for the deployed project in its dashboard; availability depends on its configured plan. A restore routine is required before expanding access: record a restore point, restore into an isolated branch/database, apply schema migrations there, and verify account ownership, encrypted project reads, and allowance accounting before changing production connections. Disable hosted inference/cloud admission during a real restore, preserve original data, reconcile provider spending that happened after the restore point, and smoke-test sign-in, device revocation and project access before reopening. Do not treat this runbook as evidence that a restore drill or an off-provider backup has already completed. Keep any database export encrypted with restricted access and an explicit deletion schedule.
+
+Rotate server credentials through Vercel environment management without printing values: update, redeploy, verify the affected operation, then revoke the old provider/GitHub credential. Rotating `BETTER_AUTH_SECRET` can invalidate sessions. Rotating `AD_SIGNING_SECRET` invalidates outstanding ad tokens. Rotating `CLOUD_PREVIEW_SECRET` requires stopping existing VMs and resuming them with the new verification key. Rotate `CRON_SECRET` with a deployment and verify a new authenticated maintenance run. `CLOUD_ENCRYPTION_KEY` is also needed to decrypt retained database backups: never replace it in place while encrypted records exist. Retain the old key securely and perform a tested re-encryption migration for every project/run/event payload before retiring it. No automatic encryption-key migration is currently implemented.
 
 ## Direct sponsors
 

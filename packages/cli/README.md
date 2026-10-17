@@ -2,14 +2,16 @@
 
 A local coding agent with a full-screen terminal workspace, streamed replies, repository tools, visible approval prompts, and labeled sponsor placements. One Freecoda plan: free forever, supported by sponsors, with fair-use limits for hosted inference.
 
-The package is prepared as `freecoda`; npm publication is currently held. The future release operator must authenticate as the npm account `freecoda` and verify that identity with `npm whoami` before a separately authorized publication. Building, packing, and installation checks do not authorize publishing. Run from the private monorepo:
+## Install
+
+Install the Freecoda CLI with Node.js 22 or newer:
 
 ```sh
-bun install --frozen-lockfile
-bun run build:cli
-node packages/cli/dist/index.js --help
-node packages/cli/dist/index.js login
-node packages/cli/dist/index.js --cwd /path/to/project
+npm install --global freecoda@0.1.1
+freecoda --help
+freecoda login
+cd /path/to/project
+freecoda
 ```
 
 `login` connects your hosted account using a short-lived device code approved in your browser. Hosted access still requires an invited account and an available approved model. Use `provider configure` instead to connect an OpenAI-compatible provider directly. Its pricing and data policies apply. Set `FREECODA_PROVIDER_KEY` to supply a direct provider key without storing it in configuration.
@@ -46,6 +48,7 @@ Bracketed paste is inserted as text, including embedded newlines and slash comma
 - `/model`: list approved hosted models, or show the direct provider model.
 - `/model <id>`: select a model for this session.
 - `/theme auto|dark|light`: save the terminal palette; `/theme` shows the current preference.
+- `/update`: show instructions to check and install an update after leaving the session.
 - `/usage`: show hosted allowance and reset information.
 - `/status`: show the current directory, provider, model, and conversation size.
 - `/new`: reset the model conversation without changing project files.
@@ -57,10 +60,21 @@ Start with `--resume` to reopen the conversation saved for the current repositor
 For a single task and plain output:
 
 ```sh
-node packages/cli/dist/index.js --cwd /path/to/project -p "Explain how authentication works"
+freecoda --cwd /path/to/project -p "Explain how authentication works"
 ```
 
 Repository trust must already be granted when input is noninteractive. Noninteractive writes and shell commands are declined; there is no implicit permission bypass.
+
+## Updates
+
+The full-screen interface checks npm for newer stable versions in the background. Exit your coding session before updating:
+
+```sh
+freecoda update
+freecoda update --install
+```
+
+The first command checks availability. `--install` explicitly invokes npm to install the validated stable version globally from the public npm registry, with package lifecycle scripts disabled. It never uses sudo. For a permissions error, configure a user-owned npm prefix or use a Node version manager. `/update` only shows these instructions; it cannot replace the CLI while an agent is working.
 
 ## Approvals and local state
 

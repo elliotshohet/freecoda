@@ -10,7 +10,8 @@ class ReleaseAssets(unittest.TestCase):
             directory=source/f'{platform}-{arch}'; directory.mkdir(parents=True)
             files=[]; checksums=[]
             for ext in exts:
-                name=f'Freecoda-0.1.0-{platform}-{arch}{ext}'; data=name.encode()
+                target_arch = ('amd64' if ext == '.deb' else 'x86_64') if platform == 'linux' else arch
+                name=f'Freecoda-0.1.0-{platform}-{target_arch}{ext}'; data=name.encode()
                 (directory/name).write_bytes(data)
                 checksums.append(f'{hashlib.sha256(data).hexdigest()}  {name}')
                 files.append({'url':name,'sha512':base64.b64encode(hashlib.sha512(data).digest()).decode(),'size':len(data)})
