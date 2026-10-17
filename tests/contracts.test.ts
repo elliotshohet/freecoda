@@ -436,3 +436,40 @@ test("public readiness coalesces probe load, expires its cache, and exposes only
   expect(failed.status).toBe(503);
   expect(await failed.json()).toEqual({ ready: false });
 });
+
+test("recovery fixture verification refuses missing or invalid retained cloud keys before starting external work", async () => {
+  const path = await import("node:path");
+  for (const key of ["", "invalid-key"]) {
+    const child = Bun.spawn(
+      [
+        process.execPath,
+        path.resolve(import.meta.dir, "../scripts/recovery-drill.ts"),
+      ],
+      {
+        cwd: path.resolve(import.meta.dir, ".."),
+        env: {
+          ...process.env,
+          PATH: "",
+          DATABASE_URL:
+            "postgresql://fixture:private-fixture-password@fixture.neon.tech/fixture",
+          CLOUD_ENCRYPTION_KEY: key,
+          FREECODA_RECOVERY_VERIFY_PROJECT_ID:
+            "00000000-0000-0000-0000-000000000001",
+          FREECODA_RECOVERY_VERIFY_PATH: "fixture.txt",
+          FREECODA_RECOVERY_VERIFY_SHA256: "0".repeat(64),
+        },
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
+    const [code, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    expect(code).toBe(1);
+    expect(stderr).toContain("retained cloud encryption key validation");
+    expect(stderr).not.toContain("isolated PostgreSQL18 container creation");
+    expect(stdout + stderr).not.toContain("private-fixture-password");
+  }
+}, 10000);

@@ -21,6 +21,7 @@ import {
 } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
 import path from "node:path";
+import { encryptionReady } from "../apps/web/lib/cloud/crypto";
 const { Pool } = createRequire(
   new URL("../apps/web/package.json", import.meta.url),
 )("pg") as typeof import("pg");
@@ -260,6 +261,28 @@ async function inventory(pool: Database, client?: import("pg").PoolClient) {
   };
 }
 try {
+  const fixtureProject = process.env.FREECODA_RECOVERY_VERIFY_PROJECT_ID;
+  const fixturePath = process.env.FREECODA_RECOVERY_VERIFY_PATH;
+  const fixtureHash = process.env.FREECODA_RECOVERY_VERIFY_SHA256;
+  const verifyFixture = Boolean(fixtureProject || fixturePath || fixtureHash);
+  if (
+    verifyFixture &&
+    (!fixtureProject ||
+      !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(
+        fixtureProject,
+      ) ||
+      !fixturePath ||
+      fixturePath.length > 500 ||
+      !fixtureHash ||
+      !/^[a-f0-9]{64}$/.test(fixtureHash))
+  )
+    throw new Error("Invalid expected recovery fixture");
+  if (verifyFixture && !encryptionReady()) {
+    stage = "retained cloud encryption key validation";
+    throw new Error(
+      "The retained production cloud encryption key is required for fixture verification",
+    );
+  }
   const production = new URL(process.env.DATABASE_URL || "");
   if (!production.hostname.endsWith(".neon.tech"))
     throw new Error("Production source must be the existing Neon database");
@@ -527,6 +550,7 @@ try {
     ["cloud_runs", "run", "id"],
     ["cloud_events", "event", "run_id"],
   ]) {
+    if (verifyFixture && table === "cloud_projects") continue;
     const rows = (
       await restored.query(
         `SELECT ${idColumn} AS context_id,payload FROM public.${quote(table)} LIMIT 1`,
@@ -536,6 +560,28 @@ try {
       decrypt(row.payload, `${context}:${row.context_id}`);
       encryptedPayloadsVerified++;
     }
+  }
+  let expectedFixtureVerified = false;
+  if (verifyFixture) {
+    const rows = (
+      await restored.query(
+        `SELECT id,payload FROM public.cloud_projects WHERE id='${fixtureProject}'::uuid`,
+      )
+    ).rows;
+    if (rows.length !== 1)
+      throw new Error("Expected restored project is missing");
+    const body = decrypt<{
+      files?: { path: string; content: string; encoding?: string }[];
+    }>(rows[0].payload, `project:${rows[0].id}`);
+    const file = body.files?.find((file) => file.path === fixturePath);
+    if (
+      !file ||
+      file.encoding === "base64" ||
+      createHash("sha256").update(file.content).digest("hex") !== fixtureHash
+    )
+      throw new Error("Restored fixture content does not match");
+    expectedFixtureVerified = true;
+    encryptedPayloadsVerified++;
   }
   await restored.end();
   restored = undefined;
@@ -563,6 +609,7 @@ try {
         sha256: digest.digest("hex"),
         schemaHash: expected!.schemaHash,
         encryptedPayloadsVerified,
+        expectedFixtureVerified,
         containerRemoved: managed,
         tableCount: actual.tables,
         rowCounts: actual.counts,
@@ -582,6 +629,7 @@ try {
     JSON.stringify({
       status: "verified",
       encryptedPayloadsVerified,
+      expectedFixtureVerified,
       containerRemoved: managed,
       tableCount: actual.tables,
       encryptedBytes: info.size,

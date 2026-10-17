@@ -88,11 +88,19 @@ async function connect() {
   };
 }
 async function rendererProof(label) {
+  await waitFor('complete desktop document and preload bridge', async () => {
+    const readiness = await client('Runtime.evaluate', {
+      expression: `document.readyState === 'complete' && typeof window.freecoda === 'object' && !!document.querySelector('#theme-select')`,
+      returnByValue: true,
+    });
+    assert(!readiness.exceptionDetails, JSON.stringify(readiness.exceptionDetails));
+    return readiness.result.value === true;
+  }, 45_000);
   const result = await client('Runtime.evaluate', {
     expression: `(async()=>({url:location.href,node:typeof process,require:typeof require,rawIPC:typeof ipcRenderer,state:await window.freecoda.getState()}))()`,
     awaitPromise: true, returnByValue: true,
   });
-  assert(!result.exceptionDetails); const data = result.result.value;
+  assert(!result.exceptionDetails, JSON.stringify(result.exceptionDetails)); const data = result.result.value;
   assert.equal(data.url, 'freecoda://desktop/index.html');
   assert.equal(data.node, 'undefined'); assert.equal(data.require, 'undefined'); assert.equal(data.rawIPC, 'undefined');
   assert.equal(data.state.auth.signedIn, false); assert.equal(data.state.workspace, null); assert.equal(data.state.running, false);
