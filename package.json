@@ -1,0 +1,5 @@
+{
+  "name": "freecoda-workspace", "private": true, "type": "module", "workspaces": ["apps/*", "packages/*"],
+  "scripts": {"dev":"bun --cwd apps/web dev", "build":"bun run build:cli && bun --cwd apps/web build", "build:cli":"bun packages/cli/build.ts", "typecheck":"tsc --noEmit && bun --cwd apps/web typecheck", "test":"bun test tests", "db:migrate":"bun scripts/migrate.ts", "cli":"bun packages/cli/src/index.ts", "models:sync":"bun scripts/sync-models.ts", "eval":"bun scripts/evaluate.ts"},
+  "devDependencies":{"@types/node":"latest","@types/react":"latest","@types/react-dom":"latest","@types/bun":"latest","@types/pg":"latest","typescript":"latest"}
+}

@@ -1,0 +1,2 @@
+export const publicConfig=()=>({database:!!process.env.DATABASE_URL,auth:!!(process.env.DATABASE_URL&&process.env.GITHUB_CLIENT_ID&&process.env.GITHUB_CLIENT_SECRET&&process.env.BETTER_AUTH_SECRET),gateway:!!(process.env.AI_GATEWAY_API_KEY||process.env.VERCEL_OIDC_TOKEN),payments:!!(process.env.STRIPE_SECRET_KEY&&process.env.STRIPE_WEBHOOK_SECRET),hostedEnabled:process.env.HOSTED_INFERENCE_ENABLED==='true'});
+export const appUrl=()=>process.env.BETTER_AUTH_URL||'http://127.0.0.1:3010';
