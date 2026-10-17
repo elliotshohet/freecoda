@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import type { DesktopBridge, DesktopEvent } from "./shared";
 // Expose individual operations, never raw IPC or Node APIs.
 const api: DesktopBridge = {
+  setTheme: (theme) => ipcRenderer.invoke("desktop:setTheme", theme),
   getState: () => ipcRenderer.invoke("desktop:getState"),
   openFolder: () => ipcRenderer.invoke("desktop:openFolder"),
   trustWorkspace: (input) => ipcRenderer.invoke("desktop:trustWorkspace", input),

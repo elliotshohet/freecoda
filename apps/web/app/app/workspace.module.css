@@ -28,8 +28,8 @@
   font-size: 12px;
 }
 .free {
-  border: 1px solid #d9d3f8;
-  color: #5640bc;
+  border: 1px solid light-dark(#d9d3f8, #393143);
+  color: light-dark(#5640bc, #baa6df);
   background: var(--pale);
   border-radius: 20px;
   padding: 7px 13px;
@@ -47,7 +47,7 @@
   padding: 50px 24px;
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: white;
+  background: light-dark(white, #1d1b27);
 }
 .setup h2 {
   font-size: 28px;
@@ -74,7 +74,7 @@
 }
 .iconButton {
   border: 1px solid var(--line);
-  background: white;
+  background: light-dark(white, #1d1b27);
   padding: 12px;
   display: flex;
   border-radius: 9px;
@@ -86,8 +86,8 @@
 }
 .capacity {
   background: var(--pale);
-  color: #554e78;
-  border: 1px solid #e1dbf8;
+  color: light-dark(#554e78, #baa6df);
+  border: 1px solid light-dark(#e1dbf8, #393143);
   border-radius: 9px;
   padding: 11px 16px;
   display: flex;
@@ -119,14 +119,14 @@
 .workbench {
   display: grid;
   grid-template-columns: 210px minmax(0, 1fr);
-  border: 1px solid #dcdde8;
+  border: 1px solid light-dark(#dcdde8, #393143);
   border-radius: 14px;
   overflow: hidden;
-  background: #fff;
+  background: light-dark(#fff, #1d1b27);
   min-height: 680px;
 }
 .projects {
-  background: #f5f5fa;
+  background: light-dark(#f5f5fa, #241e32);
   border-right: 1px solid var(--line);
   padding: 10px;
   display: flex;
@@ -191,8 +191,8 @@
 .projectList > button:hover,
 .projectList > button.selected,
 .repoList > button:hover {
-  background: #e8e4f9;
-  color: #5844b7;
+  background: light-dark(#e8e4f9, #241e32);
+  color: light-dark(#5844b7, #baa6df);
 }
 .importButton {
   display: flex;
@@ -201,8 +201,8 @@
   gap: 6px;
   width: 100%;
   font-size: 11px;
-  background: white;
-  border: 1px solid #dedbe9;
+  background: light-dark(white, #1d1b27);
+  border: 1px solid light-dark(#dedbe9, #393143);
   padding: 10px 5px;
   border-radius: 7px;
   margin-top: 20px;
@@ -265,7 +265,7 @@
 .projectStatus {
   color: var(--muted);
   font-size: 10px;
-  background: #f3f3f7;
+  background: light-dark(#f3f3f7, #241e32);
   padding: 4px 8px;
   border-radius: 8px;
 }
@@ -281,7 +281,7 @@
 .files {
   overflow: auto;
   border-right: 1px solid var(--line);
-  background: #fcfcfe;
+  background: light-dark(#fcfcfe, #241e32);
 }
 .files > button {
   width: 100%;
@@ -294,7 +294,7 @@
   background: transparent;
   font-family: var(--mono);
   font-size: 10px;
-  color: #6e6c83;
+  color: light-dark(#6e6c83, #b7adc5);
 }
 .files > button span {
   overflow: hidden;
@@ -316,7 +316,7 @@
   justify-content: space-between;
   gap: 10px;
   min-height: 38px;
-  border-bottom: 1px solid #efeff5;
+  border-bottom: 1px solid light-dark(#efeff5, #393143);
   padding: 0 14px;
   font-size: 10px;
   font-family: var(--mono);
@@ -334,7 +334,7 @@
 .editorBar button {
   border: 0;
   background: var(--pale);
-  color: #5a46ba;
+  color: light-dark(#5a46ba, #baa6df);
   padding: 5px 9px;
   border-radius: 4px;
   font-size: 10px;
@@ -348,16 +348,16 @@
   border-radius: 0;
   font: 12px/1.9 var(--mono);
   padding: 17px 20px;
-  color: #37334f;
-  background: #fff;
+  color: light-dark(#37334f, #baa6df);
+  background: light-dark(#fff, #1d1b27);
   tab-size: 2;
   outline-offset: -3px !important;
   white-space: pre;
   overflow: auto;
 }
 .codeEditor:disabled {
-  background: #fafafd;
-  color: #737082;
+  background: light-dark(#fafafd, #241e32);
+  color: light-dark(#737082, #b7adc5);
 }
 .editorEmpty {
   flex: 1;
@@ -367,7 +367,7 @@
   flex-direction: column;
   text-align: center;
   padding: 25px;
-  color: #a4a0b7;
+  color: light-dark(#a4a0b7, #baa6df);
 }
 .editorEmpty p {
   margin: 12px 0 4px;
@@ -383,7 +383,7 @@
   margin-top: 20px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: white;
+  background: light-dark(white, #1d1b27);
   padding: 8px 15px;
   font-size: 12px;
 }
@@ -459,7 +459,7 @@
   line-height: 1.85;
 }
 .userMessage {
-  background: #f5f3fd;
+  background: light-dark(#f5f3fd, #241e32);
   border-radius: 9px;
   padding: 12px 16px;
   margin-left: 25px;
@@ -476,10 +476,10 @@
 }
 .composer {
   margin: 0 17px 16px;
-  border: 1px solid #dcd7ef;
+  border: 1px solid light-dark(#dcd7ef, #393143);
   border-radius: 10px;
   overflow: hidden;
-  background: #fdfcff;
+  background: light-dark(#fdfcff, #241e32);
 }
 .composer > textarea {
   border: 0;
@@ -507,11 +507,11 @@
 }
 .composer select {
   font: 10px var(--sans);
-  color: #5b4e86;
-  border: 1px solid #e2ddef;
+  color: light-dark(#5b4e86, #baa6df);
+  border: 1px solid light-dark(#e2ddef, #393143);
   padding: 5px;
   border-radius: 4px;
-  background: white;
+  background: light-dark(white, #1d1b27);
 }
 .composer div > span {
   flex: 1;
@@ -519,8 +519,8 @@
   font-size: 9px;
 }
 .send {
-  background: var(--purple);
-  color: white;
+  background: var(--action-bg);
+  color: light-dark(white, white);
   border: 0;
   border-radius: 6px;
   padding: 8px 11px;
@@ -557,7 +557,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid #dbd6ee;
+  border: 1px solid light-dark(#dbd6ee, #393143);
   border-radius: 6px;
   background: var(--pale);
   padding: 8px 10px;
@@ -569,7 +569,7 @@
   overflow: auto;
   padding: 14px;
   font: 11px/1.8 var(--mono);
-  background: #fafafe;
+  background: light-dark(#fafafe, #241e32);
   border: 1px solid var(--line);
   border-radius: 7px;
 }
@@ -579,12 +579,12 @@
   min-height: 1em;
 }
 .diff .added {
-  color: #24734c;
-  background: #edf8f1;
+  color: light-dark(#24734c, #92c9ad);
+  background: light-dark(#edf8f1, #1c3027);
 }
 .diff .removed {
-  color: #a34a57;
-  background: #fff0f1;
+  color: light-dark(#a34a57, #efa9bd);
+  background: light-dark(#fff0f1, #35212b);
 }
 .reviewCheck {
   display: flex;
@@ -593,17 +593,17 @@
   font-size: 11px;
   line-height: 1.7;
   margin: 16px 0;
-  color: #655c7b;
+  color: light-dark(#655c7b, #baa6df);
 }
 .output {
-  background: #292637;
-  color: #e0dcec;
+  background: light-dark(#292637, #14121c);
+  color: light-dark(#e0dcec, #e0dcec);
   min-height: 310px;
   padding: 18px 22px;
 }
 .output > p {
   font-size: 10px;
-  color: #a9a2bd;
+  color: light-dark(#a9a2bd, #baa6df);
   margin: 0 0 14px;
 }
 .output pre {
@@ -614,7 +614,7 @@
   overflow: auto;
 }
 .output > span {
-  color: #a9a2bd;
+  color: light-dark(#a9a2bd, #baa6df);
   font-size: 12px;
 }
 .preview {
@@ -644,16 +644,16 @@
   width: 100%;
   height: 420px;
   border: 0;
-  background: white;
+  background: light-dark(white, #1d1b27);
 }
 .error {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  border: 1px solid #edcdd4;
-  background: #fff4f5;
-  color: #9b3a51;
+  border: 1px solid light-dark(#edcdd4, #393143);
+  background: light-dark(#fff4f5, #35212b);
+  color: light-dark(#9b3a51, #efa9bd);
   border-radius: 8px;
   padding: 12px 15px;
   font-size: 12px;
@@ -670,7 +670,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #377d5c;
+  color: light-dark(#377d5c, #92c9ad);
   font-size: 12px;
   margin-bottom: 15px;
 }
@@ -684,7 +684,7 @@
   position: fixed;
   inset: 0;
   z-index: 200;
-  background: #25223d66;
+  background: light-dark(#25223d66, #14121c66);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -692,7 +692,7 @@
   backdrop-filter: blur(3px);
 }
 .dialog {
-  background: white;
+  background: light-dark(white, #1d1b27);
   position: relative;
   border-radius: 15px;
   padding: 32px;
@@ -700,7 +700,7 @@
   max-width: 100%;
   max-height: 85vh;
   overflow: auto;
-  box-shadow: 0 20px 80px #29233526;
+  box-shadow: 0 20px 80px light-dark(#29233526, #00000026);
 }
 .dialog h2 {
   margin: 0 30px 12px 0;
@@ -741,8 +741,8 @@
   display: block;
 }
 .deleteButton {
-  color: white;
-  background: #a8465b;
+  color: light-dark(white, white);
+  background: light-dark(#a8465b, #a8465b);
   padding: 12px 16px;
   border: 0;
   border-radius: 7px;
@@ -892,7 +892,7 @@
   gap: 10px;
   padding: 8px 15px;
   border-bottom: 1px solid var(--line);
-  background: #fcfcfe;
+  background: light-dark(#fcfcfe, #241e32);
   font-size: 10px;
   color: var(--muted);
   flex-wrap: wrap;
@@ -909,11 +909,11 @@
   border-radius: 4px;
   padding: 6px 8px;
   color: var(--ink);
-  background: white;
+  background: light-dark(white, #1d1b27);
 }
 .appFolder button {
-  border: 1px solid #ddd7ef;
-  background: white;
+  border: 1px solid light-dark(#ddd7ef, #393143);
+  background: light-dark(white, #1d1b27);
   color: var(--purple);
   font-size: 10px;
   border-radius: 4px;
@@ -924,7 +924,7 @@
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: white;
+  background: light-dark(white, #1d1b27);
   color: var(--ink);
 }
 @media (max-width: 700px) {
@@ -947,6 +947,12 @@
   border: 1px solid var(--line);
   border-radius: 4px;
   font: 10px var(--sans);
-  background: white;
+  background: light-dark(white, #1d1b27);
   color: var(--ink);
+}
+.projectList > button:hover,
+.projectList > button.selected,
+.repoList > button:hover {
+  background: light-dark(#e8e4f9, #3a2d4f);
+  color: light-dark(#5844b7, #d5c1f2);
 }

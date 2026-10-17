@@ -376,7 +376,7 @@ test("desktop cancellation waits for an approved manual command to exit", async 
     // Bun itself is the portable executable in every CI job. The process ignores
     // TERM on POSIX so cancellation must await the process-tree hard kill.
     const script =
-      "process.on('SIGTERM',()=>{});console.log('READY:'+process.pid);setInterval(()=>{},1000)";
+      "process.on('SIGTERM',()=>{});require('node:fs').writeFileSync('child.pid',String(process.pid));console.log('READY:'+process.pid);setInterval(()=>{},1000)";
     const command = `"${process.execPath}" -e "${script}"`;
     const running = service.runCommand({ command });
     await until(() => events.some((event) => event.type === "approval"));
@@ -387,8 +387,18 @@ test("desktop cancellation waits for an approved manual command to exit", async 
       approved: true,
       scope: "once",
     });
-    // Allow the child to install its handler before cancelling.
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // Wait for actual readiness rather than depending on host startup speed.
+    let readyPid = 0;
+    for (let i = 0; i < 500; i++) {
+      try {
+        readyPid = Number(
+          await readFile(path.join(f.repository, "child.pid"), "utf8"),
+        );
+      } catch {}
+      if (readyPid > 0) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(readyPid).toBeGreaterThan(0);
     await service.cancelRun();
     const result = await running;
     const pid = Number(result.output.match(/READY:(\d+)/)?.[1]);

@@ -57,6 +57,7 @@ export type DesktopSaveInput = {
   expectedHash: string | null;
 };
 export interface DesktopBridge {
+  setTheme(theme: "system" | "light" | "dark"): Promise<void>;
   getState(): Promise<DesktopState>;
   openFolder(): Promise<DesktopWorkspace | null>;
   trustWorkspace(input: {

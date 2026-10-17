@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, dialog, ipcMain, net, protocol, session, shell, type IpcMainInvokeEvent } from "electron";
+import { app, BrowserWindow, Menu, dialog, ipcMain, net, nativeTheme, protocol, session, shell, type IpcMainInvokeEvent } from "electron";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { APP_URL, assetPath, externalURL, isAppDocument } from "./security";
@@ -33,6 +33,11 @@ async function chooseFolder() {
 }
 function installIPC() {
   const methods = {
+    setTheme: (theme: unknown) => {
+      if (theme !== "system" && theme !== "light" && theme !== "dark") throw new Error("Invalid theme.");
+      nativeTheme.themeSource = theme;
+      window?.setBackgroundColor(nativeTheme.shouldUseDarkColors ? "#171522" : "#f6f5fa");
+    },
     getState: () => service.getState(),
     openFolder: chooseFolder,
     trustWorkspace: (input: Parameters<LocalAgentService["trustWorkspace"]>[0]) => service.trustWorkspace(input),
@@ -58,7 +63,7 @@ function installIPC() {
 function createWindow() {
   window = new BrowserWindow({
     width: 1440, height: 920, minWidth: 900, minHeight: 620, show: false,
-    title: "Freecoda", backgroundColor: "#f6f5fa", icon: path.join(assetsDirectory, "icon.png"),
+    title: "Freecoda", backgroundColor: nativeTheme.shouldUseDarkColors ? "#171522" : "#f6f5fa", icon: path.join(assetsDirectory, "icon.png"),
     webPreferences: {
       preload: path.join(assetsDirectory, "preload.cjs"), nodeIntegration: false,
       contextIsolation: true, sandbox: true, webSecurity: true, webviewTag: false,

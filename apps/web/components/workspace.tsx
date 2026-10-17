@@ -148,8 +148,8 @@ export function Workspace() {
                 <h2>Your terminal is the starting line.</h2>
                 <p>
                   Sign in to see your daily allowance and connect your CLI.
-                  Freecoda has one free plan, supported by direct sponsors.
-                  No API key required. Hosted access is invite-only during beta.
+                  Freecoda has one free plan, supported by direct sponsors. No
+                  API key required. Hosted access is invite-only during beta.
                 </p>
                 <button
                   className="button dark"
@@ -173,7 +173,7 @@ export function Workspace() {
           </section>
           <aside>
             <section className="panel">
-              <ShieldCheck size={23} color="#8d79bc" />
+              <ShieldCheck size={23} color="var(--purple)" />
               <h2 style={{ marginTop: 14 }}>A clear view of the service.</h2>
               <p>
                 These checks reflect this running instance. No sample activity

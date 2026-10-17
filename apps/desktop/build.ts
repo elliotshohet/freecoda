@@ -7,10 +7,11 @@ for (const [entry, target, format] of [
   ["src/main.ts", "node", "cjs"],
   ["src/preload.ts", "node", "cjs"],
   ["src/renderer/index.ts", "browser", "esm"],
+  ["src/renderer/theme.ts", "browser", "esm"],
 ] as const) {
   const result = await Bun.build({
     entrypoints: [path.join(root, entry)], outdir: out,
-    naming: entry.includes("renderer") ? "renderer.js" : "[name].cjs",
+    naming: entry.endsWith("theme.ts") ? "theme.js" : entry.includes("renderer") ? "renderer.js" : "[name].cjs",
     target, format, external: ["electron"], minify: false, sourcemap: "external",
     define: { "process.env.NODE_ENV": JSON.stringify("production") },
   });

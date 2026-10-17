@@ -46,12 +46,17 @@ export async function runShell(
       const shell = windows
         ? process.env.ComSpec || process.env.COMSPEC || "cmd.exe"
         : "/bin/sh";
-      const args = windows ? ["/d", "/s", "/c", command] : ["-c", command];
+      // Match Node's cmd.exe shell mode: cmd parses the outer quotes itself,
+      // rather than receiving CRT-style backslash escaping of embedded quotes.
+      const args = windows
+        ? ["/d", "/s", "/c", `"${command}"`]
+        : ["-c", command];
       const child = spawn(shell, args, {
         cwd: root,
         env,
         detached: !windows,
         windowsHide: true,
+        windowsVerbatimArguments: windows,
         stdio: ["ignore", "pipe", "pipe"],
       });
       let output = "";

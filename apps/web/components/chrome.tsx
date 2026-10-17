@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ThemeControl } from "./theme-control";
 import { ArrowUpRight, Command } from "lucide-react";
 export function Mark() {
   return (
@@ -22,9 +23,12 @@ export function Header() {
         <Link href="/docs">Docs</Link>
         <Link href="/app">Build in your browser</Link>
       </nav>
-      <Link className="header-cta" href="/app">
-        Your workspace <ArrowUpRight size={15} />
-      </Link>
+      <div className="header-actions">
+        <ThemeControl />
+        <Link className="header-cta" href="/app">
+          Your workspace <ArrowUpRight size={15} />
+        </Link>
+      </div>
     </header>
   );
 }

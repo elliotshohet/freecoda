@@ -9,6 +9,7 @@
     />
     <title>Freecoda</title>
     <link rel="icon" href="./logo.svg" type="image/svg+xml" />
+    <script src="./theme.js"></script>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -29,10 +30,19 @@
           Cloud workspace <span aria-hidden="true">↗</span>
         </button>
       </div>
-      <button class="account-button" id="account-open">
-        <span class="account-dot"></span
-        ><span id="account-label">Your account</span>
-      </button>
+      <div class="titlebar-actions">
+        <label class="theme-control"
+          ><span class="sr-only">Color theme</span
+          ><select id="theme-select" aria-label="Color theme">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select></label
+        ><button class="account-button" id="account-open">
+          <span class="account-dot"></span
+          ><span id="account-label">Your account</span>
+        </button>
+      </div>
     </header>
     <div id="notice" class="notice" role="status" hidden></div>
     <div id="error" class="error" role="alert" hidden>

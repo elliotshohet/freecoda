@@ -18,7 +18,7 @@ export function assetPath(url: string): string | null {
   try {
     const u = new URL(url);
     if (u.protocol !== "freecoda:" || u.hostname !== "desktop" || u.username || u.password || u.search) return null;
-    const allowed = new Set(["/index.html", "/renderer.js", "/styles.css", "/icon.png", "/logo.svg"]);
+    const allowed = new Set(["/index.html", "/renderer.js", "/theme.js", "/styles.css", "/icon.png", "/logo.svg"]);
     return allowed.has(u.pathname) ? u.pathname.slice(1) : null;
   } catch { return null; }
 }
