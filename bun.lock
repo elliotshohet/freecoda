@@ -36,6 +36,7 @@
         "@fontsource/ibm-plex-mono": "latest",
         "@freecoda/contracts": "workspace:*",
         "@vercel/analytics": "^2.0.1",
+        "@vercel/functions": "3.10.1",
         "@vercel/oidc": "3.2.0",
         "@vercel/sandbox": "^3.8.0",
         "@vercel/speed-insights": "^2.0.0",
@@ -57,7 +58,7 @@
     },
     "packages/cli": {
       "name": "freecoda",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "bin": {
         "freecoda": "bin/freecoda.js",
       },

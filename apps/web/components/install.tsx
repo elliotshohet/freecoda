@@ -2,7 +2,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, ArrowUpRight, Terminal } from "lucide-react";
 import Link from "next/link";
-import { CLI_INSTALL_COMMAND, CLI_PUBLISHED } from "@/lib/releases";
+import {
+  CLI_INSTALL_COMMAND,
+  CLI_PUBLISHED,
+  DESKTOP_PUBLISHED,
+} from "@/lib/releases";
 export function Install({ compact = false }: { compact?: boolean }) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
@@ -50,6 +54,12 @@ export function Install({ compact = false }: { compact?: boolean }) {
             <ArrowUpRight size={12} />
           </Link>
         </div>
+      )}
+      {!compact && DESKTOP_PUBLISHED && (
+        <a className="desktop-install-link" href="/docs#desktop">
+          Download the desktop beta{" "}
+          <ArrowUpRight size={13} aria-hidden="true" />
+        </a>
       )}
     </div>
   );

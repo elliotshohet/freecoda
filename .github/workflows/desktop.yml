@@ -62,6 +62,11 @@ jobs:
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       EXPECTED_EXTENSIONS: ${{ matrix.extensions }}
+      CSC_LINK: ${{ matrix.platform == 'mac' && secrets.DESKTOP_MAC_CERTIFICATE_P12 || matrix.platform == 'win' && secrets.DESKTOP_WINDOWS_CERTIFICATE_PFX || '' }}
+      CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.DESKTOP_MAC_CERTIFICATE_PASSWORD || matrix.platform == 'win' && secrets.DESKTOP_WINDOWS_CERTIFICATE_PASSWORD || '' }}
+      APPLE_ID: ${{ matrix.platform == 'mac' && secrets.DESKTOP_APPLE_ID || '' }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ matrix.platform == 'mac' && secrets.DESKTOP_APPLE_APP_PASSWORD || '' }}
+      APPLE_TEAM_ID: ${{ matrix.platform == 'mac' && secrets.DESKTOP_APPLE_TEAM_ID || '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -76,8 +81,38 @@ jobs:
       - run: bun run desktop:typecheck
       - run: bun test tests/desktop-security.test.ts tests/desktop-local-agent.test.ts tests/desktop-updater.test.ts tests/desktop-packaging.test.ts tests/shell-platform.test.ts
       - run: bun run desktop:build
+      - name: Native runtime smoke (macOS and Windows)
+        if: runner.os != 'Linux'
+        run: node apps/desktop/scripts/smoke.mjs
+      - name: Native runtime smoke (Linux sandbox)
+        if: runner.os == 'Linux'
+        run: |
+          sandbox_binary=$(node -e 'const p=require("node:path");const f=require.resolve("electron/package.json",{paths:[p.resolve("apps/desktop")]});console.log(p.join(p.dirname(f),"dist","chrome-sandbox"));')
+          sudo chown root:root "$sandbox_binary"
+          sudo chmod 4755 "$sandbox_binary"
+          xvfb-run -a node apps/desktop/scripts/smoke.mjs
+      - name: Validate optional signing configuration
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          if [ -n "$CSC_LINK" ]; then
+            test -n "$CSC_KEY_PASSWORD" || { echo 'Signing certificate password is required'; exit 1; }
+            if [ "$PLATFORM" = mac ]; then
+              test -n "$APPLE_ID" && test -n "$APPLE_APP_SPECIFIC_PASSWORD" && test -n "$APPLE_TEAM_ID" || { echo 'Developer ID signing requires Apple notarization credentials'; exit 1; }
+            fi
+            echo 'Signing enabled; build must produce a signed installer.'
+          else
+            test -z "$CSC_KEY_PASSWORD$APPLE_ID$APPLE_APP_SPECIFIC_PASSWORD$APPLE_TEAM_ID" || { echo 'Partial signing configuration: certificate is missing'; exit 1; }
+            echo 'No signing identity configured: producing explicitly unsigned installers.'
+          fi
       - name: Package without publishing
-        run: bun run desktop:package -- --${{ matrix.platform }} ${{ matrix.targets }} --${{ matrix.arch }}
+        run: |
+          signing=()
+          if [ -n "$CSC_LINK" ]; then
+            export CSC_IDENTITY_AUTO_DISCOVERY=true
+            signing+=(--config.forceCodeSigning=true)
+          fi
+          bun run desktop:package -- --${{ matrix.platform }} ${{ matrix.targets }} --${{ matrix.arch }} "${signing[@]}"
       - name: Verify requested formats and calculate SHA-256
         run: |
           node --input-type=module <<'NODE'

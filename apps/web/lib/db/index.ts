@@ -1,15 +1,31 @@
 import { Pool, type PoolClient } from "pg";
+import { attachDatabasePool } from "@vercel/functions";
+import { failureCategory } from "../observability";
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "./schema";
 const globalDb = globalThis as typeof globalThis & { freecodaPool?: Pool };
 export function getPool() {
   if (!process.env.DATABASE_URL) throw new Error("Database is not configured");
-  return (globalDb.freecodaPool ??= new Pool({
-    connectionString: process.env.DATABASE_URL,
-    max: 5,
-    connectionTimeoutMillis: 5000,
-    idleTimeoutMillis: 10000,
-  }));
+  if (!globalDb.freecodaPool) {
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      max: 5,
+      connectionTimeoutMillis: 5000,
+      idleTimeoutMillis: 10000,
+    });
+    // Idle socket failures otherwise surface as unhandled EventEmitter errors.
+    pool.on("error", (error) => {
+      console.error(
+        JSON.stringify({
+          event: "database_idle_error",
+          category: failureCategory(error),
+        }),
+      );
+    });
+    attachDatabasePool(pool);
+    globalDb.freecodaPool = pool;
+  }
+  return globalDb.freecodaPool;
 }
 export function getDb() {
   return drizzle(getPool(), { schema });

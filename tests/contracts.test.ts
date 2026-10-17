@@ -30,9 +30,15 @@ const model = {
   maxContextTokens: 200000,
   approved: true,
 };
-test('trusted hosted calls preserve live cancellation signals',()=>{
-  const controller=new AbortController();
-  const options=safeModelOptions({prompt:[{role:'user',content:[{type:'text',text:'Hello'}]}],abortSignal:controller.signal},model);
+test("trusted hosted calls preserve live cancellation signals", () => {
+  const controller = new AbortController();
+  const options = safeModelOptions(
+    {
+      prompt: [{ role: "user", content: [{ type: "text", text: "Hello" }] }],
+      abortSignal: controller.signal,
+    },
+    model,
+  );
   expect(options.abortSignal).toBe(controller.signal);
   controller.abort();
   expect(options.abortSignal?.aborted).toBe(true);
@@ -369,4 +375,35 @@ test("assistant replay omits only empty reasoning placeholders and empty assista
     toolResult,
   ]);
   expect(prompt[1].content).toEqual([{ type: "reasoning", text: "" }]);
+});
+
+test("unexpected API failures expose only a correlation ID and sanitized classification", async () => {
+  const { handle } = await import("../apps/web/lib/http");
+  const original = console.error;
+  const lines: string[] = [];
+  console.error = (...values: unknown[]) => {
+    lines.push(values.join(" "));
+  };
+  try {
+    const error = Object.assign(
+      new Error(
+        "Bearer private-provider-key postgresql://private-password@host/db",
+      ),
+      { code: "ECONNRESET" },
+    );
+    const response = await handle(async () => {
+      throw error;
+    });
+    expect(response.status).toBe(503);
+    const body = await response.json();
+    expect(body.requestId).toMatch(/^[a-f0-9-]{36}$/);
+    expect(response.headers.get("X-Request-ID")).toBe(body.requestId);
+    expect(JSON.parse(lines[0]).category).toBe("database_connection");
+    expect(JSON.stringify({ body, lines })).not.toContain(
+      "private-provider-key",
+    );
+    expect(JSON.stringify({ body, lines })).not.toContain("private-password");
+  } finally {
+    console.error = original;
+  }
 });

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
+import { failureCategory } from "./observability";
 import { appUrl } from "./config";
 export class ApiError extends Error {
   constructor(
@@ -54,9 +56,23 @@ export async function handle(fn: () => Promise<Response>) {
         { error: e.message },
         { status: e.status, headers: { "Cache-Control": "no-store" } },
       );
+    const requestId = randomUUID();
+    console.error(
+      JSON.stringify({
+        event: "api_failure",
+        requestId,
+        category: failureCategory(e),
+      }),
+    );
     return Response.json(
-      { error: "The service is temporarily unavailable. Try again shortly." },
-      { status: 503, headers: { "Cache-Control": "no-store" } },
+      {
+        error: "The service is temporarily unavailable. Try again shortly.",
+        requestId,
+      },
+      {
+        status: 503,
+        headers: { "Cache-Control": "no-store", "X-Request-ID": requestId },
+      },
     );
   }
 }

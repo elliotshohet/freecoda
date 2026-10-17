@@ -474,3 +474,29 @@ test("daily maintenance requires authorization, retains uncertain BYOK spend, an
     else process.env.CRON_SECRET = previous;
   }
 });
+
+test("idle PostgreSQL errors cannot crash the service or leak connection secrets", async () => {
+  const previous = console.error;
+  const logs: string[] = [];
+  console.error = (...values: unknown[]) => {
+    logs.push(values.join(" "));
+  };
+  try {
+    pool.emit(
+      "error",
+      Object.assign(
+        new Error("postgresql://secret-password@private-host/database"),
+        { code: "ECONNRESET" },
+      ),
+    );
+    expect((await pool.query("SELECT 1 AS available")).rows[0].available).toBe(
+      1,
+    );
+    expect(JSON.parse(logs[0]).event).toBe("database_idle_error");
+    expect(JSON.parse(logs[0]).category).toBe("database_connection");
+    expect(logs.join(" ")).not.toContain("secret-password");
+    expect(logs.join(" ")).not.toContain("private-host");
+  } finally {
+    console.error = previous;
+  }
+});

@@ -1792,3 +1792,62 @@ input:-webkit-autofill {
   -webkit-box-shadow: 0 0 0 1000px light-dark(#fbfaff, #1d1b27) inset;
   caret-color: var(--ink);
 }
+
+.desktop-install-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 14px;
+  color: var(--purple);
+  font-size: 12px;
+  font-weight: 700;
+}
+.desktop-downloads {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 24px 0 12px;
+}
+.prose .desktop-download {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  text-decoration: none;
+}
+.desktop-download:hover {
+  border-color: var(--purple);
+  background: var(--pale);
+}
+.desktop-download:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 3px;
+}
+.desktop-download strong {
+  display: block;
+  font-size: 13px;
+}
+.desktop-download small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 4px;
+}
+.download-verification {
+  font-size: 12px;
+}
+.download-verification a:last-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+@media (max-width: 540px) {
+  .desktop-downloads {
+    grid-template-columns: 1fr;
+  }
+}

@@ -34,6 +34,7 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 app.setName("Freecoda");
+if (process.platform === "win32") app.setAppUserModelId("com.freecoda.desktop");
 const assetsDirectory = path.join(app.getAppPath(), "dist");
 let window: BrowserWindow | null = null;
 let service: LocalAgentService;

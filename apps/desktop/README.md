@@ -66,3 +66,25 @@ Debian installations use their package manager/manual `.deb` installer. macOS
 automatic installation requires a Developer ID signed app; unsigned builds
 offer manual downloads. Keep `latest.yml`, `latest-linux.yml`, and the combined
 `latest-mac.yml` alongside their exact referenced binaries and blockmaps.
+
+### Activating installer signing
+
+The native workflow supports optional signing without changing the current
+unsigned release. Add repository secrets only after obtaining existing signing
+credentials; no accounts or certificates are purchased by this workflow.
+
+For both macOS architectures, configure `DESKTOP_MAC_CERTIFICATE_P12` (base64
+Developer ID Application P12), `DESKTOP_MAC_CERTIFICATE_PASSWORD`,
+`DESKTOP_APPLE_ID`, `DESKTOP_APPLE_APP_PASSWORD` (Apple app-specific password),
+and `DESKTOP_APPLE_TEAM_ID`. Electron-builder imports the certificate, signs the
+app with hardened runtime, and notarizes using Apple's service. Windows uses
+`DESKTOP_WINDOWS_CERTIFICATE_PFX` (base64 Authenticode PFX) and
+`DESKTOP_WINDOWS_CERTIFICATE_PASSWORD`. Hardware/cloud-only Windows identities
+need a separate signing integration instead of a PFX.
+
+Partial configuration fails the build. A configured certificate enables
+`forceCodeSigning`, so signing failure cannot silently produce an unsigned
+release. The app's macOS Developer ID check and Windows signature verification
+remain enabled. A new signed release needs a new version and fresh native
+artifacts; never overwrite the current stable binaries. These credentials have
+not been configured or validated yet.

@@ -24,5 +24,5 @@ await cp(path.join(root, "src/renderer/logo.svg"), path.join(out, "logo.svg"));
 for (const name of ["LICENSE", "NOTICE"]) {
   await cp(path.join(root, "../..", name), path.join(out, name));
 }
-await writeFile(path.join(out, "build.json"), JSON.stringify({ version: "0.1.0" }));
+await writeFile(path.join(out, "build.json"), JSON.stringify({ version: (await Bun.file(path.join(root, "package.json")).json()).version }));
 console.log("Desktop main, isolated preload, and renderer built.");

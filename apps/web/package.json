@@ -27,7 +27,8 @@
     "react": "latest",
     "react-dom": "latest",
     "workflow": "^5.2.2",
-    "zod": "latest"
+    "zod": "latest",
+    "@vercel/functions": "3.10.1"
   },
   "devDependencies": {
     "@types/diff": "^8.0.0"

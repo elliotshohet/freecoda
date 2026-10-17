@@ -1,3 +1,4 @@
+import { DesktopDownloads } from "@/components/desktop-downloads";
 import { Install } from "@/components/install";
 import { CLI_PUBLISHED } from "@/lib/releases";
 import Link from "next/link";
@@ -8,6 +9,7 @@ export default function Docs() {
       <nav className="docs-nav" aria-label="Documentation">
         <a href="#installation">Installation</a>
         <a href="#browser">Browser workspace</a>
+        <a href="#desktop">Desktop downloads</a>
         <a href="#first-project">Your first project</a>
         <a href="#commands">Commands</a>
         <a href="#byok">Advanced settings</a>
@@ -95,12 +97,8 @@ export default function Docs() {
           reports a permissions error, use a Node version manager or a
           user-owned npm prefix.
         </p>
-        <h2>Desktop availability</h2>
-        <p>
-          Native desktop installers are being prepared. A stable public download
-          is not available yet. The browser workspace is available to invited
-          users.
-        </p>
+        <h2 id="desktop">Download the desktop beta</h2>
+        <DesktopDownloads />
         <details id="byok">
           <summary>Advanced settings: optional API key</summary>
           <p>
@@ -125,8 +123,8 @@ export default function Docs() {
           </p>
           <p>
             To return to your free hosted allowance, run{" "}
-            <code>freecoda hosted</code>{" "}
-            and sign in with <code>freecoda login</code> if needed.
+            <code>freecoda hosted</code> and sign in with{" "}
+            <code>freecoda login</code> if needed.
           </p>
         </details>
         <h2 id="permissions">Terminal permissions</h2>
