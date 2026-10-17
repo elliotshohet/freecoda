@@ -168,9 +168,8 @@ try {
   });
   client = new CDP(socket);
   await client.send("Network.enable");
-  await client.send("Network.setBlockedURLs", {
-    urls: ["http://*", "https://*"],
-  });
+  // Observe requests without adding a test-only network policy: the shipped CSP
+  // must independently reject the fetch probe below.
   await client.send("Runtime.enable");
 
   let initial;
