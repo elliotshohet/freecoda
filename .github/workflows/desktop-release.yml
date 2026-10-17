@@ -62,7 +62,7 @@ jobs:
           if gh release view "$tag" --repo elliotshohet/freecoda-releases --json isDraft,body > existing-release.json; then
             python3 -c 'import json,os; r=json.load(open("existing-release.json")); assert r["isDraft"], "Published releases are immutable; use a new version"; assert "Source commit: "+os.environ["SOURCE_SHA"]+"." in r["body"], "Draft belongs to another source commit; use a new version"'
           else
-            gh release create "$tag" --repo elliotshohet/freecoda-releases --draft --title "Freecoda $RELEASE_VERSION" --notes "Freecoda desktop installers. Source commit: $SOURCE_SHA. Verify SHA256SUMS.txt before installation. macOS and Windows builds are currently unsigned; macOS automatic installation requires Developer ID signing. Linux deb updates use the package manager."
+            gh release create "$tag" --repo elliotshohet/freecoda-releases --draft --title "Freecoda $RELEASE_VERSION" --notes "Freecoda desktop installers. Source commit: $SOURCE_SHA. Verify SHA256SUMS.txt before installation. Review platform signing and notarization status before opening an installer; checksums alone do not authenticate a publisher. macOS automatic installation requires Developer ID signing; unsigned macOS builds use manual downloads. Windows and Linux AppImage builds install downloaded updates on normal quit. Linux DEB updates use the package manager."
           fi
           gh release upload "$tag" public-assets/* --repo elliotshohet/freecoda-releases --clobber
           echo "Draft prepared: https://github.com/elliotshohet/freecoda-releases/releases"
