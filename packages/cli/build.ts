@@ -1,9 +1,10 @@
 import { mkdir, writeFile, copyFile, chmod } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 const root = new URL("./", import.meta.url);
 await mkdir(new URL("dist/", root), { recursive: true });
 const build = await Bun.build({
-  entrypoints: [new URL("src/index.ts", root).pathname],
-  outdir: new URL("dist/", root).pathname,
+  entrypoints: [fileURLToPath(new URL("src/index.ts", root))],
+  outdir: fileURLToPath(new URL("dist/", root)),
   target: "node",
   format: "esm",
   minify: false,
