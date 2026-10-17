@@ -76,3 +76,12 @@ For a suspected security vulnerability, use [GitHub private vulnerability report
 This public repository contains desktop installers, update metadata, and distribution documentation. Application development source is maintained in a separate private repository; downloading an installer does not grant repository access.
 
 See [LICENSE](LICENSE) and [NOTICE](NOTICE) for the Apache-2.0 license and attribution, including the modified Codebuff editing helper. Its upstream [license](vendor/codebuff/LICENSE) and [notice](vendor/codebuff/NOTICE) are included here. No application source code is published in this repository.
+
+### Supplemental notices for earlier downloads
+
+- [Freecoda CLI 0.1.0 and 0.1.1 third-party notices](legal/CLI_0.1.0-0.1.1_THIRD_PARTY_NOTICES.txt)
+- [Freecoda desktop 0.1.0 third-party notices](legal/DESKTOP_0.1.0_THIRD_PARTY_NOTICES.txt)
+
+These supplemental documents were prepared by comparing actual published application source maps with the reviewed package notice inventory. Both CLI versions contain the same 25 bundled package name/version pairs; desktop 0.1.0 contains the same 26 pairs across macOS Intel/Apple silicon, Windows x64 and Linux x64. The desktop input installers were checked against their public release checksums before inspection.
+
+**Earlier packages, installers, update feeds and checksums are unchanged.** These files supplement the notices for those versions; they do not imply that old artifacts were rebuilt. New builds include `THIRD_PARTY_NOTICES.txt` within the distribution. The application-bundle notices do not replace the separate notices for the Electron/Chromium runtime.
