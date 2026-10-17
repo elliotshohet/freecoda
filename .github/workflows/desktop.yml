@@ -15,6 +15,10 @@ on:
       - "tests/bundled-notices.test.ts"
       - "scripts/bundled-notices.ts"
       - "legal/**"
+      # This harness runs against published binaries in desktop-upgrade.yml.
+      - "!apps/desktop/scripts/qualify-upgrade.mjs"
+      - "!apps/desktop/scripts/upgrade-version.mjs"
+      - "!apps/desktop/scripts/upgrade-version.test.mjs"
   pull_request:
     paths:
       - "apps/desktop/**"
@@ -28,6 +32,10 @@ on:
       - "tests/bundled-notices.test.ts"
       - "scripts/bundled-notices.ts"
       - "legal/**"
+      # This harness runs against published binaries in desktop-upgrade.yml.
+      - "!apps/desktop/scripts/qualify-upgrade.mjs"
+      - "!apps/desktop/scripts/upgrade-version.mjs"
+      - "!apps/desktop/scripts/upgrade-version.test.mjs"
 permissions:
   contents: read
 concurrency:

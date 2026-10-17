@@ -7,6 +7,7 @@ import { readFile, writeFile, mkdir, mkdtemp, chmod, readdir } from 'node:fs/pro
 import { createHash } from 'node:crypto';
 import { tmpdir, platform } from 'node:os';
 import path from 'node:path';
+import { readInstalledVersion } from './upgrade-version.mjs';
 
 assert(['win32', 'linux'].includes(platform()), 'Qualification requires native Windows/Linux.');
 assert(process.env.CI === 'true', 'Run only on a disposable CI runner.');
@@ -159,9 +160,16 @@ async function normalClose() {
     const { stdout } = await run('xdotool', ['search', '--onlyvisible', '--name', '^Freecoda$']);
     const id = stdout.trim().split(/\s+/)[0]; assert(id);
     await run('xdotool', ['windowactivate', '--sync', id, 'key', 'alt+F4']);
-    await pause(1000);
-    const { stdout: dialog } = await run('xdotool', ['search', '--onlyvisible', '--name', 'Close Freecoda']);
-    await run('xdotool', ['windowactivate', '--sync', dialog.trim().split(/\s+/)[0], 'key', 'Right', 'Return']);
+    const dialog = await waitFor('native Linux close confirmation', async () => {
+      try {
+        const { stdout } = await run('xdotool', ['search', '--onlyvisible', '--name', '^Close Freecoda\\?$']);
+        return stdout.trim().split(/\s+/)[0] || null;
+      } catch (error) {
+        if (error.code === 1) return null; // No matching window yet.
+        throw error;
+      }
+    }, 10_000);
+    await run('xdotool', ['windowactivate', '--sync', dialog, 'key', 'Right', 'Return']);
   }
   await waitFor('normal application exit', () => {
     assert(!child.signalCode, `Application was terminated by ${child.signalCode}.`);
@@ -187,7 +195,7 @@ try {
     const install = path.join(root, 'installed');
     await run(oldInstaller, ['/S', '/currentuser', `/D=${install}`], { timeout: 120_000 });
     executable = path.join(install, 'freecoda.exe'); installedAsar = path.join(install, 'resources', 'app.asar');
-    assert.equal(JSON.parse(asar.extractFile(installedAsar, 'package.json')).version, from);
+    assert.equal(readInstalledVersion(asar, installedAsar), from);
   } else {
     executable = oldInstaller; await chmod(executable, 0o755);
   }
@@ -211,7 +219,7 @@ try {
   await normalClose();
   if (platform() === 'win32') {
     await waitFor('NSIS replaced installed app with new version', async () => {
-      try { return JSON.parse(asar.extractFile(installedAsar, 'package.json')).version === to; } catch { return false; }
+      try { return readInstalledVersion(asar, installedAsar) === to; } catch { return false; }
     }, 120_000);
   } else {
     executable = path.join(root, newAsset.name);

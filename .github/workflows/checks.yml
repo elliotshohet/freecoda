@@ -37,6 +37,8 @@ jobs:
           node-version: '24'
       - run: bun install --frozen-lockfile
       - run: bun scripts/migrate.ts
+      - run: node --check apps/desktop/scripts/qualify-upgrade.mjs
+      - run: node --test apps/desktop/scripts/upgrade-version.test.mjs
       - run: bun run typecheck
       - run: bun run test
       - run: bun run test:integration

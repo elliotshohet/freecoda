@@ -10,6 +10,12 @@ on:
         description: Expected current stable release version
         required: true
         default: 0.1.1
+      platform:
+        description: Native platform to qualify
+        type: choice
+        options: [both, linux, windows]
+        default: both
+        required: true
 permissions:
   contents: read
 concurrency:
@@ -23,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, windows-2022]
+        os: ${{ fromJSON(inputs.platform == 'linux' && '["ubuntu-22.04"]' || inputs.platform == 'windows' && '["windows-2022"]' || '["ubuntu-22.04","windows-2022"]') }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -43,6 +49,7 @@ jobs:
         with:
           node-version: "24"
       - run: bun install --frozen-lockfile
+      - run: node --test apps/desktop/scripts/upgrade-version.test.mjs
       - name: Install Linux native display and FUSE dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libfuse2 xvfb openbox xdotool scrot

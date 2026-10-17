@@ -55,6 +55,16 @@ export function DesktopDownloads() {
         before opening it.
       </p>
       <p>
+        On Linux, make the AppImage executable before launching it, for example{" "}
+        <code>chmod +x /path/to/Freecoda.AppImage</code>. The AppImage needs a
+        FUSE 2 runtime; see the{" "}
+        <a href="https://docs.appimage.org/user-guide/troubleshooting/fuse.html">
+          AppImage FUSE guidance
+        </a>
+        . If the AppImage runtime is unavailable on Debian or Ubuntu, use the
+        DEB download instead.
+      </p>
+      <p>
         Open a project folder and review its trust prompt before continuing.
         Freecoda asks for approval before local file changes and shell commands.
         Sign in to connect your hosted allowance, or open the browser workspace
