@@ -123,19 +123,20 @@ async function normalClose() {
   if (platform() === 'win32') {
     // Exercise the actual native close confirmation. No IPC/test hooks.
     const script = `
-      Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class FreecodaNativeClose { [DllImport("user32.dll",CharSet=CharSet.Unicode)] public static extern IntPtr FindWindow(string cls,string title); [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd,out uint pid); [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr hwnd,uint command); [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd); }';
+      Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class FreecodaNativeClose { [DllImport("user32.dll",EntryPoint="FindWindowW",ExactSpelling=true,CharSet=CharSet.Unicode)] public static extern IntPtr FindWindow(IntPtr cls,string title); [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd,out uint pid); [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr hwnd,uint command); [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd); }';
       $w=New-Object -ComObject WScript.Shell;
       if(-not $w.AppActivate(${child.pid})){throw 'Cannot focus Freecoda'};
       Start-Sleep -Milliseconds 400; $w.SendKeys('%{F4}');
-      $deadline=(Get-Date).AddSeconds(10); $dialog=[IntPtr]::Zero;
+      $deadline=(Get-Date).AddSeconds(10); $dialog=[IntPtr]::Zero; $loggedCandidate=[IntPtr]::Zero;
       while((Get-Date) -lt $deadline){
-        $candidate=[FreecodaNativeClose]::FindWindow($null,'Close Freecoda?');
+        $candidate=[FreecodaNativeClose]::FindWindow([IntPtr]::Zero,'Close Freecoda?');
         if($candidate -ne [IntPtr]::Zero){
           [uint32]$dialogProcess=0; [uint32]$ownerProcess=0;
           [void][FreecodaNativeClose]::GetWindowThreadProcessId($candidate,[ref]$dialogProcess);
           $owner=[FreecodaNativeClose]::GetWindow($candidate,4);
           [void][FreecodaNativeClose]::GetWindowThreadProcessId($owner,[ref]$ownerProcess);
-          if($dialogProcess -eq ${child.pid} -and $ownerProcess -eq ${child.pid}){$dialog=$candidate; break}
+          if($loggedCandidate -ne $candidate){Write-Output ('Native dialog handle='+$candidate+' pid='+$dialogProcess+' ownerHandle='+$owner+' ownerPid='+$ownerProcess+' expected=${child.pid}'); $loggedCandidate=$candidate};
+          if($dialogProcess -eq ${child.pid} -and ($owner -eq [IntPtr]::Zero -or $ownerProcess -eq ${child.pid})){$dialog=$candidate; break}
         };
         Start-Sleep -Milliseconds 200;
       };
@@ -148,7 +149,8 @@ async function normalClose() {
       $w.SendKeys('{DOWN}{ENTER}');
     `;
     try {
-      await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script]);
+      const { stdout } = await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script]);
+      if (stdout.trim()) record(stdout.trim().slice(-2000));
     } catch (error) {
       diagnostics += '\nNative close diagnostics:\n' + String(error.stdout || '').slice(-12_000);
       throw error;
