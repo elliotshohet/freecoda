@@ -1,0 +1,42 @@
+{
+  "name": "@freecoda/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Freecoda desktop coding workspace",
+  "author": "Freecoda <hello@freecoda.com>",
+  "homepage": "https://freecoda.com",
+  "license": "Apache-2.0",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "bun build.ts",
+    "typecheck": "tsc --noEmit",
+    "start": "electron .",
+    "package": "electron-builder --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.9.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.freecoda.desktop",
+    "productName": "Freecoda",
+    "asar": true,
+    "directories": { "output": "release", "buildResources": "resources" },
+    "files": ["dist/**", "package.json"],
+    "artifactName": "Freecoda-${version}-${os}-${arch}.${ext}",
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "resources/icon.icns",
+      "target": ["dmg", "zip"],
+      "hardenedRuntime": true
+    },
+    "win": { "icon": "resources/icon.ico", "target": ["nsis"] },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "perMachine": false, "createDesktopShortcut": true },
+    "linux": {
+      "icon": "resources/icon.png",
+      "target": ["AppImage", "deb"],
+      "category": "Development",
+      "maintainer": "Freecoda <hello@freecoda.com>"
+    }
+  }
+}

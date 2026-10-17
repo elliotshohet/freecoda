@@ -1,0 +1,145 @@
+name: Desktop packages
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "apps/desktop/**"
+      - "packages/core/**"
+      - "packages/contracts/**"
+      - "packages/cli/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/desktop.yml"
+      - "tests/desktop-*.test.ts"
+  pull_request:
+    paths:
+      - "apps/desktop/**"
+      - "packages/core/**"
+      - "packages/contracts/**"
+      - "packages/cli/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/desktop.yml"
+      - "tests/desktop-*.test.ts"
+permissions:
+  contents: read
+concurrency:
+  group: desktop-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  package:
+    name: ${{ matrix.platform }} ${{ matrix.arch }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux
+            arch: x64
+            targets: AppImage deb
+            extensions: '[".AppImage",".deb"]'
+          - os: windows-2022
+            platform: win
+            arch: x64
+            targets: nsis
+            extensions: '[".exe"]'
+          - os: macos-15-intel
+            platform: mac
+            arch: x64
+            targets: dmg zip
+            extensions: '[".dmg",".zip"]'
+          - os: macos-15
+            platform: mac
+            arch: arm64
+            targets: dmg zip
+            extensions: '[".dmg",".zip"]'
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      EXPECTED_EXTENSIONS: ${{ matrix.extensions }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: bun install --frozen-lockfile
+      - run: bun run desktop:typecheck
+      - run: bun test tests/desktop-security.test.ts tests/desktop-local-agent.test.ts tests/shell-platform.test.ts
+      - run: bun run desktop:build
+      - name: Package without publishing
+        run: bun run desktop:package -- --${{ matrix.platform }} ${{ matrix.targets }} --${{ matrix.arch }} --publish never
+      - name: Verify requested formats and calculate SHA-256
+        run: |
+          node --input-type=module <<'NODE'
+          import { readdir, readFile, writeFile } from 'node:fs/promises';
+          import { createHash } from 'node:crypto';
+          import path from 'node:path';
+          const directory = 'apps/desktop/release';
+          const extensions = JSON.parse(process.env.EXPECTED_EXTENSIONS);
+          const entries = await readdir(directory, { withFileTypes: true });
+          const files = entries.filter(entry => entry.isFile() && extensions.some(extension => entry.name.endsWith(extension))).map(entry => entry.name).sort();
+          for (const extension of extensions) {
+            if (!files.some(file => file.endsWith(extension))) throw new Error(`Missing desktop package format: ${extension}`);
+          }
+          const checksums = [];
+          for (const file of files) {
+            const digest = createHash('sha256').update(await readFile(path.join(directory, file))).digest('hex');
+            checksums.push(`${digest}  ${file}`);
+          }
+          await writeFile(path.join(directory, 'SHA256SUMS.txt'), checksums.join('\n') + '\n');
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: freecoda-desktop-${{ matrix.platform }}-${{ matrix.arch }}-${{ github.run_number }}
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.zip
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.AppImage
+            apps/desktop/release/*.deb
+            apps/desktop/release/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+  cli-package:
+    name: CLI tarball (unpublished)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: bun install --frozen-lockfile
+      - run: bun run build:cli
+      - name: Pack locally without publishing
+        run: |
+          mkdir -p ../../.data/cli-release
+          npm pack --ignore-scripts --pack-destination ../../.data/cli-release
+        working-directory: packages/cli
+      - name: Smoke-test standalone installation
+        run: |
+          npm install --prefix .data/cli-install --ignore-scripts --no-audit --no-fund ./.data/cli-release/freecoda-*.tgz
+          node .data/cli-install/node_modules/freecoda/bin/freecoda.js --help
+          cd .data/cli-release
+          sha256sum *.tgz > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: freecoda-cli-unpublished-${{ github.run_number }}
+          path: .data/cli-release/*
+          if-no-files-found: error
+          retention-days: 14

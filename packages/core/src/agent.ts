@@ -7,7 +7,7 @@ import {
   type ToolSet,
 } from "ai";
 import { z } from "zod";
-import { Workspace, type Approval } from "./workspace";
+import { Workspace, redactSecrets, type Approval } from "./workspace";
 import { runShell } from "./shell";
 export async function runAgent(options: {
   root: string;
@@ -18,6 +18,8 @@ export async function runAgent(options: {
   signal?: AbortSignal;
   onText?: (text: string) => void;
   onTool?: (name: string) => void;
+  onToolResult?: (name: string, result: unknown) => void;
+  redactText?: (value: string) => string;
 }) {
   // Denials apply to the whole category for this turn. Serialize approvals
   // within a category so parallel model tool calls cannot race a refusal.
@@ -35,6 +37,8 @@ export async function runAgent(options: {
     pending.set(kind, decision);
     return decision;
   };
+  const redact = (value: string) =>
+    options.redactText?.(redactSecrets(value)) ?? redactSecrets(value);
   const ws = await Workspace.open(options.root, approve, options.signal);
   const readOnly = options.mode === "plan" || options.mode === "review";
   const tools: ToolSet = {
@@ -47,12 +51,17 @@ export async function runAgent(options: {
       description:
         "Read a workspace-relative text file. Credential files are excluded.",
       inputSchema: z.object({ path: z.string() }),
-      execute: async ({ path }) => ({ content: await ws.read(path) }),
+      execute: async ({ path }) => ({ content: redact(await ws.read(path)) }),
     }),
     search: tool({
       description: "Find literal text in non-ignored files, up to 50 results.",
       inputSchema: z.object({ query: z.string() }),
-      execute: async ({ query }) => ({ matches: await ws.search(query) }),
+      execute: async ({ query }) => ({
+        matches: (await ws.search(query)).map((hit) => ({
+          ...hit,
+          text: redact(hit.text),
+        })),
+      }),
     }),
     ...(!readOnly
       ? {
@@ -80,15 +89,22 @@ export async function runAgent(options: {
             description:
               "Propose a shell command for tests or project checks. Always requires user approval. Not sandboxed.",
             inputSchema: z.object({ command: z.string() }),
-            execute: async ({ command }) =>
-              runShell(command, ws.root, approve, options.signal),
+            execute: async ({ command }) => {
+              const result = await runShell(
+                command,
+                ws.root,
+                approve,
+                options.signal,
+              );
+              return { ...result, output: redact(result.output) };
+            },
           }),
         }
       : {}),
   };
   let repoInstructions = "";
   try {
-    repoInstructions = (await ws.read("AGENTS.md")).slice(0, 12000);
+    repoInstructions = redact(await ws.read("AGENTS.md")).slice(0, 12000);
   } catch {}
   const agent = new ToolLoopAgent({
     model: options.model,
@@ -99,6 +115,18 @@ export async function runAgent(options: {
     maxRetries: 0,
     // Stream errors propagate to the caller; never log provider request bodies.
     prepareCall: (options) => ({ ...options, onError: async () => {} }),
+    onToolExecutionEnd: async ({ toolCall, toolOutput }) => {
+      if (toolOutput.type === "tool-result")
+        options.onToolResult?.(toolCall.toolName, toolOutput.output);
+      else
+        options.onToolResult?.(toolCall.toolName, {
+          error: redact(
+            toolOutput.error instanceof Error
+              ? toolOutput.error.message
+              : "Tool execution failed.",
+          ),
+        });
+    },
     onToolExecutionStart: async ({ toolCall }) => {
       options.onTool?.(toolCall.toolName);
     },

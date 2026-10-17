@@ -1,0 +1,81 @@
+export type AgentMode = "build" | "plan" | "review";
+export type ApprovalKind = "write" | "shell";
+export type DesktopFileEntry = { path: string; type: "file" };
+export type DesktopWorkspace = {
+  root: string;
+  name: string;
+  trusted: boolean;
+  files: DesktopFileEntry[];
+};
+export type DesktopFile = {
+  path: string;
+  content: string;
+  hash: string;
+  readOnly: boolean;
+};
+export type DesktopCommandResult = { output: string; exitCode: number | null };
+export type DesktopLogin = {
+  loginId: string;
+  userCode: string;
+  verificationUri: string;
+  expiresAt: string;
+};
+export type DesktopState = {
+  workspace: DesktopWorkspace | null;
+  recentFolders: { root: string; name: string; trusted: boolean }[];
+  auth: { signedIn: boolean; server: string; model?: string };
+  running: boolean;
+  conversation?: { role: "user" | "assistant"; text: string }[];
+};
+export type DesktopEvent =
+  | { type: "state"; state: DesktopState }
+  | { type: "run-started"; runId: string }
+  | { type: "text-delta"; runId: string; text: string }
+  | { type: "tool-start"; runId: string; name: string }
+  | { type: "tool-result"; runId: string; name: string; result: unknown }
+  | {
+      type: "approval";
+      id: string;
+      runId?: string;
+      kind: ApprovalKind;
+      description: string;
+    }
+  | { type: "approval-resolved"; id: string; approved: boolean }
+  | { type: "output"; text: string; exitCode?: number | null }
+  | { type: "done"; runId: string; text: string; cancelled?: boolean }
+  | { type: "error"; runId?: string; text: string }
+  | { type: "auth"; signedIn: boolean; message: string };
+export type DesktopApprovalResponse = {
+  id: string;
+  approved: boolean;
+  scope: "once" | "session";
+};
+export type DesktopRunInput = { prompt: string; mode: AgentMode };
+export type DesktopSaveInput = {
+  path: string;
+  content: string;
+  expectedHash: string | null;
+};
+export interface DesktopBridge {
+  getState(): Promise<DesktopState>;
+  openFolder(): Promise<DesktopWorkspace | null>;
+  trustWorkspace(input: {
+    root: string;
+    consent: true;
+  }): Promise<DesktopWorkspace>;
+  listFiles(): Promise<DesktopFileEntry[]>;
+  readFile(path: string): Promise<DesktopFile>;
+  saveFile(input: DesktopSaveInput): Promise<DesktopFile>;
+  runCommand(input: { command: string }): Promise<DesktopCommandResult>;
+  runAgent(input: DesktopRunInput): Promise<{ runId: string }>;
+  cancelRun(): Promise<void>;
+  respondApproval(
+    input: DesktopApprovalResponse,
+  ): Promise<{ accepted: boolean }>;
+  login(): Promise<DesktopLogin>;
+  logout(): Promise<void>;
+  usage(): Promise<unknown>;
+  clearHistory(): Promise<void>;
+  openCloud(): Promise<void>;
+  onEvent(listener: (event: DesktopEvent) => void): () => void;
+}

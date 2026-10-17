@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'"
+    />
+    <title>Freecoda</title>
+    <link rel="icon" href="./logo.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <a class="skip" href="#editor">Skip to editor</a>
+    <header class="titlebar">
+      <div class="wordmark">
+        <img src="./logo.svg" alt="" width="28" height="28" /><strong
+          >freecoda</strong
+        ><span class="beta">desktop beta</span>
+      </div>
+      <div class="workspace-switch" role="tablist" aria-label="Workspace type">
+        <button role="tab" aria-selected="true" id="local-tab">
+          On this computer</button
+        ><button
+          id="cloud-open"
+          title="Open the cloud workspace in your browser"
+        >
+          Cloud workspace <span aria-hidden="true">↗</span>
+        </button>
+      </div>
+      <button class="account-button" id="account-open">
+        <span class="account-dot"></span
+        ><span id="account-label">Your account</span>
+      </button>
+    </header>
+    <div id="notice" class="notice" role="status" hidden></div>
+    <div id="error" class="error" role="alert" hidden>
+      <span id="error-text"></span
+      ><button id="error-close" aria-label="Dismiss error">×</button>
+    </div>
+    <main id="app" class="app-grid">
+      <aside class="sidebar" aria-label="Project files">
+        <div class="sidebar-heading">
+          <span>Workspace</span
+          ><button
+            id="open-folder"
+            class="icon-button"
+            title="Open a folder"
+            aria-label="Open a folder"
+          >
+            ＋
+          </button>
+        </div>
+        <button id="folder-picker" class="folder-picker">
+          <span class="folder-icon" aria-hidden="true">▱</span
+          ><span id="folder-name">Open a project folder</span
+          ><span aria-hidden="true">⌄</span>
+        </button>
+        <p id="folder-path" class="folder-path">
+          Your files stay on this computer.
+        </p>
+        <label class="file-search"
+          ><span class="sr-only">Find a project file</span
+          ><input
+            id="file-filter"
+            placeholder="Find a file…"
+            type="search"
+            autocomplete="off"
+            disabled
+        /></label>
+        <nav id="file-tree" class="file-tree" aria-label="Files">
+          <p class="file-empty">Open a project to explore its files.</p>
+        </nav>
+        <div class="sidebar-footer">
+          <button id="refresh-files" class="quiet-button" disabled>
+            ↻ Refresh files</button
+          ><span id="trust-status">No folder open</span>
+        </div>
+      </aside>
+      <section class="editor-pane" aria-label="File editor">
+        <div class="editor-toolbar">
+          <div class="file-tab">
+            <span aria-hidden="true">⌘</span
+            ><span id="file-name">Your next big thing</span
+            ><span id="dirty-indicator" aria-label="Unsaved changes" hidden
+              >●</span
+            >
+          </div>
+          <button id="save-file" class="small-button" disabled>
+            Save file <kbd id="save-shortcut">⌘S</kbd>
+          </button>
+        </div>
+        <div id="welcome" class="welcome">
+          <div class="welcome-logo">
+            <img src="./logo.svg" alt="" width="76" height="76" />
+          </div>
+          <h1>Make room for<br />your next idea.</h1>
+          <p>
+            Open a project, ask a question, and build something that feels like
+            yours.
+          </p>
+          <button id="welcome-open" class="button purple">
+            Open a project folder</button
+          ><span class="welcome-note"
+            >Your editor. Your repository. Your approval.</span
+          >
+          <div class="welcome-shortcuts">
+            <span><kbd>⌘O</kbd> Open folder</span
+            ><span><kbd>⌘S</kbd> Save file</span>
+          </div>
+        </div>
+        <div id="editor-wrap" class="editor-wrap" hidden>
+          <div id="line-numbers" class="line-numbers" aria-hidden="true"></div>
+          <textarea
+            id="editor"
+            aria-label="Edit project file"
+            spellcheck="false"
+            autocorrect="off"
+            autocapitalize="off"
+            wrap="off"
+            disabled
+          ></textarea>
+        </div>
+        <div class="editor-status">
+          <span id="file-status">Local workspace</span
+          ><span id="cursor-position">No file selected</span>
+        </div>
+        <section class="output-pane" aria-label="Tool activity and output">
+          <div class="output-header">
+            <div role="tablist" aria-label="Output panels">
+              <button
+                role="tab"
+                id="output-tab"
+                aria-controls="output-log"
+                aria-selected="true"
+              >
+                Command output</button
+              ><button
+                role="tab"
+                id="activity-tab"
+                aria-controls="activity-log"
+                aria-selected="false"
+              >
+                Agent activity
+              </button>
+            </div>
+            <button
+              class="icon-button"
+              id="clear-output"
+              aria-label="Clear visible output"
+              title="Clear visible output"
+            >
+              ⌫
+            </button>
+          </div>
+          <pre
+            id="output-log"
+            class="output-log"
+            role="tabpanel"
+            aria-labelledby="output-tab"
+            tabindex="0"
+          >
+Command output will appear here. Shell commands always require your approval.</pre>
+          <form id="command-form" class="command-form">
+            <span aria-hidden="true">›</span
+            ><label class="sr-only" for="command">Run a shell command</label
+            ><input
+              id="command"
+              placeholder="Run a command…"
+              maxlength="4000"
+              autocomplete="off"
+              disabled
+            /><button id="run-command" type="submit" disabled>Run</button
+            ><button id="stop-command" type="button" hidden>Stop</button>
+          </form>
+          <div
+            id="activity-log"
+            class="activity-log"
+            role="tabpanel"
+            aria-labelledby="activity-tab"
+            tabindex="0"
+            hidden
+          >
+            <p>No agent activity yet.</p>
+          </div>
+        </section>
+      </section>
+      <section class="agent-pane" aria-label="Coding agent">
+        <div class="agent-header">
+          <div>
+            <span class="agent-star" aria-hidden="true">✳</span
+            ><strong>Freecoda</strong>
+          </div>
+          <button
+            id="new-chat"
+            class="icon-button"
+            aria-label="Start a new conversation"
+            title="New conversation"
+          >
+            ＋
+          </button>
+        </div>
+        <div class="agent-context">
+          <span id="agent-context">Open a folder to start</span
+          ><span id="agent-status">Ready</span>
+        </div>
+        <div
+          id="conversation"
+          class="conversation"
+          role="log"
+          aria-label="Conversation"
+          aria-live="polite"
+          aria-relevant="additions text"
+        >
+          <div id="chat-welcome" class="chat-welcome">
+            <span class="agent-star" aria-hidden="true">✳</span>
+            <h2>What’s on your mind?</h2>
+            <p>A stubborn bug. A new feature. A question about your code.</p>
+            <div class="prompt-suggestions">
+              <button
+                data-prompt="Explain how this project is organized and where I should start."
+                data-mode="plan"
+              >
+                Understand this project</button
+              ><button
+                data-prompt="Review this project for a concrete bug. Explain your findings before making changes."
+                data-mode="review"
+              >
+                Find something to improve
+              </button>
+            </div>
+          </div>
+        </div>
+        <div id="working" class="working" role="status" hidden>
+          <span class="spinner" aria-hidden="true"></span
+          ><span id="working-text">Working in your project…</span>
+        </div>
+        <form id="chat-form" class="composer">
+          <label class="sr-only" for="prompt">Message the coding agent</label
+          ><textarea
+            id="prompt"
+            rows="3"
+            maxlength="20000"
+            placeholder="What would you like to build?"
+            disabled
+          ></textarea>
+          <div class="composer-controls">
+            <label
+              ><span class="sr-only">Agent mode</span
+              ><select id="mode" aria-label="Agent mode">
+                <option value="build">Build</option>
+                <option value="plan">Plan · read only</option>
+                <option value="review">Review · read only</option>
+              </select></label
+            ><span class="composer-hint">⌘ Enter to send</span
+            ><button id="send" type="submit" class="send" disabled>
+              Send <span aria-hidden="true">↑</span></button
+            ><button id="stop" type="button" class="stop" hidden>
+              Stop <span aria-hidden="true">■</span>
+            </button>
+          </div>
+        </form>
+        <p class="permission-note">
+          <span aria-hidden="true">◇</span> You approve every file change and
+          shell command.
+        </p>
+        <aside class="house-ad" aria-label="Freecoda announcement">
+          <span>Freecoda announcement</span
+          ><strong>Good tools deserve a little room.</strong>
+          <p>
+            Free forever, supported by sponsors. Your code and conversations are
+            never shared with advertisers.
+          </p>
+        </aside>
+      </section>
+    </main>
+    <dialog id="trust-dialog" aria-labelledby="trust-title">
+      <form method="dialog" id="trust-form">
+        <div class="dialog-icon" aria-hidden="true">◇</div>
+        <h2 id="trust-title">Make yourself at home.</h2>
+        <p>
+          Only open projects you trust. This folder may contain instructions for
+          the agent.
+        </p>
+        <pre id="trust-path" class="path-preview"></pre>
+        <div class="trust-details">
+          <p>
+            Relevant files, your prompts, and tool output are sent to the AI
+            provider when you start a task.
+          </p>
+          <p>
+            The agent reads inside this folder. File changes and shell commands
+            still need your approval. Shell commands run on your computer and
+            are not an operating system sandbox.
+          </p>
+        </div>
+        <label class="check-label"
+          ><input id="trust-check" type="checkbox" required /><span
+            >I trust this project and agree to send relevant context to the AI
+            provider.</span
+          ></label
+        >
+        <div class="dialog-actions">
+          <button value="cancel" formnovalidate class="button secondary">
+            Cancel</button
+          ><button
+            id="trust-confirm"
+            value="trust"
+            class="button purple"
+            disabled
+          >
+            Trust & open folder
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="approval-dialog" aria-labelledby="approval-title">
+      <div class="approval-header">
+        <span class="dialog-icon" aria-hidden="true">◇</span
+        ><span id="approval-kind">Permission request</span>
+      </div>
+      <h2 id="approval-title">Review before continuing.</h2>
+      <p id="approval-description">
+        The agent is asking to change your project.
+      </p>
+      <pre id="approval-content" class="approval-content" tabindex="0"></pre>
+      <p id="approval-warning" class="approval-warning"></p>
+      <div class="dialog-actions">
+        <button id="deny-tool" class="button secondary">Deny</button
+        ><button id="approve-tool" class="button purple">Allow once</button>
+      </div>
+      <p class="dialog-caption">
+        A refusal applies to this kind of action for the rest of this turn.
+      </p>
+    </dialog>
+    <dialog id="account-dialog" aria-labelledby="account-title">
+      <button
+        class="dialog-close"
+        id="account-close"
+        aria-label="Close account settings"
+      >
+        ×
+      </button>
+      <div class="dialog-icon" aria-hidden="true">◉</div>
+      <h2 id="account-title">A little room to build.</h2>
+      <p>One free plan. Sponsor supported. No card required.</p>
+      <div id="account-state" class="account-state">Loading your account…</div>
+      <div id="usage-view" hidden>
+        <div class="usage-heading">
+          <span>Daily AI allowance</span><strong id="usage-percent"></strong>
+        </div>
+        <progress
+          id="usage-progress"
+          max="100"
+          value="0"
+          aria-label="Daily AI allowance remaining"
+        ></progress>
+        <p id="usage-reset" class="muted"></p>
+      </div>
+      <div id="login-view" hidden>
+        <p id="login-instructions"></p>
+        <code id="login-code" class="login-code"></code>
+        <p class="muted">
+          Approve only the code displayed in this app. The browser opens on
+          Freecoda to finish connecting.
+        </p>
+      </div>
+      <div class="dialog-actions">
+        <button id="refresh-usage" class="button secondary" hidden>
+          Refresh allowance</button
+        ><button id="logout" class="button secondary" hidden>Sign out</button
+        ><button id="login" class="button purple">Connect with GitHub</button>
+      </div>
+      <p class="dialog-caption">
+        Hosted usage is limited to invited accounts and available capacity.
+        Local files and chat stay on this computer; AI requests send the context
+        needed for your task.
+      </p>
+    </dialog>
+    <script type="module" src="./renderer.js"></script>
+  </body>
+</html>

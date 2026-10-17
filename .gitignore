@@ -9,3 +9,6 @@ coverage/
 .data/
 .DS_Store
 .vercel
+
+apps/desktop/release/
+*.tgz

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import c from "picocolors";
+import type { SponsorBanner } from "./ui";
 import { validateBaseURL } from "@freecoda/core";
 const adSchema = z.object({
   id: z.string().nullable(),
@@ -14,7 +15,10 @@ const plain = (value: string) =>
     .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-export async function showSponsor(server: string) {
+export async function showSponsor(
+  server: string,
+  render?: (ad: SponsorBanner) => boolean | void,
+) {
   try {
     const base = validateBaseURL(server);
     const res = await fetch(`${base}/api/v1/ads?placement=terminal`, {
@@ -25,11 +29,23 @@ export async function showSponsor(server: string) {
     const ad = adSchema.parse(await res.json());
     const link = new URL(ad.href, base);
     if (link.origin !== new URL(base).origin) return;
-    console.log(
-      c.dim(
-        `\n  ${ad.id ? "Sponsored by " + plain(ad.sponsor) : "Freecoda announcement"}\n  ${plain(ad.headline)}\n  ${plain(ad.description)}\n  ${link.toString()}\n`,
-      ),
-    );
+    if (link.username || link.password) return;
+    const banner: SponsorBanner = {
+      label: ad.id
+        ? "Sponsored by " + plain(ad.sponsor)
+        : "Freecoda announcement",
+      headline: plain(ad.headline),
+      description: plain(ad.description),
+      href: link.toString(),
+    };
+    if (render) {
+      if (render(banner) === false) return;
+    } else
+      console.log(
+        c.dim(
+          `\n  ${banner.label}\n  ${banner.headline}\n  ${banner.description}\n  ${banner.href}\n`,
+        ),
+      );
     if (ad.id && ad.token)
       await fetch(`${base}/api/v1/ads/impression`, {
         method: "POST",

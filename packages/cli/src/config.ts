@@ -21,7 +21,9 @@ const configSchema = z.object({
   token: z.string().optional(),
   provider: provider.optional(),
   trustedRoots: z.array(z.string()).default([]),
+  theme: z.enum(["auto", "dark", "light"]).default("auto"),
 });
+export type ThemePreference = "auto" | "dark" | "light";
 export type Config = z.infer<typeof configSchema>;
 export const stateDir = () =>
   process.env.FREECODA_CONFIG_DIR ||
@@ -64,7 +66,11 @@ export async function loadConfig(): Promise<Config> {
     return configSchema.parse(JSON.parse(await readFile(file, "utf8")));
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === "ENOENT")
-      return { server: "https://freecoda.com", trustedRoots: [] };
+      return {
+        server: "https://freecoda.com",
+        trustedRoots: [],
+        theme: "auto",
+      };
     throw new Error(
       "Could not read Freecoda configuration. Check its format and permissions.",
     );

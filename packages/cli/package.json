@@ -1,7 +1,7 @@
 {
-  "name": "@freecoda/cli",
+  "name": "freecoda",
   "version": "0.1.0",
-  "description": "A local coding agent with clear limits and private-by-default workflows",
+  "description": "The free, sponsor-supported coding agent for your terminal",
   "type": "module",
   "license": "Apache-2.0",
   "bin": {
@@ -15,9 +15,29 @@
     "NOTICE"
   ],
   "scripts": {
-    "build": "bun build.ts"
+    "build": "bun build.ts",
+    "prepack": "bun build.ts"
   },
-  "dependencies": {
+  "dependencies": {},
+  "engines": {
+    "node": ">=22"
+  },
+  "homepage": "https://freecoda.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elliotshohet/freecoda.git",
+    "directory": "packages/cli"
+  },
+  "keywords": [
+    "ai",
+    "coding-agent",
+    "cli",
+    "freecoda"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
     "@freecoda/core": "workspace:*",
     "@freecoda/contracts": "workspace:*",
     "commander": "latest",
@@ -25,8 +45,5 @@
     "open": "latest",
     "ai": "7.0.143",
     "zod": "4.6.7"
-  },
-  "engines": {
-    "node": ">=22"
   }
 }

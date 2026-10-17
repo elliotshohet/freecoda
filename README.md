@@ -1,9 +1,10 @@
 # Freecoda
 
-A coding agent for the browser and terminal. One plan: **free forever, supported by direct sponsors**. There are no paid credits, subscriptions, or user checkout. Hosted usage has fair-use limits and an operator spending cap. This monorepo is private during development.
+A coding agent for the browser, desktop, and terminal. One plan: **free forever, supported by direct sponsors**. There are no paid credits, subscriptions, or user checkout. Hosted usage has fair-use limits and an operator spending cap. This monorepo is private during development.
 
 ## Workspace
 
+- `apps/desktop`: native Linux, macOS, and Windows client with local editor, hosted AI chat, approved commands, and private desktop history.
 - `apps/web`: website, GitHub sign-in, device authorization, inference proxy, transactional usage accounting, and sponsor placements.
 - `packages/cli`: interactive terminal client and local conversation history.
 - `packages/core`: repository tools, approval handling, model transports, and agent loop.
@@ -25,6 +26,17 @@ bun run dev
 ```
 
 Open http://127.0.0.1:3010. PostgreSQL binds to loopback on port 5439. The website reports actual service configuration and disables unavailable integrations. Never commit `.env` files or credentials. Use a separate OAuth callback for localhost: `http://127.0.0.1:3010/api/auth/callback/github`.
+
+## Desktop app
+
+```sh
+bun run desktop:dev
+# Build installers on the target platform; no publishing.
+bun run desktop:build
+bun run desktop:package -- --mac dmg zip --x64
+```
+
+See [desktop setup and installers](apps/desktop/README.md) for Linux AppImage/DEB, Windows NSIS, Intel/Apple Silicon macOS, private CI artifacts, and signing status. Opening a folder requires explicit trust before reading project files. Writes and commands require approval. Hosted sign-in opens the system browser; credentials stay in the main process.
 
 ## Run the CLI
 
@@ -57,7 +69,7 @@ bun run test:integration
 bun run build
 ```
 
-Integration tests require a separate local database named `freecoda_test` and refuse other database targets. GitHub Actions runs compilation, unit/integration checks, a production build, and CLI build/help smoke checks on Linux, macOS, and Windows. These smoke checks do not establish full interactive platform compatibility; Windows users should use WSL2 initially.
+Integration tests require a separate local database named `freecoda_test` and refuse other database targets. GitHub Actions runs compilation, unit/integration checks, a production build, and CLI build/help smoke checks on Linux, macOS, and Windows. Desktop packaging runs separately on Linux, Windows, Intel macOS, and Apple Silicon macOS. Packaging checks do not establish full interactive compatibility on every platform.
 
 ## Hosted launch gates
 
