@@ -16,6 +16,9 @@ import { identity, requireInvite, rateLimit } from "./security";
 import { reserve, settle, uncertain } from "./usage";
 import { publicConfig } from "./config";
 function stripProviderOptions(value: unknown): unknown {
+  // Trusted SDK calls carry a live signal. Recursing through it would turn
+  // it into {}, which fetch rejects before sending the model request.
+  if (value instanceof AbortSignal) return value;
   if (Array.isArray(value)) return value.map(stripProviderOptions);
   if (value && typeof value === "object")
     return Object.fromEntries(

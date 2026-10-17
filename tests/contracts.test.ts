@@ -30,6 +30,13 @@ const model = {
   maxContextTokens: 200000,
   approved: true,
 };
+test('trusted hosted calls preserve live cancellation signals',()=>{
+  const controller=new AbortController();
+  const options=safeModelOptions({prompt:[{role:'user',content:[{type:'text',text:'Hello'}]}],abortSignal:controller.signal},model);
+  expect(options.abortSignal).toBe(controller.signal);
+  controller.abort();
+  expect(options.abortSignal?.aborted).toBe(true);
+});
 test("quotas use UTC boundaries and next calendar day", () => {
   const date = new Date("2026-12-31T23:59:59.000Z");
   expect(utcDay(date)).toBe("2026-12-31");

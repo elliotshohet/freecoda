@@ -381,9 +381,10 @@ export async function executeRunTurn(
       supportedUrls: baseModel.supportedUrls,
       async doGenerate(options: Parameters<typeof baseModel.doGenerate>[0]) {
         await check();
-        const reservation = await reserve(userId, config.id, quote(options));
+        const prepared = optionsFor(options);
+        const reservation = await reserve(userId, config.id, quote(prepared));
         try {
-          const result = await baseModel.doGenerate(optionsFor(options));
+          const result = await baseModel.doGenerate(prepared);
           await account(reservation, result);
           return result;
         } catch (error) {
@@ -393,10 +394,11 @@ export async function executeRunTurn(
       },
       async doStream(options: Parameters<typeof baseModel.doStream>[0]) {
         await check();
-        const reservation = await reserve(userId, config.id, quote(options));
+        const prepared = optionsFor(options);
+        const reservation = await reserve(userId, config.id, quote(prepared));
         let finished = false;
         try {
-          const result = await baseModel.doStream(optionsFor(options));
+          const result = await baseModel.doStream(prepared);
           return {
             ...result,
             stream: result.stream.pipeThrough(
