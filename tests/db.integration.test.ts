@@ -500,3 +500,48 @@ test("idle PostgreSQL errors cannot crash the service or leak connection secrets
     console.error = previous;
   }
 });
+
+test("public readiness detects healthy, stale, failed, running and missing maintenance with real database connectivity", async () => {
+  const { databaseReadiness } = await import("../apps/web/lib/readiness");
+  await pool.query("DELETE FROM maintenance_status");
+  expect(await databaseReadiness(pool)).toBe(false);
+  await pool.query(
+    "INSERT INTO maintenance_status(id,started_at,finished_at,status) VALUES('daily',now()-interval '2 minutes',now()-interval '1 minute','ok')",
+  );
+  expect(await databaseReadiness(pool)).toBe(true);
+  await pool.query(
+    "UPDATE maintenance_status SET started_at=now()-interval '50 hours',finished_at=now()-interval '49 hours'",
+  );
+  expect(await databaseReadiness(pool)).toBe(false);
+  await pool.query(
+    "UPDATE maintenance_status SET started_at=now()-interval '2 minutes',finished_at=now()-interval '1 minute',status='failed'",
+  );
+  expect(await databaseReadiness(pool)).toBe(false);
+  await pool.query(
+    "UPDATE maintenance_status SET started_at=now()-interval '6 minutes',finished_at=NULL,status='running'",
+  );
+  expect(await databaseReadiness(pool)).toBe(false);
+  await pool.query(
+    "UPDATE maintenance_status SET started_at=now()+interval '1 day',finished_at=now()+interval '2 days',status='ok'",
+  );
+  expect(await databaseReadiness(pool)).toBe(false);
+});
+
+test("public readiness fails closed when a real database connection cannot be established", async () => {
+  const { databaseReadiness } = await import("../apps/web/lib/readiness");
+  const { createRequire } = await import("node:module");
+  const { Pool } = createRequire(
+    new URL("../apps/web/package.json", import.meta.url),
+  )("pg") as typeof import("pg");
+  const unavailable = new URL(process.env.DATABASE_URL!);
+  unavailable.pathname = `/freecoda_readiness_missing_${randomUUID().replaceAll("-", "")}`;
+  const isolated = new Pool({
+    connectionString: unavailable.toString(),
+    connectionTimeoutMillis: 1000,
+  });
+  try {
+    expect(await databaseReadiness(isolated)).toBe(false);
+  } finally {
+    await isolated.end();
+  }
+});

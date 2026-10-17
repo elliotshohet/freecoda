@@ -97,6 +97,12 @@ test("recovery retention refuses malformed manifests, traversal, mismatched dige
       path.join(f.archiveDirectory, b.manifest.encryptedBackup),
       Buffer.alloc(60, 43),
     );
+    const invalidExpiry = await pair(f, "6666666666", "2026-10-01T00:00:00Z");
+    invalidExpiry.manifest.retentionExpiresAt = "2026-10-02T00:00:00Z";
+    await writeFile(
+      path.join(f.archiveDirectory, `${invalidExpiry.base}.json`),
+      JSON.stringify(invalidExpiry.manifest),
+    );
     await writeFile(path.join(f.archiveDirectory, "arbitrary.json"), "{}");
     const result = await expireRecoveryArtifacts({
       ...f,
@@ -104,7 +110,7 @@ test("recovery retention refuses malformed manifests, traversal, mismatched dige
       apply: true,
     });
     expect(result.deleted).toBe(0);
-    expect(result.rejected).toBe(3);
+    expect(result.rejected).toBe(4);
     expect(
       (await readFile(path.join(f.keyDirectory, `${a.base}.key`))).length,
     ).toBe(32);

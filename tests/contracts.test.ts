@@ -407,3 +407,32 @@ test("unexpected API failures expose only a correlation ID and sanitized classif
     console.error = original;
   }
 });
+
+test("public readiness coalesces probe load, expires its cache, and exposes only a boolean", async () => {
+  const { createReadinessHandler } = await import("../apps/web/lib/readiness");
+  let now = 0,
+    calls = 0;
+  let healthy = true;
+  const route = createReadinessHandler(
+    async () => {
+      calls++;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      if (!healthy) throw new Error("private database connection string");
+      return true;
+    },
+    () => now,
+  );
+  const responses = await Promise.all(
+    Array.from({ length: 20 }, () => route()),
+  );
+  expect(calls).toBe(1);
+  expect(await responses[0].json()).toEqual({ ready: true });
+  expect(responses[0].status).toBe(200);
+  expect(responses[0].headers.get("Cache-Control")).toContain("s-maxage=10");
+  healthy = false;
+  now = 10001;
+  const failed = await route();
+  expect(calls).toBe(2);
+  expect(failed.status).toBe(503);
+  expect(await failed.json()).toEqual({ ready: false });
+});
