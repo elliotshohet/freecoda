@@ -32,6 +32,8 @@ import {
   newConversation,
   listConversations,
   clearConversations,
+  conversationScope,
+  type ConversationMode,
 } from "./threads";
 import {
   CLI_VERSION,
@@ -42,7 +44,7 @@ import {
 } from "./update";
 const program = new Command()
   .name("freecoda")
-  .description("A local coding agent. Your code, your choices.")
+  .description("Your conversational assistant and local coding workspace.")
   .version(CLI_VERSION);
 program
   .command("update")
@@ -185,15 +187,21 @@ program
 program
   .command("history")
   .command("clear")
-  .description("Delete saved conversations for the current repository")
+  .description(
+    "Delete saved chat and coding conversations for the current directory",
+  )
   .action(async () => {
     const root = await realpath(program.opts().cwd || process.cwd());
     await clearConversations(root);
-    console.log("All local tasks deleted for this repository.");
+    await clearConversations(conversationScope(root, "chat"));
+    console.log(
+      "All local chat and coding conversations deleted for this directory.",
+    );
   });
 program
   .option("--cwd <path>", "Workspace directory")
-  .option("--resume", "Resume the latest local conversation")
+  .option("--resume", "Resume the latest conversation in the selected mode")
+  .option("--mode <mode>", "Initial mode: chat, build, plan, or review", "chat")
   .option(
     "--theme <theme>",
     "Terminal palette: auto, dark, or light (saved locally)",
@@ -216,15 +224,24 @@ program
       config.theme = opts.theme;
       await saveConfig(config);
     }
-    if (!config.trustedRoots.includes(root)) {
+    if (!["chat", "build", "plan", "review"].includes(opts.mode))
+      throw Error("Choose --mode chat, build, plan, or review.");
+    let defaultMode: ConversationMode = opts.mode;
+    async function ensureRepositoryTrust() {
+      if (config.trustedRoots.includes(root)) return;
       console.log(
-        `\nWorkspace: ${root}\nFreecoda reads non-ignored files and repository instructions. Relevant context goes to your chosen AI provider. Writes and shell commands require approval. Shell commands are not an OS sandbox.\n`,
+        `\nWorkspace: ${root}\nCoding modes read non-ignored project files and repository instructions. Relevant context goes to your selected provider. Your permission preset controls edits and commands. Commands are not an OS sandbox.\n`,
       );
-      if ((await ask("Trust this repository? [y/N] ")).toLowerCase() !== "y")
-        throw new Error("Repository not trusted. No project files were read.");
+      if (
+        !process.stdin.isTTY ||
+        (await ask("Trust this repository? [y/N] ")).toLowerCase() !== "y"
+      )
+        throw Error("Repository not trusted. No project files were read.");
       config.trustedRoots.push(root);
       await saveConfig(config);
     }
+    if (defaultMode !== "chat") await ensureRepositoryTrust();
+    let scope = conversationScope(root, defaultMode);
     let model: LanguageModel | undefined;
     let modelLabel = "";
     let modelId = "";
@@ -261,10 +278,10 @@ program
       modelLabel = `${chosen.id} · hosted via ${chosen.provider}`;
     }
     await selectModel(opts.model);
-    const latest = await loadConversation(root);
+    const latest = await loadConversation(scope);
     // Preserve legacy single-session history before the latest-task pointer changes.
     if (latest.messages.length) await saveConversation(latest);
-    let conversation = opts.resume ? latest : newConversation(root);
+    let conversation = opts.resume ? latest : newConversation(scope);
     let messages: ModelMessage[] = conversation.messages;
     const screen =
       !opts.prompt && !opts.plain && TerminalScreen.available()
@@ -330,7 +347,23 @@ program
         );
       };
     const permissions = approvals();
-    let defaultMode: "build" | "plan" | "review" = "build";
+    screen?.setMode(permissions.effectiveMode(defaultMode));
+    async function switchMode(next: ConversationMode) {
+      if (next !== "chat") await ensureRepositoryTrust();
+      const nextScope = conversationScope(root, next);
+      if (nextScope !== scope) {
+        await saveConversation({ ...conversation, messages });
+        scope = nextScope;
+        conversation = newConversation(scope);
+        messages = [];
+        screen?.clear();
+        notice(
+          "Started a separate conversation. General chat and coding history never mix; /resume lists this mode’s saved conversations.",
+        );
+      }
+      defaultMode = next;
+      screen?.setMode(permissions.effectiveMode(defaultMode));
+    }
     try {
       for (;;) {
         let input: string;
@@ -357,7 +390,7 @@ program
             permissions.setPreset(preset);
             screen?.setMode(permissions.effectiveMode(defaultMode));
             notice(
-              `Permissions: ${permissions.describe()}. Previous category grants cleared. Session only; Plan and Review always stay read-only.`,
+              `Permissions: ${permissions.describe()}. Previous category grants cleared. Session only; coding presets never enable project access or tools in Chat. Plan and Review always stay read-only.`,
             );
           } else if (selected)
             error(
@@ -396,7 +429,7 @@ program
         }
         if (input === "/help") {
           notice(
-            "/plan <task>  Read-only plan\n/review <task>  Read-only code review\n/mode build|plan|review  Set the default mode\n/model [id]  List or select models\n/permissions [read-only|default|full-access]  Session tool permissions\n/theme auto|dark|light  Save the terminal palette\n/update  Check/install instructions (exit session first)\n/usage  Hosted allowance and reset time\n/status  Current workspace and provider\n/new  Start a new saved task\n/resume [number or id]  List or reopen saved tasks\n/clear  Clear the visible transcript\n/exit  Exit Freecoda\n\nEnter sends. Ctrl+J adds a newline. Paste never submits automatically. Up/Down recalls input. PageUp/PageDown scrolls. Escape or Ctrl+C cancels a running request. Approval: y once, s category for this session, n decline.",
+            "/plan <task>  Read-only plan\n/review <task>  Read-only code review\n/mode chat|build|plan|review  Set the default mode\n/model [id]  List or select models\n/permissions [read-only|default|full-access]  Session tool permissions\n/theme auto|dark|light  Save the terminal palette\n/update  Check/install instructions (exit session first)\n/usage  Hosted allowance and reset time\n/status  Current workspace and provider\n/new  Start a new saved task\n/resume [number or id]  List or reopen saved tasks\n/clear  Clear the visible transcript\n/exit  Exit Freecoda\n\nEnter sends. Ctrl+J adds a newline. Paste never submits automatically. Up/Down recalls input. PageUp/PageDown scrolls. Escape or Ctrl+C cancels a running request. Approval: y once, s category for this session, n decline.",
           );
           if (opts.prompt) break;
           continue;
@@ -409,7 +442,7 @@ program
         }
         if (input === "/new") {
           conversation = await saveConversation({ ...conversation, messages });
-          conversation = newConversation(root);
+          conversation = newConversation(scope);
           messages = [];
           await saveConversation(conversation);
           screen?.clear();
@@ -419,7 +452,7 @@ program
         }
         if (input === "/resume" || input.startsWith("/resume ")) {
           try {
-            const saved = await listConversations(root);
+            const saved = await listConversations(scope);
             const selected = input.slice(7).trim();
             if (!selected)
               notice(
@@ -442,7 +475,7 @@ program
                 );
               else {
                 await saveConversation({ ...conversation, messages });
-                conversation = await loadConversation(root, item.id);
+                conversation = await loadConversation(scope, item.id);
                 messages = conversation.messages;
                 await saveConversation(conversation);
                 screen?.clear();
@@ -481,7 +514,7 @@ program
         }
         if (input === "/status") {
           notice(
-            `Workspace: ${root}\nModel: ${modelLabel}\nMode: ${defaultMode} (effective: ${permissions.effectiveMode(defaultMode)})\nPermissions: ${permissions.describe()}\nTheme: ${config.theme}\nConversation: ${messages.length} messages saved locally\nPlan: free forever, supported by sponsors. Hosted fair-use limits apply.`,
+            `Workspace: ${root}\nModel: ${modelLabel}\nMode: ${defaultMode} (effective: ${permissions.effectiveMode(defaultMode)})\nAccess: ${defaultMode === "chat" ? "Chat has no project access or tools. Coding preset: " : "Coding preset: "}${permissions.describe()}\nTheme: ${config.theme}\nConversation: ${messages.length} messages saved locally\nPlan: free forever, supported by sponsors. Hosted fair-use limits apply.`,
           );
           if (opts.prompt) break;
           continue;
@@ -537,12 +570,15 @@ program
         }
         if (input === "/mode" || input.startsWith("/mode ")) {
           const selected = input.slice(6).trim();
-          if (!["build", "plan", "review"].includes(selected))
-            error("Use /mode build, /mode plan, or /mode review.");
+          if (!["chat", "build", "plan", "review"].includes(selected))
+            error("Use /mode chat, build, plan, or review.");
           else {
-            defaultMode = selected as typeof defaultMode;
-            screen?.setMode(permissions.effectiveMode(defaultMode));
-            notice("Default mode: " + defaultMode);
+            try {
+              await switchMode(selected as ConversationMode);
+              notice("Default mode: " + defaultMode);
+            } catch (e) {
+              error(e instanceof Error ? e.message : "Could not change mode.");
+            }
           }
           if (opts.prompt) break;
           continue;
@@ -557,6 +593,33 @@ program
           : /^\/review(?:\s|$)/.test(input)
             ? "review"
             : defaultMode;
+        if (conversationScope(root, mode) !== scope) {
+          try {
+            await switchMode(mode);
+          } catch (e) {
+            error(
+              e instanceof Error ? e.message : "Repository trust required.",
+            );
+            if (opts.prompt) {
+              process.exitCode = 1;
+              break;
+            }
+            continue;
+          }
+        } else if (mode !== "chat") {
+          try {
+            await ensureRepositoryTrust();
+          } catch (e) {
+            error(
+              e instanceof Error ? e.message : "Repository trust required.",
+            );
+            if (opts.prompt) {
+              process.exitCode = 1;
+              break;
+            }
+            continue;
+          }
+        }
         const prompt =
           mode === "review"
             ? `Review the project and report concrete issues. ${input.replace(/^\/review\s*/, "")}`

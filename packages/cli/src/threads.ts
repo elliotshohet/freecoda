@@ -4,6 +4,12 @@ import path from "node:path";
 import type { ModelMessage } from "ai";
 import { historyFile, savePrivate, stateDir } from "./config";
 
+export type ConversationMode = "chat" | "build" | "plan" | "review";
+/** General conversation can never reopen repository/tool context by accident. */
+export function conversationScope(root: string, mode: ConversationMode) {
+  return mode === "chat" ? `freecoda-general-chat:${root}` : root;
+}
+
 export type Conversation = {
   id: string;
   root: string;

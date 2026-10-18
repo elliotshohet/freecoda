@@ -106,7 +106,7 @@ export const TERMINAL_COMMANDS = [
   { command: "/model", description: "List or choose the active model" },
   {
     command: "/mode",
-    description: "Choose build, plan, or review",
+    description: "Choose chat, build, plan, or review",
     argument: true,
   },
   {
@@ -171,7 +171,7 @@ export class TerminalScreen {
   private busy = false;
   private status = "Ready";
   private model = "";
-  private mode = "build";
+  private mode = "chat";
   private permissions = "Default · ask before edits and commands";
   private permissionIndex = 1;
   private sponsor: SponsorBanner = {
@@ -212,7 +212,7 @@ export class TerminalScreen {
     process.stdout.write("\x1b[?1049h\x1b[?2004h\x1b[?25l");
     this.append(
       "notice",
-      "Your local coding workspace. /help lists commands. Writes and shell commands require your approval.",
+      "Your Freecoda conversation. Chat has no project access or tools. /mode build opens coding; /help lists commands.",
     );
     this.render();
     return this;
@@ -736,7 +736,7 @@ export class TerminalScreen {
               ? this.question.label
               : this.busy
                 ? `${this.status} · Esc to interrupt`
-                : `${this.mode === "build" ? "Agent" : this.mode === "plan" ? "Plan" : "Review"} · ${this.mode === "build" ? this.permissions : "read-only turn · " + this.permissions}`,
+                : `${this.mode === "chat" ? "Chat · no project access or tools" : (this.mode === "build" ? "Agent" : this.mode === "plan" ? "Plan" : "Review") + " · " + (this.mode === "build" ? this.permissions : "read-only turn · " + this.permissions)}`,
             inner,
           ),
         ),
@@ -777,7 +777,7 @@ export class TerminalScreen {
               ? "y once · s this category/session · n decline"
               : this.question?.kind === "permissions"
                 ? "1–3 select · Enter confirm · Esc keeps current permissions"
-                : `Enter send · Ctrl+J newline · ↑ history · PgUp scroll · /help · ${this.permissions}`,
+                : `Enter send · Ctrl+J newline · ↑ history · PgUp scroll · /help · ${this.mode === "chat" ? "Chat · no tools" : this.permissions}`,
             inner,
           ),
       ),

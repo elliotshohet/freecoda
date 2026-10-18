@@ -41,7 +41,7 @@ env.pop('NO_COLOR',None)
 for key in list(env):
  if key.startswith(('OPENAI_','AI_GATEWAY_','VERCEL_','GITHUB_','GH_')):env.pop(key,None)
 env.update({'TERM':'xterm-256color','FORCE_COLOR':'1','COLORFGBG':'0;7','FREECODA_CONFIG_DIR':config})
-child=subprocess.Popen([node,entry,'--cwd',root],stdin=slave,stdout=slave,stderr=slave,env=env,close_fds=True)
+child=subprocess.Popen([node,entry,'--cwd',root,'--mode','build'],stdin=slave,stdout=slave,stderr=slave,env=env,close_fds=True)
 os.close(slave)
 output=b''
 def wait_for(text,start=0,timeout=12):
@@ -63,7 +63,7 @@ def send(text):
    try:output+=os.read(master,65536)
    except OSError:break
 try:
- wait_for('Your local coding workspace')
+ wait_for('Your Freecoda conversation')
  start=len(output);send('/permissions');send('\r');wait_for('Permissions · ↑/↓ choose',start)
  send('\x1b[A');send('\r');wait_for('Permissions: Read only',start)
  start=len(output);send('/status');send('\r');wait_for('effective: plan',start)
@@ -97,6 +97,11 @@ try:
  wait_for('House sponsor fixture')
  start=len(output);send('/new');send('\r');wait_for('New task. /resume',start)
  start=len(output);send('/resume 2');send('\r');wait_for('Resumed task: Fix addition',start)
+ start=len(output);send('/mode chat');send('\r');wait_for('Default mode: chat',start)
+ start=len(output);send('/status');send('\r');wait_for('Chat has no project access or tools',start);wait_for('Conversation: 0 messages',start)
+ start=len(output);send('/resume');send('\r');wait_for('No saved tasks',start)
+ start=len(output);send('/mode build');send('\r');wait_for('Default mode: build',start)
+ start=len(output);send('/resume');send('\r');wait_for('Fix addition',start)
  send('/exit');send('\r')
  child.wait(timeout=5)
  assert child.returncode==0,'CLI returned a failure'

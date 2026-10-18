@@ -44,7 +44,7 @@ Bracketed paste is inserted as text, including embedded newlines and slash comma
 - `/help`: show commands and keyboard controls.
 - `/plan <task>`: make a read-only plan for one turn.
 - `/review <task>`: review project code using read-only tools.
-- `/mode build|plan|review`: choose the default mode for following turns.
+- `/mode chat|build|plan|review`: choose the default mode for following turns. Chat is the default and has no project access or tools.
 - `/model`: list approved hosted models, or show the direct provider model.
 - `/model <id>`: select a model for this session.
 - `/theme auto|dark|light`: save the terminal palette; `/theme` shows the current preference.
@@ -56,7 +56,7 @@ Bracketed paste is inserted as text, including embedded newlines and slash comma
 - `/clear`: clear the visible transcript while retaining model context.
 - `/exit`: leave the application.
 
-Start with `--resume` to reopen the conversation saved for the current repository. `--model <id>` chooses an approved hosted model or a model offered by your configured direct provider. Switching models retains the current conversation; use `/new` when you want fresh context.
+Start with `--resume` to reopen the latest conversation in the current directory and mode scope. General chat and coding histories are separate; crossing between them starts a new conversation. Use `/resume` to reopen an older conversation in the selected scope. `--mode build` starts coding directly. `--model <id>` chooses an approved hosted model or a model offered by your configured direct provider. Switching models retains the current conversation; use `/new` when you want fresh context.
 
 For a single task and plain output:
 
@@ -64,7 +64,7 @@ For a single task and plain output:
 freecoda --cwd /path/to/project -p "Explain how authentication works"
 ```
 
-Repository trust must already be granted when input is noninteractive. Noninteractive writes and shell commands are declined; there is no implicit permission bypass.
+Chat does not require repository trust. Coding modes require trust before reading project context; trust must already be granted when input is noninteractive. Noninteractive writes and shell commands are declined; there is no implicit permission bypass.
 
 ## Session permissions
 
@@ -85,9 +85,9 @@ The first command checks availability. `--install` explicitly invokes npm to ins
 
 ## Approvals and local state
 
-Freecoda asks you to trust a repository before reading context. Repository tools exclude common credential files and respect `.gitignore` and `.freecodaignore`. Writes show a diff; shell commands show the requested command. Approve with `y` once, `s` for that action category during this session, or `n` to decline. Plan and review modes expose only read tools. Shell execution is not an OS sandbox, so review commands before allowing them.
+Freecoda starts in general chat with no repository context or tools. Switching to build, plan, or review asks you to trust the repository before reading context. Repository tools exclude common credential files and respect `.gitignore` and `.freecodaignore`. Writes show a diff; shell commands show the requested command. Approve with `y` once, `s` for that action category during this session, or `n` to decline. Plan and review modes expose only read tools. Shell execution is not an OS sandbox, so review commands before allowing them.
 
-Conversation history and optional direct provider keys are stored under `~/.config/freecoda` with owner-only permissions. `FREECODA_CONFIG_DIR` overrides that directory. `history clear` removes all saved tasks for the current repository; `logout` revokes the hosted terminal token. Model context can contain relevant repository excerpts and is sent to your selected provider.
+Conversation history and optional direct provider keys are stored under `~/.config/freecoda` with owner-only permissions. `FREECODA_CONFIG_DIR` overrides that directory. `history clear` removes saved general chat and coding conversations for the current directory; `logout` revokes the hosted terminal token. Model context can contain relevant repository excerpts and is sent to your selected provider.
 
 ## Sponsor placements
 

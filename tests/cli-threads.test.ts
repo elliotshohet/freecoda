@@ -5,6 +5,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { historyFile, savePrivate } from "../packages/cli/src/config";
 import {
+  conversationScope,
   newConversation,
   saveConversation,
   loadConversation,
@@ -78,6 +79,34 @@ test("saved CLI tasks survive new conversations, migrate legacy history, and sta
     expect(await listConversations(root)).toEqual([]);
     expect((await loadConversation(other)).id).toBe(otherTask.id);
     expect((await loadConversation(root)).messages).toEqual([]);
+  } finally {
+    if (previous === undefined) delete process.env.FREECODA_CONFIG_DIR;
+    else process.env.FREECODA_CONFIG_DIR = previous;
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("general chat history never loads coding messages or legacy task context", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "freecoda-chat-scope-"));
+  const previous = process.env.FREECODA_CONFIG_DIR;
+  process.env.FREECODA_CONFIG_DIR = directory;
+  try {
+    const root = path.join(directory, "project"),
+      chat = conversationScope(root, "chat");
+    expect(conversationScope(root, "build")).toBe(root);
+    const coding = await saveConversation({
+      ...newConversation(root),
+      messages: [{ role: "user", content: "PRIVATE_REPOSITORY_CONTEXT" }],
+    });
+    expect((await loadConversation(chat)).messages).toEqual([]);
+    expect(await listConversations(chat)).toEqual([]);
+    await expect(loadConversation(chat, coding.id)).rejects.toThrow();
+    const general = await saveConversation({
+      ...newConversation(chat),
+      messages: [{ role: "user", content: "Explain rainbows" }],
+    });
+    expect((await loadConversation(root)).id).toBe(coding.id);
+    expect((await loadConversation(chat)).id).toBe(general.id);
   } finally {
     if (previous === undefined) delete process.env.FREECODA_CONFIG_DIR;
     else process.env.FREECODA_CONFIG_DIR = previous;

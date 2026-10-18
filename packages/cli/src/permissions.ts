@@ -64,7 +64,7 @@ export class SessionPermissions {
       return "Default · commands allowed this session; ask before edits";
     return "Default · ask before edits and commands";
   }
-  effectiveMode(mode: "build" | "plan" | "review") {
+  effectiveMode(mode: "chat" | "build" | "plan" | "review") {
     return this.selected === "read-only" && mode === "build" ? "plan" : mode;
   }
   approve: Approval = async (kind, description) => {
