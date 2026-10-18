@@ -13,12 +13,12 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <a class="skip" href="#editor">Skip to editor</a>
+    <a class="skip" href="#prompt">Skip to conversation</a>
     <header class="titlebar">
       <div class="wordmark">
         <img src="./logo.svg" alt="" width="28" height="28" /><strong
           >freecoda</strong
-        ><span class="beta">desktop beta</span>
+        ><span class="beta">desktop</span>
       </div>
       <div class="workspace-switch" role="tablist" aria-label="Workspace type">
         <button role="tab" aria-selected="true" id="local-tab">
@@ -50,7 +50,11 @@
       ><button id="error-close" aria-label="Dismiss error">×</button>
     </div>
     <main id="app" class="app-grid">
-      <aside class="sidebar" aria-label="Project files">
+      <aside
+        class="sidebar"
+        aria-label="Projects and conversations"
+        id="project-sidebar"
+      >
         <div class="sidebar-heading">
           <span>Workspace</span
           ><button
@@ -70,25 +74,65 @@
         <p id="folder-path" class="folder-path">
           Your files stay on this computer.
         </p>
-        <label class="file-search"
-          ><span class="sr-only">Find a project file</span
-          ><input
-            id="file-filter"
-            placeholder="Find a file…"
-            type="search"
-            autocomplete="off"
-            disabled
-        /></label>
-        <nav id="file-tree" class="file-tree" aria-label="Files">
-          <p class="file-empty">Open a project to explore its files.</p>
-        </nav>
-        <div class="sidebar-footer">
-          <button id="refresh-files" class="quiet-button" disabled>
-            ↻ Refresh files</button
-          ><span id="trust-status">No folder open</span>
+        <button id="sidebar-new-task" class="sidebar-action">
+          <span aria-hidden="true">＋</span> New task
+        </button>
+        <button id="current-thread" class="thread-link" aria-current="page">
+          <span aria-hidden="true">◌</span>
+          <span id="thread-title">Current conversation</span>
+        </button>
+        <div class="sidebar-section-label">Your workspace</div>
+        <button id="sidebar-files" class="sidebar-action">
+          <span aria-hidden="true">▱</span> Files & changes
+        </button>
+        <button id="sidebar-output" class="sidebar-action">
+          <span aria-hidden="true">›_</span> Terminal & activity
+        </button>
+        <div
+          id="thread-history"
+          class="thread-history"
+          aria-label="Saved conversations"
+        ></div>
+        <div class="sidebar-bottom">
+          <span class="local-dot"></span> Local workspace
+          <span class="free-badge">Free</span>
         </div>
       </aside>
-      <section class="editor-pane" aria-label="File editor">
+      <section
+        class="editor-pane"
+        id="workbench"
+        aria-label="Files, editor and output"
+        hidden
+      >
+        <div class="workbench-heading">
+          <strong>Project tools</strong
+          ><button
+            id="close-workbench"
+            class="icon-button"
+            aria-label="Close project tools"
+          >
+            ×
+          </button>
+        </div>
+        <div class="workbench-files">
+          <label class="file-search"
+            ><span class="sr-only">Find a project file</span
+            ><input
+              id="file-filter"
+              placeholder="Find a file…"
+              type="search"
+              autocomplete="off"
+              disabled
+          /></label>
+          <nav id="file-tree" class="file-tree" aria-label="Files">
+            <p class="file-empty">Open a project to explore its files.</p>
+          </nav>
+          <div class="sidebar-footer">
+            <button id="refresh-files" class="quiet-button" disabled>
+              ↻ Refresh files</button
+            ><span id="trust-status">No folder open</span>
+          </div>
+        </div>
         <div class="editor-toolbar">
           <div class="file-tab">
             <span aria-hidden="true">⌘</span
@@ -105,11 +149,8 @@
           <div class="welcome-logo">
             <img src="./logo.svg" alt="" width="76" height="76" />
           </div>
-          <h1>Make room for<br />your next idea.</h1>
-          <p>
-            Open a project, ask a question, and build something that feels like
-            yours.
-          </p>
+          <h1>Your project files</h1>
+          <p>Choose a file to read or edit it alongside your conversation.</p>
           <button id="welcome-open" class="button purple">
             Open a project folder</button
           ><span class="welcome-note"
@@ -200,16 +241,32 @@ Command output will appear here. Shell commands always require your approval.</p
         <div class="agent-header">
           <div>
             <span class="agent-star" aria-hidden="true">✳</span
-            ><strong>Freecoda</strong>
+            ><strong id="conversation-title">New task</strong>
           </div>
-          <button
-            id="new-chat"
-            class="icon-button"
-            aria-label="Start a new conversation"
-            title="New conversation"
-          >
-            ＋
-          </button>
+          <div class="conversation-actions">
+            <button
+              id="toggle-sidebar"
+              class="icon-button"
+              aria-label="Toggle project sidebar"
+              aria-expanded="true"
+            >
+              ☰</button
+            ><button
+              id="toggle-workbench"
+              class="small-button"
+              aria-expanded="false"
+              aria-controls="workbench"
+            >
+              Project tools</button
+            ><button
+              id="new-chat"
+              class="icon-button"
+              aria-label="Start a new conversation"
+              title="New conversation"
+            >
+              ＋
+            </button>
+          </div>
         </div>
         <div class="agent-context">
           <span id="agent-context">Open a folder to start</span
@@ -225,8 +282,11 @@ Command output will appear here. Shell commands always require your approval.</p
         >
           <div id="chat-welcome" class="chat-welcome">
             <span class="agent-star" aria-hidden="true">✳</span>
-            <h2>What’s on your mind?</h2>
-            <p>A stubborn bug. A new feature. A question about your code.</p>
+            <h2>What are we building?</h2>
+            <p>
+              Start with a task, ask about your project, or pick up where you
+              left off.
+            </p>
             <div class="prompt-suggestions">
               <button
                 data-prompt="Explain how this project is organized and where I should start."
@@ -252,7 +312,7 @@ Command output will appear here. Shell commands always require your approval.</p
             id="prompt"
             rows="3"
             maxlength="20000"
-            placeholder="What would you like to build?"
+            placeholder="Ask Freecoda anything about your project…"
             disabled
           ></textarea>
           <div class="composer-controls">
@@ -263,6 +323,7 @@ Command output will appear here. Shell commands always require your approval.</p
                 <option value="plan">Plan · read only</option>
                 <option value="review">Review · read only</option>
               </select></label
+            ><span id="model-label" class="model-label">Freecoda model</span
             ><span class="composer-hint">⌘ Enter to send</span
             ><button id="send" type="submit" class="send" disabled>
               Send <span aria-hidden="true">↑</span></button
@@ -276,12 +337,14 @@ Command output will appear here. Shell commands always require your approval.</p
           shell command.
         </p>
         <aside class="house-ad" aria-label="Freecoda announcement">
-          <span>Freecoda announcement</span
-          ><strong>Good tools deserve a little room.</strong>
+          <span>Freecoda · sponsor supported</span>
           <p>
-            Free forever, supported by sponsors. Your code and conversations are
-            never shared with advertisers.
+            Free forever. Your code and conversations are never shared with
+            advertisers.
           </p>
+          <button id="sponsor-info" class="quiet-button">
+            About the free plan
+          </button>
         </aside>
       </section>
     </main>

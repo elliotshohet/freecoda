@@ -111,7 +111,11 @@ function updateControls() {
   hide("send", running);
   hide("stop", !running);
   button("stop").disabled = actionBusy;
-  button("new-chat").disabled = running || actionBusy;
+  button("new-chat").disabled = !safe;
+  button("sidebar-new-task").disabled = !safe;
+  el("thread-history")
+    .querySelectorAll<HTMLButtonElement>("button")
+    .forEach((node) => (node.disabled = !safe));
   input("file-filter").disabled = !trusted();
   input("command").disabled = !safe;
   hide("run-command", commandInFlight);
@@ -143,7 +147,16 @@ function updateControls() {
 }
 function renderState(next: DesktopState) {
   const oldRoot = state?.workspace?.root;
+  const oldThread = state?.activeThreadId;
   state = structuredClone(next);
+  if (oldThread !== next.activeThreadId) {
+    output = "";
+    text(
+      "output-log",
+      "Command output will appear here. Shell commands always require your approval.",
+    );
+    el("activity-log").replaceChildren();
+  }
   running = next.running;
   if (oldRoot !== next.workspace?.root) {
     file = null;
@@ -189,14 +202,17 @@ function renderState(next: DesktopState) {
   if (
     next.workspace?.trusted &&
     next.conversation &&
-    conversationRoot !== next.workspace.root &&
+    conversationRoot !==
+      `${next.workspace.root}:${next.activeThreadId || "current"}` &&
     !running
   ) {
     clearConversation(false);
     for (const item of next.conversation) appendMessage(item.role, item.text);
-    conversationRoot = next.workspace.root;
+    conversationRoot = `${next.workspace.root}:${next.activeThreadId || "current"}`;
   }
   renderFiles();
+  renderThreads();
+  text("model-label", next.auth.model || "Freecoda model");
   updateControls();
   renderAccount();
   if (
@@ -344,6 +360,7 @@ async function openFile(path: string) {
     const next = await bridge.readFile(path);
     if (root !== state?.workspace?.root || request !== fileRequest) return;
     file = next;
+    showWorkbench(true);
     editor.value = next.content;
     text("file-name", next.path);
     hide("welcome");
@@ -448,17 +465,17 @@ function clearConversation(confirm = true) {
   assistantParagraph = null;
 }
 async function newConversation() {
+  if (running || actionBusy) return;
   if (
-    running ||
-    !window.confirm(
-      "Start a new conversation and clear saved local history for this project?",
-    )
+    dirty() &&
+    !window.confirm("Keep unsaved editor changes and start a new task?")
   )
     return;
   try {
-    await bridge.clearHistory();
-    clearConversation(false);
-    notify("Started a new conversation.");
+    renderState(await bridge.createThread());
+    prompt.value = "";
+    prompt.focus();
+    notify("New task started. Previous conversations are saved locally.");
   } catch (error) {
     showError(error);
   }
@@ -850,8 +867,7 @@ async function handleEvent(event: DesktopEvent) {
             /* The agent may have removed this file; preserve the visible editor. */
           }
         }
-        updateControls();
-        renderFiles();
+        renderState(await bridge.getState());
         if (
           state?.auth.signedIn &&
           el<HTMLDialogElement>("account-dialog").open
@@ -879,6 +895,98 @@ async function handleEvent(event: DesktopEvent) {
       break;
   }
 }
+
+function showWorkbench(open: boolean) {
+  hide("workbench", !open);
+  el("app").classList.toggle("tools-open", open);
+  button("toggle-workbench").setAttribute("aria-expanded", String(open));
+}
+function renderThreads() {
+  const threads = state?.threads || [];
+  hide("current-thread", threads.length > 0);
+  const active = threads.find((thread) => thread.id === state?.activeThreadId);
+  const title =
+    active?.title ||
+    state?.conversation
+      ?.find((item) => item.role === "user")
+      ?.text.slice(0, 70) ||
+    "New task";
+  text("conversation-title", title);
+  text("thread-title", title);
+  const history = el("thread-history");
+  history.replaceChildren();
+  if (threads.length) {
+    const heading = document.createElement("div");
+    heading.className = "sidebar-section-label";
+    heading.textContent = "Conversations";
+    history.append(heading);
+  }
+  for (const thread of threads) {
+    const node = document.createElement("button");
+    node.className = "thread-link";
+    node.textContent = thread.title || "New task";
+    node.title = thread.title || "New task";
+    if (thread.id === state?.activeThreadId)
+      node.setAttribute("aria-current", "page");
+    node.disabled = running || actionBusy;
+    node.addEventListener(
+      "click",
+      async () => {
+        if (running || actionBusy || thread.id === state?.activeThreadId)
+          return;
+        try {
+          renderState(await bridge.openThread(thread.id));
+          prompt.value = "";
+          updateControls();
+        } catch (error) {
+          showError(error);
+        }
+      },
+      { signal },
+    );
+    history.append(node);
+  }
+}
+button("toggle-workbench").addEventListener(
+  "click",
+  () => showWorkbench(el("workbench").hidden === true),
+  { signal },
+);
+button("close-workbench").addEventListener(
+  "click",
+  () => showWorkbench(false),
+  { signal },
+);
+button("sidebar-files").addEventListener("click", () => showWorkbench(true), {
+  signal,
+});
+button("sidebar-output").addEventListener(
+  "click",
+  () => {
+    showWorkbench(true);
+    outputTab("output");
+    input("command").focus();
+  },
+  { signal },
+);
+button("toggle-sidebar").addEventListener(
+  "click",
+  () => {
+    const hidden = el("app").classList.toggle("sidebar-hidden");
+    hide("project-sidebar", hidden);
+    button("toggle-sidebar").setAttribute("aria-expanded", String(!hidden));
+  },
+  { signal },
+);
+button("sidebar-new-task").addEventListener(
+  "click",
+  () => void newConversation(),
+  { signal },
+);
+button("current-thread").addEventListener("click", () => prompt.focus(), {
+  signal,
+});
+button("sponsor-info").addEventListener("click", openAccount, { signal });
 
 button("error-close").addEventListener("click", clearError, { signal });
 for (const id of ["open-folder", "welcome-open", "folder-picker"])
