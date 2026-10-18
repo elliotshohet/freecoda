@@ -212,7 +212,7 @@
             aria-labelledby="output-tab"
             tabindex="0"
           >
-Command output will appear here. Shell commands always require your approval.</pre>
+Command output will appear here. Your permission preset controls local command execution.</pre>
           <form id="command-form" class="command-form">
             <span aria-hidden="true">›</span
             ><label class="sr-only" for="command">Run a shell command</label
@@ -323,6 +323,14 @@ Command output will appear here. Shell commands always require your approval.</p
                 <option value="plan">Plan · read only</option>
                 <option value="review">Review · read only</option>
               </select></label
+            ><button
+              id="permissions-open"
+              type="button"
+              class="permissions-button"
+              aria-haspopup="dialog"
+              title="Change permissions with /permissions"
+            >
+              Default permissions</button
             ><span id="model-label" class="model-label">Freecoda model</span
             ><span class="composer-hint">⌘ Enter to send</span
             ><button id="send" type="submit" class="send" disabled>
@@ -332,7 +340,7 @@ Command output will appear here. Shell commands always require your approval.</p
             </button>
           </div>
         </form>
-        <p class="permission-note">
+        <p class="permission-note" id="permission-note">
           <span aria-hidden="true">◇</span> You approve every file change and
           shell command.
         </p>
@@ -350,6 +358,78 @@ Command output will appear here. Shell commands always require your approval.</p
         </aside>
       </section>
     </main>
+    <dialog
+      id="permissions-dialog"
+      aria-labelledby="permissions-title"
+      aria-describedby="permissions-description"
+    >
+      <form id="permissions-form">
+        <h2 id="permissions-title">Choose permissions</h2>
+        <p id="permissions-description">
+          Applies to this local session and resets when you change projects.
+          Commands run on your computer, without an operating system sandbox.
+        </p>
+        <fieldset class="permissions-options">
+          <legend class="sr-only">Permission preset</legend>
+          <label
+            ><input
+              type="radio"
+              name="permission-preset"
+              value="read-only"
+            /><span
+              ><strong>Read only</strong
+              ><small
+                >Read and discuss files. File changes and shell commands are
+                denied.</small
+              ></span
+            ></label
+          >
+          <label
+            ><input
+              type="radio"
+              name="permission-preset"
+              value="default"
+              checked
+            /><span
+              ><strong>Default</strong
+              ><small
+                >Ask for your approval before each file change and shell
+                command.</small
+              ></span
+            ></label
+          >
+          <label
+            ><input
+              type="radio"
+              name="permission-preset"
+              value="full-access"
+            /><span
+              ><strong>Full access</strong
+              ><small
+                >Allow local file changes and shell commands without individual
+                prompts. Commands can access files and network resources outside
+                your project.</small
+              ></span
+            ></label
+          >
+        </fieldset>
+        <p class="permissions-warning">
+          Full access grants permission for the session. Only enable it for a
+          project and task you trust. Plan and Review modes remain read only.
+        </p>
+        <div class="dialog-actions">
+          <button
+            id="permissions-cancel"
+            type="button"
+            class="button secondary"
+          >
+            Cancel</button
+          ><button id="permissions-apply" type="submit" class="button purple">
+            Apply permissions
+          </button>
+        </div>
+      </form>
+    </dialog>
     <dialog id="trust-dialog" aria-labelledby="trust-title">
       <form method="dialog" id="trust-form">
         <div class="dialog-icon" aria-hidden="true">◇</div>

@@ -1,5 +1,6 @@
 import type {
   AgentMode,
+  DesktopPermissionPreset,
   DesktopBridge,
   DesktopEvent,
   DesktopFile,
@@ -98,16 +99,22 @@ function workspaceName() {
 }
 function updateControls() {
   const safe = trusted() && !running && !actionBusy;
+  const readOnly = state?.permissionPreset === "read-only";
+  const localCommand = /^\/permissions(?:\s|$)/i.test(prompt.value.trim());
   button("open-folder").disabled = running || actionBusy;
   button("folder-picker").disabled = running || actionBusy;
   button("welcome-open").disabled = running || actionBusy;
   button("refresh-files").disabled = !safe;
-  button("save-file").disabled = !safe || !file || file.readOnly || !dirty();
-  editor.disabled = !safe || !file || file.readOnly;
-  prompt.disabled = !trusted() || running || actionBusy;
+  button("save-file").disabled =
+    !safe || readOnly || !file || file.readOnly || !dirty();
+  editor.disabled = !safe || readOnly || !file || file.readOnly;
+  prompt.disabled = running || actionBusy;
   mode.disabled = running || actionBusy;
   button("send").disabled =
-    !safe || !state?.auth.signedIn || !prompt.value.trim() || dirty();
+    running ||
+    actionBusy ||
+    !prompt.value.trim() ||
+    (!localCommand && (!safe || !state?.auth.signedIn || dirty()));
   hide("send", running);
   hide("stop", !running);
   button("stop").disabled = actionBusy;
@@ -117,11 +124,11 @@ function updateControls() {
     .querySelectorAll<HTMLButtonElement>("button")
     .forEach((node) => (node.disabled = !safe));
   input("file-filter").disabled = !trusted();
-  input("command").disabled = !safe;
+  input("command").disabled = !safe || readOnly;
   hide("run-command", commandInFlight);
   hide("stop-command", !commandInFlight);
   button("run-command").disabled =
-    !safe || !input("command").value.trim() || dirty();
+    !safe || readOnly || !input("command").value.trim() || dirty();
   document
     .querySelectorAll<HTMLButtonElement>("#file-tree button")
     .forEach((node) => {
@@ -130,6 +137,32 @@ function updateControls() {
   document
     .querySelectorAll<HTMLButtonElement>("[data-prompt]")
     .forEach((node) => (node.disabled = !safe));
+  button("permissions-open").disabled =
+    running || actionBusy || commandInFlight;
+  button("permissions-apply").disabled =
+    running || actionBusy || commandInFlight;
+  el("permissions-dialog")
+    .querySelectorAll<HTMLInputElement>("input")
+    .forEach(
+      (node) => (node.disabled = running || actionBusy || commandInFlight),
+    );
+  const preset = state?.permissionPreset || "default";
+  text(
+    "permissions-open",
+    preset === "read-only"
+      ? "Read only"
+      : preset === "full-access"
+        ? "Full access"
+        : "Default permissions",
+  );
+  text(
+    "permission-note",
+    preset === "read-only"
+      ? "Read only · file changes and shell commands are denied."
+      : preset === "full-access"
+        ? "Full access · local edits and shell commands run without approval. Session only."
+        : "Default · you approve each file change and shell command.",
+  );
   hide("working", !running);
   text(
     "agent-status",
@@ -140,7 +173,11 @@ function updateControls() {
     file?.readOnly
       ? "Read only · sensitive values hidden"
       : trusted()
-        ? "Local execution · changes need approval"
+        ? readOnly
+          ? "Read only · no edits or commands"
+          : state?.permissionPreset === "full-access"
+            ? "Full access · local execution"
+            : "Default · changes need approval"
         : "Local workspace",
   );
   hide("dirty-indicator", !dirty());
@@ -153,7 +190,7 @@ function renderState(next: DesktopState) {
     output = "";
     text(
       "output-log",
-      "Command output will appear here. Shell commands always require your approval.",
+      "Command output will appear here. Your permission preset controls local command execution.",
     );
     el("activity-log").replaceChildren();
   }
@@ -173,7 +210,7 @@ function renderState(next: DesktopState) {
     output = "";
     text(
       "output-log",
-      "Command output will appear here. Shell commands always require your approval.",
+      "Command output will appear here. Your permission preset controls local command execution.",
     );
     el("activity-log").replaceChildren();
   }
@@ -482,7 +519,21 @@ async function newConversation() {
 }
 async function sendPrompt(event?: Event) {
   event?.preventDefault();
-  if (!trusted() || running || actionBusy || !prompt.value.trim()) return;
+  if (running || actionBusy || !prompt.value.trim()) return;
+  if (/^\/permissions(?:\s|$)/i.test(prompt.value.trim())) {
+    if (prompt.value.trim().toLowerCase() !== "/permissions") {
+      showError(new Error("Use /permissions to choose a permission preset."));
+      return;
+    }
+    openPermissions();
+    prompt.value = "";
+    updateControls();
+    return;
+  }
+  if (!trusted()) {
+    notify("Open and trust a project folder before starting a task.");
+    return;
+  }
   if (dirty()) {
     showError(
       new Error("Save or discard your file changes before starting a task."),
@@ -895,6 +946,71 @@ async function handleEvent(event: DesktopEvent) {
       break;
   }
 }
+
+function openPermissions() {
+  if (running || actionBusy || commandInFlight) return;
+  const preset = state?.permissionPreset || "default";
+  for (const node of el(
+    "permissions-dialog",
+  ).querySelectorAll<HTMLInputElement>('input[name="permission-preset"]'))
+    node.checked = node.value === preset;
+  const dialog = el<HTMLDialogElement>("permissions-dialog");
+  if (!dialog.open) dialog.showModal();
+}
+button("permissions-open").addEventListener("click", openPermissions, {
+  signal,
+});
+button("permissions-cancel").addEventListener(
+  "click",
+  () => el<HTMLDialogElement>("permissions-dialog").close(),
+  { signal },
+);
+el("permissions-form").addEventListener(
+  "submit",
+  async (event) => {
+    event.preventDefault();
+    if (running || actionBusy || commandInFlight) return;
+    const selected = el("permissions-dialog").querySelector<HTMLInputElement>(
+      'input[name="permission-preset"]:checked',
+    )?.value;
+    if (
+      !selected ||
+      !["read-only", "default", "full-access"].includes(selected)
+    )
+      return;
+    actionBusy = true;
+    updateControls();
+    try {
+      renderState(
+        await bridge.setPermissions(selected as DesktopPermissionPreset),
+      );
+      el<HTMLDialogElement>("permissions-dialog").close();
+      notify("Session permissions updated.");
+    } catch (error) {
+      showError(error);
+    } finally {
+      actionBusy = false;
+      updateControls();
+    }
+  },
+  { signal },
+);
+prompt.addEventListener(
+  "keydown",
+  (event) => {
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      /^\/permissions(?:\s|$)/i.test(prompt.value.trim())
+    ) {
+      event.preventDefault();
+      void sendPrompt();
+    }
+  },
+  { signal },
+);
 
 function showWorkbench(open: boolean) {
   hide("workbench", !open);
