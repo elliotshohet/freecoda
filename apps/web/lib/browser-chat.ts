@@ -137,6 +137,7 @@ export async function browserChat(
     headers: { "Content-Type": "application/json" },
     signal: req.signal,
     body: JSON.stringify({
+      protocol: 1,
       model: model.id,
       operation: "stream",
       options: browserModelOptions(body.messages),

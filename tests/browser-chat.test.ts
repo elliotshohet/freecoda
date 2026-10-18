@@ -1,4 +1,5 @@
 import { test, expect } from "bun:test";
+import { modelCallSchema } from "../packages/contracts/src";
 import {
   browserChatSchema,
   browserModelOptions,
@@ -115,6 +116,8 @@ test("actual browser handler enforces origin/session and streams only public tex
       called++;
       expect(user.id).toBe("fixture-user");
       const body = await req.json();
+      expect(modelCallSchema.safeParse(body).success).toBe(true);
+      expect(body.protocol).toBe(1);
       expect(body.model).toBe("approved-fixture");
       expect(body.operation).toBe("stream");
       expect(body.options.tools).toBeUndefined();
