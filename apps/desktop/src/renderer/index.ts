@@ -48,7 +48,7 @@ let actionBusy = false;
 let accountBusy = false;
 let output = "";
 let outputVersion = 0;
-let assistantParagraph: HTMLParagraphElement | null = null;
+let assistantParagraph: HTMLElement | null = null;
 let noticeTimer: ReturnType<typeof setTimeout>;
 let approvalQueue: Extract<DesktopEvent, { type: "approval" }>[] = [];
 let currentApproval: string | null = null;
@@ -94,11 +94,16 @@ function dirty() {
 function trusted() {
   return state?.workspace?.trusted === true;
 }
+function isChat() {
+  return state?.conversationMode !== "coding";
+}
 function workspaceName() {
   return state?.workspace?.name || "Your project";
 }
 function updateControls() {
-  const safe = trusted() && !running && !actionBusy;
+  const chat = isChat();
+  const ready = (chat || trusted()) && !running && !actionBusy;
+  const safe = !chat && trusted() && !running && !actionBusy;
   const readOnly = state?.permissionPreset === "read-only";
   const localCommand = /^\/permissions(?:\s|$)/i.test(prompt.value.trim());
   button("open-folder").disabled = running || actionBusy;
@@ -114,16 +119,16 @@ function updateControls() {
     running ||
     actionBusy ||
     !prompt.value.trim() ||
-    (!localCommand && (!safe || !state?.auth.signedIn || dirty()));
+    (!localCommand && (!ready || !state?.auth.signedIn || (!chat && dirty())));
   hide("send", running);
   hide("stop", !running);
   button("stop").disabled = actionBusy;
-  button("new-chat").disabled = !safe;
-  button("sidebar-new-task").disabled = !safe;
+  button("new-chat").disabled = !ready;
+  button("sidebar-new-task").disabled = !ready;
   el("thread-history")
     .querySelectorAll<HTMLButtonElement>("button")
-    .forEach((node) => (node.disabled = !safe));
-  input("file-filter").disabled = !trusted();
+    .forEach((node) => (node.disabled = !ready));
+  input("file-filter").disabled = !safe;
   input("command").disabled = !safe || readOnly;
   hide("run-command", commandInFlight);
   hide("stop-command", !commandInFlight);
@@ -136,7 +141,7 @@ function updateControls() {
     });
   document
     .querySelectorAll<HTMLButtonElement>("[data-prompt]")
-    .forEach((node) => (node.disabled = !safe));
+    .forEach((node) => (node.disabled = !ready));
   button("permissions-open").disabled =
     running || actionBusy || commandInFlight;
   button("permissions-apply").disabled =
@@ -146,27 +151,38 @@ function updateControls() {
     .forEach(
       (node) => (node.disabled = running || actionBusy || commandInFlight),
     );
+  document
+    .querySelectorAll<HTMLButtonElement>("[data-conversation]")
+    .forEach((node) => {
+      node.hidden = node.dataset.conversation !== (chat ? "chat" : "coding");
+    });
+  for (const id of ["toggle-workbench", "sidebar-files", "sidebar-output"])
+    button(id).disabled = chat || running || actionBusy;
   const preset = state?.permissionPreset || "default";
   text(
     "permissions-open",
-    preset === "read-only"
-      ? "Read only"
-      : preset === "full-access"
-        ? "Full access"
-        : "Default permissions",
+    chat
+      ? "No tools"
+      : preset === "read-only"
+        ? "Read only"
+        : preset === "full-access"
+          ? "Full access"
+          : "Default permissions",
   );
   text(
     "permission-note",
-    preset === "read-only"
-      ? "Read only · file changes and shell commands are denied."
-      : preset === "full-access"
-        ? "Full access · local edits and shell commands run without approval. Session only."
-        : "Default · you approve each file change and shell command.",
+    chat
+      ? "Chat has no file, shell, or web browsing tools. Check important information."
+      : preset === "read-only"
+        ? "Read only · file changes and shell commands are denied."
+        : preset === "full-access"
+          ? "Full access · local edits and shell commands run without approval. Session only."
+          : "Default · you approve each file change and shell command.",
   );
   hide("working", !running);
   text(
     "agent-status",
-    running ? "Working" : trusted() ? "Ready" : "Waiting for a folder",
+    running ? "Working" : chat || trusted() ? "Ready" : "Waiting for a folder",
   );
   text(
     "file-status",
@@ -184,6 +200,7 @@ function updateControls() {
 }
 function renderState(next: DesktopState) {
   const oldRoot = state?.workspace?.root;
+  const oldMode = state?.conversationMode;
   const oldThread = state?.activeThreadId;
   state = structuredClone(next);
   if (oldThread !== next.activeThreadId) {
@@ -195,6 +212,30 @@ function renderState(next: DesktopState) {
     el("activity-log").replaceChildren();
   }
   running = next.running;
+  if (oldMode !== next.conversationMode) {
+    conversationRoot = null;
+    clearConversation(false);
+    prompt.value = "";
+    if (next.conversationMode === "chat") showWorkbench(false);
+  }
+  if (next.conversationMode === "chat") mode.value = "chat";
+  else if (mode.value === "chat") mode.value = "build";
+  text(
+    "chat-welcome-title",
+    next.conversationMode === "chat"
+      ? "What can I help with?"
+      : "What are we building?",
+  );
+  text(
+    "chat-welcome-description",
+    next.conversationMode === "chat"
+      ? "A little room to think, write, and build."
+      : "Ask about your project, plan a change, or build something new.",
+  );
+  prompt.placeholder =
+    next.conversationMode === "chat"
+      ? "Message Freecoda…"
+      : "Ask about your project…";
   if (oldRoot !== next.workspace?.root) {
     file = null;
     editor.value = "";
@@ -229,23 +270,29 @@ function renderState(next: DesktopState) {
   );
   text(
     "agent-context",
-    next.workspace?.trusted ? next.workspace.name : "Open a folder to start",
+    next.conversationMode === "chat"
+      ? "Chat · saved on this computer"
+      : next.workspace?.trusted
+        ? next.workspace.name
+        : "Open a folder to start",
   );
   text(
     "account-label",
     next.auth.signedIn ? "Connected · free plan" : "Your account",
   );
   button("account-open").classList.toggle("connected", next.auth.signedIn);
+  const scope =
+    next.conversationMode === "chat" ? "chat" : next.workspace?.root;
+  const conversationKey = `${scope}:${next.activeThreadId || "current"}`;
   if (
-    next.workspace?.trusted &&
+    (next.conversationMode === "chat" || next.workspace?.trusted) &&
     next.conversation &&
-    conversationRoot !==
-      `${next.workspace.root}:${next.activeThreadId || "current"}` &&
+    conversationRoot !== conversationKey &&
     !running
   ) {
     clearConversation(false);
     for (const item of next.conversation) appendMessage(item.role, item.text);
-    conversationRoot = `${next.workspace.root}:${next.activeThreadId || "current"}`;
+    conversationRoot = conversationKey;
   }
   renderFiles();
   renderThreads();
@@ -253,6 +300,7 @@ function renderState(next: DesktopState) {
   updateControls();
   renderAccount();
   if (
+    next.conversationMode === "coding" &&
     next.workspace &&
     !next.workspace.trusted &&
     !el<HTMLDialogElement>("trust-dialog").open
@@ -460,6 +508,71 @@ function updateCursor() {
     `Ln ${lines.length}, Col ${lines.at(-1)!.length + 1}`,
   );
 }
+function copyControl(value: () => string, label: string) {
+  const node = document.createElement("button");
+  node.className = "chat-copy";
+  node.textContent = label;
+  node.setAttribute("aria-label", label);
+  node.addEventListener(
+    "click",
+    async () => {
+      try {
+        await bridge.copyText(value());
+        node.textContent = "Copied";
+        setTimeout(() => (node.textContent = label), 1800);
+      } catch (error) {
+        showError(error);
+      }
+    },
+    { signal },
+  );
+  return node;
+}
+function inlineContent(parent: HTMLElement, value: string) {
+  for (const part of value.split(/(\*\*[^*]+\*\*|`[^`]+`)/g)) {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      const node = document.createElement("strong");
+      node.textContent = part.slice(2, -2);
+      parent.append(node);
+    } else if (part.startsWith("`") && part.endsWith("`")) {
+      const node = document.createElement("code");
+      node.textContent = part.slice(1, -1);
+      parent.append(node);
+    } else parent.append(document.createTextNode(part));
+  }
+}
+function renderRichContent(parent: HTMLElement, content: string) {
+  parent.replaceChildren();
+  parent.dataset.raw = content;
+  for (const part of content.split(/(```[\s\S]*?```)/g)) {
+    if (part.startsWith("```") && part.endsWith("```")) {
+      const body = part.slice(3, -3),
+        newline = body.indexOf("\n");
+      const code = newline >= 0 ? body.slice(newline + 1) : body;
+      const block = document.createElement("div");
+      block.className = "chat-code";
+      const head = document.createElement("div");
+      const label = document.createElement("span");
+      label.textContent =
+        newline >= 0 ? body.slice(0, newline).trim() || "Code" : "Code";
+      head.append(
+        label,
+        copyControl(() => code, "Copy code"),
+      );
+      const pre = document.createElement("pre"),
+        codeNode = document.createElement("code");
+      codeNode.textContent = code;
+      pre.append(codeNode);
+      block.append(head, pre);
+      parent.append(block);
+    } else
+      for (const line of part.split("\n")) {
+        const node = document.createElement(/^#{1,3} /.test(line) ? "h3" : "p");
+        inlineContent(node, line.replace(/^#{1,3} /, "") || "\u00a0");
+        parent.append(node);
+      }
+  }
+}
 function appendMessage(role: "user" | "assistant" | "system", content: string) {
   hide("chat-welcome");
   const node = document.createElement("article");
@@ -468,9 +581,16 @@ function appendMessage(role: "user" | "assistant" | "system", content: string) {
   label.className = "message-label";
   label.textContent =
     role === "user" ? "You" : role === "assistant" ? "Freecoda" : "Workspace";
-  const paragraph = document.createElement("p");
-  paragraph.textContent = content;
+  const paragraph = document.createElement("div");
+  paragraph.className = "chat-message-content";
+  paragraph.dataset.raw = content;
+  if (role === "assistant") renderRichContent(paragraph, content);
+  else paragraph.textContent = content;
   node.append(label, paragraph);
+  if (role === "assistant")
+    node.append(
+      copyControl(() => paragraph.dataset.raw || "", "Copy response"),
+    );
   el("conversation").append(node);
   scrollChat();
   return paragraph;
@@ -481,8 +601,9 @@ function scrollChat() {
 }
 function appendText(value: string) {
   if (!assistantParagraph) assistantParagraph = appendMessage("assistant", "");
-  assistantParagraph.textContent =
-    (assistantParagraph.textContent || "") + value;
+  assistantParagraph.dataset.raw =
+    (assistantParagraph.dataset.raw || "") + value;
+  assistantParagraph.textContent = assistantParagraph.dataset.raw;
   scrollChat();
 }
 function clearConversation(confirm = true) {
@@ -504,6 +625,7 @@ function clearConversation(confirm = true) {
 async function newConversation() {
   if (running || actionBusy) return;
   if (
+    !isChat() &&
     dirty() &&
     !window.confirm("Keep unsaved editor changes and start a new task?")
   )
@@ -530,11 +652,11 @@ async function sendPrompt(event?: Event) {
     updateControls();
     return;
   }
-  if (!trusted()) {
+  if (!isChat() && !trusted()) {
     notify("Open and trust a project folder before starting a task.");
     return;
   }
-  if (dirty()) {
+  if (!isChat() && dirty()) {
     showError(
       new Error("Save or discard your file changes before starting a task."),
     );
@@ -558,7 +680,9 @@ async function sendPrompt(event?: Event) {
     appendMessage("user", value);
     prompt.value = "";
     activity(
-      `${chosen === "build" ? "Build" : chosen === "plan" ? "Plan" : "Review"} started in ${workspaceName()}.`,
+      chosen === "chat"
+        ? "Conversation started."
+        : `${chosen === "build" ? "Build" : chosen === "plan" ? "Plan" : "Review"} started in ${workspaceName()}.`,
     );
   } catch (error) {
     running = false;
@@ -897,6 +1021,19 @@ async function handleEvent(event: DesktopEvent) {
       if (!activeRun || event.runId === activeRun) {
         if (event.cancelled && event.text) appendMessage("system", event.text);
         else if (!assistantParagraph && event.text) appendText(event.text);
+        if (assistantParagraph) {
+          renderRichContent(
+            assistantParagraph,
+            assistantParagraph.dataset.raw || "",
+          );
+          if (event.cancelled) {
+            const note = document.createElement("p");
+            note.className = "chat-incomplete";
+            note.textContent =
+              "Incomplete response — not saved to conversation context.";
+            assistantParagraph.after(note);
+          }
+        }
         running = false;
         activeRun = null;
         assistantParagraph = null;
@@ -905,8 +1042,8 @@ async function handleEvent(event: DesktopEvent) {
         approvalQueue = approvalQueue.filter((a) => a.runId !== event.runId);
         showApproval();
         updateControls();
-        await refreshFiles();
-        if (file && !dirty()) {
+        if (!isChat()) await refreshFiles();
+        if (!isChat() && file && !dirty()) {
           const path = file.path;
           try {
             const fresh = await bridge.readFile(path);
@@ -928,6 +1065,13 @@ async function handleEvent(event: DesktopEvent) {
       break;
     case "error":
       showError(new Error(event.text));
+      if (assistantParagraph) {
+        const note = document.createElement("p");
+        note.className = "chat-incomplete";
+        note.textContent =
+          "Incomplete response — not saved to conversation context.";
+        assistantParagraph.after(note);
+      }
       if (!event.runId || !activeRun || event.runId === activeRun) {
         running = false;
         activeRun = null;
@@ -946,6 +1090,45 @@ async function handleEvent(event: DesktopEvent) {
       break;
   }
 }
+
+async function switchAgentMode(chosen: AgentMode) {
+  if (running || actionBusy || commandInFlight) {
+    mode.value = isChat() ? "chat" : "build";
+    return;
+  }
+  try {
+    if ((chosen === "chat") !== isChat() && dirty()) {
+      mode.value = isChat() ? "chat" : "build";
+      throw Error(
+        "Save or discard your editor changes before switching conversation modes.",
+      );
+    }
+    if (chosen !== "chat" && !trusted()) {
+      try {
+        renderState(await bridge.setConversationMode("coding"));
+      } catch {
+        await chooseFolder();
+      }
+      if (!trusted() || state?.conversationMode !== "coding") {
+        mode.value = isChat() ? "chat" : "build";
+        return;
+      }
+    }
+    const desired = chosen === "chat" ? "chat" : "coding";
+    if (state?.conversationMode !== desired)
+      renderState(await bridge.setConversationMode(desired));
+    mode.value = chosen;
+    updateControls();
+  } catch (error) {
+    mode.value = isChat() ? "chat" : "build";
+    showError(error);
+  }
+}
+mode.addEventListener(
+  "change",
+  () => void switchAgentMode(mode.value as AgentMode),
+  { signal },
+);
 
 function openPermissions() {
   if (running || actionBusy || commandInFlight) return;
@@ -1019,6 +1202,7 @@ function showWorkbench(open: boolean) {
 }
 function renderThreads() {
   const threads = state?.threads || [];
+  const search = input("thread-search").value.toLowerCase();
   hide("current-thread", threads.length > 0);
   const active = threads.find((thread) => thread.id === state?.activeThreadId);
   const title =
@@ -1037,7 +1221,9 @@ function renderThreads() {
     heading.textContent = "Conversations";
     history.append(heading);
   }
-  for (const thread of threads) {
+  for (const thread of threads.filter((t) =>
+    t.title.toLowerCase().includes(search),
+  )) {
     const node = document.createElement("button");
     node.className = "thread-link";
     node.textContent = thread.title || "New task";
@@ -1060,9 +1246,35 @@ function renderThreads() {
       },
       { signal },
     );
-    history.append(node);
+    const row = document.createElement("div");
+    row.className = "chat-history-row";
+    const remove = document.createElement("button");
+    remove.className = "chat-history-delete";
+    remove.textContent = "×";
+    remove.setAttribute("aria-label", `Delete ${thread.title}`);
+    remove.disabled = running || actionBusy;
+    remove.addEventListener(
+      "click",
+      async () => {
+        if (
+          running ||
+          actionBusy ||
+          !window.confirm("Delete this conversation from this computer?")
+        )
+          return;
+        try {
+          renderState(await bridge.deleteThread(thread.id));
+        } catch (error) {
+          showError(error);
+        }
+      },
+      { signal },
+    );
+    row.append(node, remove);
+    history.append(row);
   }
 }
+input("thread-search").addEventListener("input", renderThreads, { signal });
 button("toggle-workbench").addEventListener(
   "click",
   () => showWorkbench(el("workbench").hidden === true),
@@ -1276,9 +1488,9 @@ button("cloud-open").addEventListener(
 document.querySelectorAll<HTMLButtonElement>("[data-prompt]").forEach((node) =>
   node.addEventListener(
     "click",
-    () => {
+    async () => {
+      await switchAgentMode((node.dataset.mode || "chat") as AgentMode);
       prompt.value = node.dataset.prompt || "";
-      mode.value = node.dataset.mode || "plan";
       updateControls();
       prompt.focus();
     },

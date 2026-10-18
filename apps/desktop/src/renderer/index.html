@@ -88,6 +88,12 @@
         <button id="sidebar-output" class="sidebar-action">
           <span aria-hidden="true">›_</span> Terminal & activity
         </button>
+        <label class="chat-history-search"
+          >Search conversations<input
+            id="thread-search"
+            type="search"
+            placeholder="Search chats"
+        /></label>
         <div
           id="thread-history"
           class="thread-history"
@@ -282,20 +288,42 @@ Command output will appear here. Your permission preset controls local command e
         >
           <div id="chat-welcome" class="chat-welcome">
             <span class="agent-star" aria-hidden="true">✳</span>
-            <h2>What are we building?</h2>
-            <p>
-              Start with a task, ask about your project, or pick up where you
-              left off.
+            <h2 id="chat-welcome-title">What can I help with?</h2>
+            <p id="chat-welcome-description">
+              A little room to think, write, and build.
             </p>
             <div class="prompt-suggestions">
               <button
+                data-prompt="Explain a tricky idea in simple terms."
+                data-mode="chat"
+                data-conversation="chat"
+              >
+                Explain a tricky idea
+              </button>
+              <button
+                data-prompt="Help me write something. Ask what I need first."
+                data-mode="chat"
+                data-conversation="chat"
+              >
+                Help me write something
+              </button>
+              <button
+                data-prompt="Help me make a realistic plan for my week."
+                data-mode="chat"
+                data-conversation="chat"
+              >
+                Make a plan for my week
+              </button>
+              <button
                 data-prompt="Explain how this project is organized and where I should start."
                 data-mode="plan"
+                data-conversation="coding"
               >
                 Understand this project</button
               ><button
                 data-prompt="Review this project for a concrete bug. Explain your findings before making changes."
                 data-mode="review"
+                data-conversation="coding"
               >
                 Find something to improve
               </button>
@@ -307,18 +335,19 @@ Command output will appear here. Your permission preset controls local command e
           ><span id="working-text">Working in your project…</span>
         </div>
         <form id="chat-form" class="composer">
-          <label class="sr-only" for="prompt">Message the coding agent</label
+          <label class="sr-only" for="prompt">Message Freecoda</label
           ><textarea
             id="prompt"
             rows="3"
             maxlength="20000"
-            placeholder="Ask Freecoda anything about your project…"
+            placeholder="Message Freecoda…"
             disabled
           ></textarea>
           <div class="composer-controls">
             <label
               ><span class="sr-only">Agent mode</span
-              ><select id="mode" aria-label="Agent mode">
+              ><select id="mode" aria-label="Conversation mode">
+                <option value="chat" selected>Chat</option>
                 <option value="build">Build</option>
                 <option value="plan">Plan · read only</option>
                 <option value="review">Review · read only</option>
@@ -413,6 +442,10 @@ Command output will appear here. Your permission preset controls local command e
             ></label
           >
         </fieldset>
+        <p class="permissions-warning">
+          Chat has no file or shell tools. These presets control coding actions
+          and reset when you switch conversation modes.
+        </p>
         <p class="permissions-warning">
           Full access grants permission for the session. Only enable it for a
           project and task you trust. Plan and Review modes remain read only.
