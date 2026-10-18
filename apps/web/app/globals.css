@@ -2015,6 +2015,32 @@ input:-webkit-autofill {
 .entry-composer:hover {
   border-color: var(--purple);
 }
+.entry-sign-in {
+  margin: 22px 0;
+}
+.account-settings > .panel {
+  margin-bottom: 22px;
+  scroll-margin-top: 100px;
+}
+.account-settings > h1 {
+  font-size: clamp(30px, 5vw, 48px);
+  letter-spacing: -1.5px;
+  margin-bottom: 28px;
+}
+.account-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-bottom: 30px;
+}
+.account-settings dd {
+  margin: 6px 0 18px;
+  overflow-wrap: anywhere;
+}
+.entry-sign-in [role="alert"] {
+  color: var(--ink);
+  font-size: 14px;
+}
 .entry-prompts {
   display: flex;
   justify-content: center;

@@ -238,7 +238,7 @@ export function Workspace() {
                     throw new Error(
                       result.error.message || "Could not sign out.",
                     );
-                  await load();
+                  window.location.replace("/");
                 } catch (e) {
                   setError(
                     e instanceof Error

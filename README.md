@@ -1,10 +1,12 @@
 # Freecoda
 
-A conversational assistant and coding agent for the browser, desktop, and terminal. One plan: **free forever, supported by direct sponsors**. There are no paid credits, subscriptions, or user checkout. Hosted usage has fair-use limits and an operator spending cap. This monorepo is private during development.
+A conversational assistant and coding agent for the browser, desktop, and terminal. One plan: **free forever, supported by direct sponsors**. There are no paid credits, subscriptions, or user checkout. Hosted usage has fair-use limits and an operator spending cap.
 
 ## Browser chat
 
-The home page and `/chat` open Freecoda's conversational interface: saved browser-local chats, a message composer, streamed answers, and a separately labeled sponsor placement. GitHub sign-in and an approved hosted invitation are required for inference. It shares the existing Gateway BYOK routing, usage reservations, rate limits, and free allowance; it does not bypass service capacity limits. The coding workspace remains at `/app`.
+The public home page introduces Freecoda and provides GitHub sign-in independently of chat availability. `/chat`, `/app`, and `/settings` require a verified browser session before showing the chat, coding workspace, or account interface. Restored tabs recheck their session; sign-out returns to the public home page. `/dashboard` redirects to `/settings` for profile, appearance, actual usage/devices, and existing GitHub repository access. Repository connections still require the configured GitHub App and cloud access; unavailable integrations report their actual state.
+
+Chat includes saved browser-local conversations, a message composer, streamed answers, and a separately labeled sponsor placement. An approved hosted invitation is required for inference. It shares the existing Gateway BYOK routing, usage reservations, rate limits, and free allowance; it does not bypass service capacity limits.
 
 Chat history stays in the current browser rather than syncing across devices. Sending a message submits its conversation context to the hosted model provider. The interface reports unavailable service configuration explicitly and never substitutes generated-looking fixture answers for a real provider response.
 

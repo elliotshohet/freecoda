@@ -518,11 +518,7 @@ export default function Chat() {
           <span>Coding workspace</span>
         </Link>
         <div className={s.account}>
-          <span>
-            {status?.signedIn
-              ? "Your Freecoda account"
-              : "Free forever, with ads"}
-          </span>
+          <Link href="/settings">Your account & settings</Link>
           <ThemeControl />
         </div>
       </aside>

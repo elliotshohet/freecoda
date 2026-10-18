@@ -15,7 +15,6 @@ export function Mark() {
 export function Header() {
   const pathname = usePathname();
   if (
-    pathname === "/" ||
     pathname === "/chat" ||
     pathname === "/app" ||
     pathname.startsWith("/app/")
@@ -35,8 +34,8 @@ export function Header() {
       </nav>
       <div className="header-actions">
         <ThemeControl />
-        <Link className="header-cta" href="/app">
-          Your workspace <ArrowUpRight size={15} />
+        <Link className="header-cta" href="/settings">
+          Your account <ArrowUpRight size={15} />
         </Link>
       </div>
     </header>
@@ -45,7 +44,6 @@ export function Header() {
 export function Footer() {
   const pathname = usePathname();
   if (
-    pathname === "/" ||
     pathname === "/chat" ||
     pathname === "/app" ||
     pathname.startsWith("/app/")
