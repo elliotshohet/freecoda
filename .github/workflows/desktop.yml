@@ -94,7 +94,7 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run desktop:typecheck
       - run: node --test apps/desktop/scripts/verify-signing.test.mjs
-      - run: bun test tests/desktop-security.test.ts tests/desktop-local-agent.test.ts tests/desktop-updater.test.ts tests/desktop-packaging.test.ts tests/shell-platform.test.ts
+      - run: bun test tests/desktop-security.test.ts tests/desktop-sponsor.test.ts tests/desktop-local-agent.test.ts tests/desktop-updater.test.ts tests/desktop-packaging.test.ts tests/shell-platform.test.ts
       - run: bun run desktop:build
       - name: Install native Electron runtime for smoke
         run: node -e 'const p=require("node:path"); const f=require.resolve("electron/package.json",{paths:[p.resolve("apps/desktop")]}); require(p.join(p.dirname(f),"install.js"));'

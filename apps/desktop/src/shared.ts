@@ -58,7 +58,16 @@ export type DesktopSaveInput = {
   content: string;
   expectedHash: string | null;
 };
+export type DesktopSponsor = {
+  label: string;
+  headline: string;
+  description: string;
+  paid: boolean;
+};
 export interface DesktopBridge {
+  getSponsor(): Promise<DesktopSponsor>;
+  reportSponsorVisible(): Promise<void>;
+  openSponsor(): Promise<void>;
   setTheme(theme: "system" | "light" | "dark"): Promise<void>;
   getState(): Promise<DesktopState>;
   openFolder(): Promise<DesktopWorkspace | null>;

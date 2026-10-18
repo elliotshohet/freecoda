@@ -986,7 +986,46 @@ button("sidebar-new-task").addEventListener(
 button("current-thread").addEventListener("click", () => prompt.focus(), {
   signal,
 });
-button("sponsor-info").addEventListener("click", openAccount, { signal });
+button("sponsor-info").addEventListener(
+  "click",
+  () => void bridge.openSponsor().catch(showError),
+  { signal },
+);
+async function loadSponsor() {
+  try {
+    const sponsor = await bridge.getSponsor();
+    text("sponsor-label", sponsor.label);
+    text("sponsor-headline", sponsor.headline);
+    text("sponsor-description", sponsor.description);
+    el("sponsor-placement").setAttribute(
+      "aria-label",
+      sponsor.paid ? "Sponsored placement" : "Freecoda announcement",
+    );
+    if (!sponsor.paid) return;
+    let visible = false;
+    const report = () => {
+      if (visible && document.visibilityState === "visible")
+        void bridge.reportSponsorVisible().catch(() => {});
+    };
+    const observer = new IntersectionObserver(
+      (entries) => {
+        visible = entries.some(
+          (entry) => entry.isIntersecting && entry.intersectionRatio >= 0.5,
+        );
+        report();
+      },
+      { threshold: [0.5] },
+    );
+    observer.observe(el("sponsor-placement"));
+    document.addEventListener("visibilitychange", report, { signal });
+    window.addEventListener("focus", report, { signal });
+    signal.addEventListener("abort", () => observer.disconnect(), {
+      once: true,
+    });
+  } catch {
+    /* The visible first-party fallback never blocks the workspace. */
+  }
+}
 
 button("error-close").addEventListener("click", clearError, { signal });
 for (const id of ["open-folder", "welcome-open", "folder-picker"])
@@ -1174,4 +1213,5 @@ if (!bridge) {
   updateControls();
 } else {
   void bridge.getState().then(renderState).catch(showError);
+  void loadSponsor();
 }

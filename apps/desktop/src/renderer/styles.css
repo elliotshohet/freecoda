@@ -1691,3 +1691,26 @@ textarea {
   white-space: nowrap;
   display: block;
 }
+.house-ad {
+  gap: 7px 10px;
+  padding: 8px 25px;
+}
+.house-ad > span,
+.house-ad strong,
+.house-ad p,
+.house-ad button {
+  font-size: 11px;
+  line-height: 1.5;
+}
+.house-ad strong {
+  font-weight: 500;
+  color: var(--ink);
+}
+.house-ad p {
+  max-width: 500px;
+}
+@media (max-width: 1100px) {
+  .house-ad p {
+    display: none;
+  }
+}

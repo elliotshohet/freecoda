@@ -26,6 +26,7 @@ import {
 import type { ModelMessage } from "ai";
 import type {
   DesktopState,
+  DesktopSponsor,
   DesktopWorkspace,
   DesktopEvent,
   DesktopFile,
@@ -795,6 +796,136 @@ export class LocalAgentService {
       await this.saveHistory();
       await this.emitState();
     });
+  }
+  private sponsor?: {
+    public: DesktopSponsor;
+    href: string;
+    token?: string;
+    impressed: boolean;
+  };
+  private sponsorLoading?: Promise<DesktopSponsor>;
+  async getSponsor(): Promise<DesktopSponsor> {
+    await this.initialize();
+    if (this.sponsor) return structuredClone(this.sponsor.public);
+    if (this.sponsorLoading) return this.sponsorLoading;
+    this.sponsorLoading = (async () => {
+      const plain = (value: string) =>
+        value
+          .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      try {
+        const response = await this.transport(
+          `${this.server}/api/v1/ads?placement=terminal`,
+          {
+            method: "GET",
+            credentials: "omit",
+            redirect: "error",
+            signal: AbortSignal.timeout(4000),
+          },
+        );
+        if (!response.ok) throw Error("Sponsor unavailable");
+        const reader = response.body?.getReader();
+        if (!reader) throw Error("Empty sponsor response");
+        const chunks: Uint8Array[] = [];
+        let size = 0;
+        for (;;) {
+          const part = await reader.read();
+          if (part.done) break;
+          size += part.value.byteLength;
+          if (size > 16_384) {
+            await reader.cancel();
+            throw Error("Sponsor response too large");
+          }
+          chunks.push(part.value);
+        }
+        const ad = JSON.parse(Buffer.concat(chunks).toString());
+        for (const [key, limit] of [
+          ["sponsor", 60],
+          ["headline", 90],
+          ["description", 180],
+          ["href", 1200],
+        ] as const)
+          if (typeof ad[key] !== "string" || ad[key].length > limit)
+            throw Error("Invalid sponsor response");
+        const paid =
+          typeof ad.id === "string" && ad.id.length > 0 && ad.id.length <= 200;
+        if (ad.id !== null && !paid) throw Error("Invalid sponsor identity");
+        const href = new URL(ad.href, this.server);
+        if (
+          href.origin !== new URL(this.server).origin ||
+          href.username ||
+          href.password ||
+          href.hash
+        )
+          throw Error("Invalid sponsor destination");
+        if (paid) {
+          if (
+            typeof ad.token !== "string" ||
+            !ad.token ||
+            ad.token.length > 800 ||
+            href.pathname !== "/api/v1/ads/click" ||
+            href.searchParams.get("token") !== ad.token ||
+            [...href.searchParams.keys()].some((key) => key !== "token")
+          )
+            throw Error("Invalid sponsor click link");
+        } else if (href.pathname !== "/advertise" || href.search)
+          throw Error("Invalid announcement destination");
+        this.sponsor = {
+          public: {
+            label: paid
+              ? `Sponsored by ${plain(ad.sponsor)}`
+              : "Freecoda announcement",
+            headline: plain(ad.headline),
+            description: plain(ad.description),
+            paid,
+          },
+          href: href.toString(),
+          ...(paid ? { token: ad.token } : {}),
+          impressed: false,
+        };
+      } catch {
+        this.sponsor = {
+          public: {
+            label: "Freecoda announcement",
+            headline: "Help keep Freecoda free.",
+            description:
+              "Reach people who build. Sponsor a placement without access to their code or conversations.",
+            paid: false,
+          },
+          href: `${this.server}/advertise`,
+          impressed: false,
+        };
+      }
+      return structuredClone(this.sponsor.public);
+    })();
+    try {
+      return await this.sponsorLoading;
+    } finally {
+      this.sponsorLoading = undefined;
+    }
+  }
+  async reportSponsorVisible(): Promise<void> {
+    // Only the cached signed token is eligible. No renderer-supplied identity/context is accepted.
+    const ad = this.sponsor;
+    if (!ad?.public.paid || !ad.token || ad.impressed) return;
+    ad.impressed = true;
+    try {
+      await this.transport(`${this.server}/api/v1/ads/impression`, {
+        method: "POST",
+        credentials: "omit",
+        redirect: "error",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: ad.token }),
+        signal: AbortSignal.timeout(3000),
+      });
+    } catch {
+      /* Ads never block a task. */
+    }
+  }
+  async openSponsor(): Promise<void> {
+    await this.getSponsor();
+    await this.options.openExternal(this.sponsor!.href);
   }
   private async api(endpoint: string, body?: unknown, signal?: AbortSignal) {
     const response = await this.transport(`${this.server}/api/v1/${endpoint}`, {

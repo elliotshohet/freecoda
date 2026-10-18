@@ -100,6 +100,12 @@ function installIPC() {
       );
     },
     getState: () => service.getState(),
+    getSponsor: () => service.getSponsor(),
+    reportSponsorVisible: () => {
+      if (window?.isVisible() && !window.isMinimized())
+        return service.reportSponsorVisible();
+    },
+    openSponsor: () => service.openSponsor(),
     openFolder: chooseFolder,
     trustWorkspace: (
       input: Parameters<LocalAgentService["trustWorkspace"]>[0],
