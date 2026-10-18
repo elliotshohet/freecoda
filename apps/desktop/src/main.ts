@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  clipboard,
   Menu,
   dialog,
   ipcMain,
@@ -129,7 +130,15 @@ function installIPC() {
       preset: Parameters<LocalAgentService["setPermissions"]>[0],
     ) => service.setPermissions(preset),
     createThread: () => service.createThread(),
+    setConversationMode: (mode: "chat" | "coding") =>
+      service.setConversationMode(mode),
     openThread: (id: string) => service.openThread(id),
+    deleteThread: (id: string) => service.deleteThread(id),
+    copyText: (value: string) => {
+      if (typeof value !== "string" || value.length > 128_000)
+        throw Error("Invalid clipboard text.");
+      clipboard.writeText(value);
+    },
     clearHistory: () => service.clearHistory(),
     openCloud: () => openExternal("https://freecoda.com/app"),
   };

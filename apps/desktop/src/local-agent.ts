@@ -99,6 +99,7 @@ export class LocalAgentService {
   private config: Config;
   private root: string | null = null;
   private permissionPreset: DesktopPermissionPreset = "default";
+  private conversationMode: "chat" | "coding" = "chat";
   private messages: ModelMessage[] = [];
   private threads: {
     id: string;
@@ -177,6 +178,7 @@ export class LocalAgentService {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
+    await this.restoreHistory();
   }
   private async ensurePrivateDirectory(directory: string) {
     try {
@@ -213,14 +215,27 @@ export class LocalAgentService {
       this.config,
     );
   }
+  private historyScope() {
+    return this.conversationMode === "chat"
+      ? "freecoda:general-chat"
+      : this.root!;
+  }
   private historyFile() {
-    return path.join(this.directory, "sessions", hash(this.root!) + ".json");
+    return path.join(
+      this.directory,
+      "sessions",
+      hash(this.historyScope()) + ".json",
+    );
   }
   private check() {
     if (this.disposed) throw new Error("The desktop service is closed.");
   }
-  private trustedRoot() {
+  private trustedRoot(allowFromChat = false) {
     this.check();
+    if (this.conversationMode === "chat" && !allowFromChat)
+      throw Error(
+        "Switch to the coding workspace before using repository tools.",
+      );
     if (!this.root || !this.config.trustedRoots.includes(this.root))
       throw new Error(
         "Trust the selected repository before reading files or running a task.",
@@ -253,7 +268,8 @@ export class LocalAgentService {
     await this.initialize();
     this.check();
     return {
-      workspace: await this.workspace(),
+      workspace:
+        this.conversationMode === "chat" ? null : await this.workspace(),
       recentFolders: this.config.recentRoots.map((root) => ({
         root,
         name: path.basename(root) || root,
@@ -266,6 +282,7 @@ export class LocalAgentService {
       },
       running: !!this.activeController,
       permissionPreset: this.permissionPreset,
+      conversationMode: this.conversationMode,
       threads: this.threads.map(({ id, title, updatedAt }) => ({
         id,
         title: this.clean(title),
@@ -287,7 +304,7 @@ export class LocalAgentService {
             ? [
                 {
                   role: message.role,
-                  text: this.clean(content).slice(0, 10000),
+                  text: this.clean(content).slice(0, 64000),
                 },
               ]
             : [];
@@ -311,6 +328,7 @@ export class LocalAgentService {
       if (!(await stat(root)).isDirectory())
         throw new Error("Choose a repository folder.");
       this.root = root;
+      this.conversationMode = "coding";
       this.messages = [];
       this.threads = [];
       this.activeThreadId = undefined;
@@ -410,9 +428,34 @@ export class LocalAgentService {
       readOnly: content !== file.content,
     };
   }
+  async setConversationMode(mode: "chat" | "coding"): Promise<DesktopState> {
+    await this.initialize();
+    this.check();
+    if (mode !== "chat" && mode !== "coding")
+      throw Error("Invalid conversation mode.");
+    if (this.activeController || this.workspaceChanging || this.authChanging)
+      throw Error(
+        "Finish the current action before switching conversation modes.",
+      );
+    if (mode === this.conversationMode) return this.getState();
+    if (mode === "coding") this.trustedRoot(true);
+    this.workspaceChanging = true;
+    try {
+      if (this.activeThreadId) await this.saveHistory();
+      this.conversationMode = mode;
+      this.permissionPreset = "default";
+      this.sessionApprovals.clear();
+      await this.restoreHistory();
+      await this.emitState();
+      return this.getState();
+    } finally {
+      this.workspaceChanging = false;
+    }
+  }
   async setPermissions(preset: DesktopPermissionPreset): Promise<DesktopState> {
     await this.initialize();
-    this.trustedRoot();
+    if (this.conversationMode === "coding") this.trustedRoot();
+    else this.check();
     if (this.activeController || this.workspaceChanging || this.authChanging)
       throw Error("Finish the current action before changing permissions.");
     if (!["read-only", "default", "full-access"].includes(preset))
@@ -574,7 +617,10 @@ export class LocalAgentService {
   }
   async runAgent(input: DesktopRunInput) {
     await this.initialize();
-    const root = this.trustedRoot();
+    const chat = input?.mode === "chat";
+    if (chat !== (this.conversationMode === "chat"))
+      throw Error("Switch conversation mode before starting this request.");
+    const root = chat ? this.directory : this.trustedRoot();
     if (
       this.activeController ||
       this.workspaceChanging ||
@@ -582,8 +628,8 @@ export class LocalAgentService {
       this.loginController
     )
       throw new Error("A task or repository change is already running.");
-    if (!input || !["build", "plan", "review"].includes(input.mode))
-      throw new Error("Choose build, plan, or review mode.");
+    if (!input || !["chat", "build", "plan", "review"].includes(input.mode))
+      throw new Error("Choose chat, build, plan, or review mode.");
     const prompt = text(input.prompt, "Prompt", 20_000);
     if (!this.config.token)
       throw new Error("Sign in to Freecoda before running a task.");
@@ -691,7 +737,8 @@ export class LocalAgentService {
       if (!info.isFile() || info.isSymbolicLink() || info.size > MAX_HISTORY)
         throw Error("Invalid saved conversation.");
       const saved = JSON.parse(await readFile(filename, "utf8"));
-      if (saved.root !== this.root) throw Error("Invalid saved conversation.");
+      if (saved.root !== this.historyScope())
+        throw Error("Invalid saved conversation.");
       if (Array.isArray(saved.threads)) {
         if (
           saved.threads.length > 100 ||
@@ -753,7 +800,7 @@ export class LocalAgentService {
         this.clean(first.content).replace(/\s+/g, " ").trim().slice(0, 120) ||
         "New conversation";
     const value = {
-      root: this.root,
+      root: this.historyScope(),
       activeThreadId: this.activeThreadId,
       threads: this.threads,
     };
@@ -764,7 +811,8 @@ export class LocalAgentService {
     await this.savePrivate(this.historyFile(), value);
   }
   private threadChangeAllowed() {
-    this.trustedRoot();
+    if (this.conversationMode === "coding") this.trustedRoot();
+    else this.check();
     if (this.activeController || this.workspaceChanging || this.authChanging)
       throw Error("Finish the current action before switching conversations.");
   }
@@ -816,6 +864,26 @@ export class LocalAgentService {
       if (t) t.title = "New conversation";
       await this.saveHistory();
       await this.emitState();
+    });
+  }
+  async deleteThread(id: string): Promise<DesktopState> {
+    return this.changeThread(async () => {
+      if (typeof id !== "string" || !/^[a-f0-9-]{36}$/.test(id))
+        throw Error("Invalid conversation.");
+      if (!this.threads.some((t) => t.id === id))
+        throw Error("Conversation does not belong to this conversation scope.");
+      this.threads = this.threads.filter((t) => t.id !== id);
+      if (this.activeThreadId === id) {
+        this.activeThreadId = this.threads[0]?.id;
+        this.messages = this.threads[0]?.messages || [];
+      }
+      await this.savePrivate(this.historyFile(), {
+        root: this.historyScope(),
+        activeThreadId: this.activeThreadId,
+        threads: this.threads,
+      });
+      await this.emitState();
+      return this.getState();
     });
   }
   private sponsor?: {

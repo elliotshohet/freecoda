@@ -1,4 +1,4 @@
-export type AgentMode = "build" | "plan" | "review";
+export type AgentMode = "chat" | "build" | "plan" | "review";
 export type DesktopPermissionPreset = "read-only" | "default" | "full-access";
 export type ApprovalKind = "write" | "shell";
 export type DesktopFileEntry = { path: string; type: "file" };
@@ -27,6 +27,7 @@ export type DesktopState = {
   auth: { signedIn: boolean; server: string; model?: string };
   running: boolean;
   permissionPreset: DesktopPermissionPreset;
+  conversationMode: "chat" | "coding";
   threads?: { id: string; title: string; updatedAt: string }[];
   activeThreadId?: string;
   conversation?: { role: "user" | "assistant"; text: string }[];
@@ -71,6 +72,7 @@ export interface DesktopBridge {
   reportSponsorVisible(): Promise<void>;
   openSponsor(): Promise<void>;
   setPermissions(preset: DesktopPermissionPreset): Promise<DesktopState>;
+  setConversationMode(mode: "chat" | "coding"): Promise<DesktopState>;
   setTheme(theme: "system" | "light" | "dark"): Promise<void>;
   getState(): Promise<DesktopState>;
   openFolder(): Promise<DesktopWorkspace | null>;
@@ -93,6 +95,8 @@ export interface DesktopBridge {
   clearHistory(): Promise<void>;
   createThread(): Promise<DesktopState>;
   openThread(id: string): Promise<DesktopState>;
+  deleteThread(id: string): Promise<DesktopState>;
+  copyText(value: string): Promise<void>;
   openCloud(): Promise<void>;
   onEvent(listener: (event: DesktopEvent) => void): () => void;
 }

@@ -18,6 +18,12 @@ export default function Privacy() {
         </p>
         <h2>What stays on your machine</h2>
         <p>
+          General chat in the CLI and desktop app has no repository tools and
+          does not automatically read project files. Its saved history is separate
+          from coding conversations. Sending a message still shares conversation
+          context with the selected provider.
+        </p>
+        <p>
           When you use the local CLI, your repository, tool execution, and
           conversation history stay on your machine. When you use your own API
           key, the key is stored locally with restrictive file permissions.

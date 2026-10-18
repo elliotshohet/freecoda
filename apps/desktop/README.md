@@ -2,6 +2,12 @@
 
 Electron desktop application for Freecoda. Application ID: `com.freecoda.desktop`; product name: **Freecoda**; initial version: **0.1.0**. Packaging is built from this private monorepo. Hosted account access and fair-use allowances remain the same as the website.
 
+## Chat and coding
+
+Freecoda starts in Chat: a general conversation with no repository access or tools. You can start and reopen saved conversations without selecting a folder. Chat history stays in private application storage and is separate from each coding workspace's history. Sending a message shares that conversation with the selected provider.
+
+Choose Build, Plan, or Review to work with a repository. Coding still requires selecting and trusting the folder. Returning to Chat restores the separate general conversations, hides repository tools, and resets session permission grants. Search, deletion, response copying, and clearly labeled sponsor placements remain part of the conversation interface.
+
 ## Session permissions
 
 Type `/permissions` in the conversation composer to select **Read only**, **Default**, or **Full access**. Read only blocks file changes and shell commands. Default asks for approval before changes and commands. Full access allows both without individual prompts; shell commands run on your computer without an OS sandbox. Changing this setting clears earlier category grants. The selection is session-only and resets when switching workspaces or restarting. Plan and Review remain read-only at every permission level.

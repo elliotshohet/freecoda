@@ -288,6 +288,14 @@ export default function Chat() {
       );
       return;
     }
+    if (
+      context.some((m) => m.content.length > (m.role === "user" ? 8000 : 64000))
+    ) {
+      setError(
+        "User messages can contain up to 8,000 characters. Start a new chat if a response exceeds the context limit.",
+      );
+      return;
+    }
     sending.current = true;
     setBusy(true);
     const controller = new AbortController();
@@ -322,14 +330,6 @@ export default function Chat() {
       setBusy(false);
       sending.current = false;
       abort.current = null;
-      return;
-    }
-    if (
-      context.some((m) => m.content.length > (m.role === "user" ? 8000 : 64000))
-    ) {
-      setError(
-        "User messages can contain up to 8,000 characters. Start a new chat if a response exceeds the context limit.",
-      );
       return;
     }
     const id = selected?.id || crypto.randomUUID();

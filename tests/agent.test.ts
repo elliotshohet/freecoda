@@ -242,3 +242,61 @@ test("denied writes cannot repeatedly prompt or bypass through another write too
     await rm(root, { recursive: true, force: true });
   }
 }, 10000);
+
+test("chat mode needs no workspace and sends conversation without repository tools or instructions", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "freecoda-chat-mode-"));
+  const marker = "REPOSITORY_CONTEXT_MUST_NOT_LEAVE";
+  await writeFile(path.join(root, "AGENTS.md"), marker);
+  let requests: any[] = [];
+  const server = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    async fetch(req) {
+      requests.push(await req.json());
+      return new Response(
+        "data: " +
+          JSON.stringify({
+            id: "chat-mode-fixture",
+            model: "fixture",
+            object: "chat.completion.chunk",
+            choices: [
+              {
+                index: 0,
+                delta: {
+                  role: "assistant",
+                  content: "A helpful conversation.",
+                },
+                finish_reason: "stop",
+              },
+            ],
+          }) +
+          "\n\ndata: [DONE]\n\n",
+        { headers: { "Content-Type": "text/event-stream" } },
+      );
+    },
+  });
+  try {
+    for (const directory of [root, path.join(root, "does-not-exist")]) {
+      const result = await runAgent({
+        root: directory,
+        mode: "chat",
+        model: directModel(`http://127.0.0.1:${server.port}/v1`, "fixture", ""),
+        messages: [{ role: "user", content: "Help me plan a weekend." }],
+        approve: async () => {
+          throw Error("Chat cannot request tool approval");
+        },
+      });
+      expect(result.text).toBe("A helpful conversation.");
+    }
+    expect(requests).toHaveLength(2);
+    for (const request of requests) {
+      expect(request.tools || []).toHaveLength(0);
+      expect(JSON.stringify(request.messages)).not.toContain(marker);
+      expect(request.messages[0].content).toContain("conversational assistant");
+      expect(request.messages.at(-1).content).toBe("Help me plan a weekend.");
+    }
+  } finally {
+    await server.stop(true);
+    await rm(root, { recursive: true, force: true });
+  }
+});

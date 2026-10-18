@@ -612,3 +612,68 @@ test("desktop permission presets enforce manual actions and reset for each works
     await rm(f.root, { recursive: true, force: true });
   }
 });
+
+test("desktop general conversations need no repository and remain separate from coding history", async () => {
+  const f = await fixture();
+  const make = () =>
+    new LocalAgentService({
+      dataDirectory: f.data,
+      emit: () => {},
+      openExternal: async () => {},
+    });
+  let service = make();
+  try {
+    expect((await service.getState()).conversationMode).toBe("chat");
+    expect((await service.getState()).workspace).toBeNull();
+    const general = await service.createThread();
+    await expect(
+      service.runAgent({ mode: "chat", prompt: "Help me plan a trip." }),
+    ).rejects.toThrow("Sign in");
+    await expect(service.readFile("answer.ts")).rejects.toThrow(
+      "coding workspace",
+    );
+    await service.selectWorkspace(f.repository);
+    await service.trustWorkspace({
+      root: await realpath(f.repository),
+      consent: true,
+    });
+    const coding = await service.createThread();
+    expect(coding.conversationMode).toBe("coding");
+    expect(coding.activeThreadId).not.toBe(general.activeThreadId);
+    await expect(service.openThread(general.activeThreadId!)).rejects.toThrow(
+      "does not belong",
+    );
+    await service.setPermissions("full-access");
+    const restoredGeneral = await service.setConversationMode("chat");
+    expect(restoredGeneral.activeThreadId).toBe(general.activeThreadId);
+    expect(restoredGeneral.permissionPreset).toBe("default");
+    expect(restoredGeneral.workspace).toBeNull();
+    await expect(
+      service.runCommand({ command: "echo should-not-run" }),
+    ).rejects.toThrow("coding workspace");
+    await expect(
+      service.runAgent({ mode: "build", prompt: "Do not run." }),
+    ).rejects.toThrow("Switch conversation");
+    expect((await service.setConversationMode("coding")).activeThreadId).toBe(
+      coding.activeThreadId,
+    );
+    await service.setConversationMode("chat");
+    await service.dispose();
+    service = make();
+    expect((await service.getState()).activeThreadId).toBe(
+      general.activeThreadId,
+    );
+    expect((await service.getState()).conversationMode).toBe("chat");
+    const removed = await service.deleteThread(general.activeThreadId!);
+    expect(removed.threads).toHaveLength(0);
+    await expect(service.openThread(general.activeThreadId!)).rejects.toThrow(
+      "does not belong",
+    );
+    await service.dispose();
+    service = make();
+    expect((await service.getState()).threads).toHaveLength(0);
+  } finally {
+    await service.dispose();
+    await rm(f.root, { recursive: true, force: true });
+  }
+});

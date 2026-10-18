@@ -25,7 +25,11 @@ const api: DesktopBridge = {
   setPermissions: (preset) =>
     ipcRenderer.invoke("desktop:setPermissions", preset),
   createThread: () => ipcRenderer.invoke("desktop:createThread"),
+  setConversationMode: (mode) =>
+    ipcRenderer.invoke("desktop:setConversationMode", mode),
   openThread: (id) => ipcRenderer.invoke("desktop:openThread", id),
+  deleteThread: (id) => ipcRenderer.invoke("desktop:deleteThread", id),
+  copyText: (value) => ipcRenderer.invoke("desktop:copyText", value),
   clearHistory: () => ipcRenderer.invoke("desktop:clearHistory"),
   openCloud: () => ipcRenderer.invoke("desktop:openCloud"),
   onEvent: (listener) => {
