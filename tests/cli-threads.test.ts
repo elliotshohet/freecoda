@@ -50,6 +50,7 @@ test("saved CLI tasks survive new conversations, migrate legacy history, and sta
     await expect(loadConversation(root, legacy.id)).rejects.toThrow(
       "Invalid local task file",
     );
+    await rm(filename);
     expect(JSON.parse(await readFile(historyFile(root), "utf8")).id).toBe(
       fresh.id,
     );
