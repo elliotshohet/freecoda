@@ -136,7 +136,29 @@ export async function restoreArchive(args: {
       if (size > 64 * 1024 * 1024) child.kill("SIGKILL");
       else output.push(chunk);
     });
-    child.stderr.resume(); // SQL/server diagnostics may contain recovered data; never print them.
+    let diagnostic = "";
+    child.stderr.on("data", (chunk) => {
+      if (diagnostic.length < 16000)
+        diagnostic += chunk.toString().slice(0, 16000 - diagnostic.length);
+    });
+    const classification = () =>
+      /unsupported version/.test(diagnostic)
+        ? "unsupported archive version"
+        : /already exists/.test(diagnostic)
+          ? "existing object"
+          : /does not exist/.test(diagnostic)
+            ? "missing object"
+            : /end of file|EOF|truncated|input file is too short/.test(
+                  diagnostic,
+                )
+              ? "truncated archive"
+              : /permission denied/.test(diagnostic)
+                ? "permission denied"
+                : /not a valid archive|did not find magic/.test(diagnostic)
+                  ? "invalid archive"
+                  : /syntax error/.test(diagnostic)
+                    ? "SQL syntax"
+                    : "utility error";
     const feed =
       input instanceof Readable
         ? pipeline(input, child.stdin)
@@ -147,7 +169,7 @@ export async function restoreArchive(args: {
         child.once("error", () =>
           reject(
             Error(
-              `Isolated restore ${command[0]}${command[0] === "exec" ? " " + command[3] : ""} command failed`,
+              `Isolated restore ${command[0]}${command[0] === "exec" ? " " + command[3] : ""} command failed (${classification()})`,
             ),
           ),
         );
@@ -156,7 +178,7 @@ export async function restoreArchive(args: {
             ? resolve()
             : reject(
                 Error(
-                  `Isolated restore ${command[0]}${command[0] === "exec" ? " " + command[3] : ""} command failed`,
+                  `Isolated restore ${command[0]}${command[0] === "exec" ? " " + command[3] : ""} command failed (${classification()})`,
                 ),
               ),
         );
@@ -213,7 +235,15 @@ export async function restoreArchive(args: {
     let ready = false;
     for (let attempt = 0; attempt < 60; attempt++) {
       try {
-        await exec(["pg_isready", "-U", "recovery", "-d", "recovery"]);
+        await exec([
+          "pg_isready",
+          "-h",
+          "127.0.0.1",
+          "-U",
+          "recovery",
+          "-d",
+          "recovery",
+        ]);
         ready = true;
         break;
       } catch {

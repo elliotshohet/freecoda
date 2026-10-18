@@ -18,6 +18,7 @@ import {
   chmod,
   unlink,
   realpath,
+  lstat,
 } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
 import path from "node:path";
@@ -261,6 +262,27 @@ async function inventory(pool: Database, client?: import("pg").PoolClient) {
   };
 }
 try {
+  let retainedArchiveKey: Buffer | undefined;
+  if (process.env.FREECODA_RECOVERY_ARCHIVE_KEY_FILE) {
+    stage = "retained archive key validation";
+    const master = path.resolve(process.env.FREECODA_RECOVERY_ARCHIVE_KEY_FILE);
+    const info = await lstat(master);
+    if (
+      !info.isFile() ||
+      info.isSymbolicLink() ||
+      (info.mode & 0o077) !== 0 ||
+      info.size !== 32 ||
+      inside(directory, master) ||
+      inside(keyDirectory, master)
+    )
+      throw new Error(
+        "Master archive key must be a separate owner-only32byte file",
+      );
+    const actual = await realpath(master);
+    if (inside(directory, actual) || inside(keyDirectory, actual))
+      throw new Error("Master archive key overlaps retained artifacts");
+    retainedArchiveKey = await readFile(master);
+  }
   const fixtureProject = process.env.FREECODA_RECOVERY_VERIFY_PROJECT_ID;
   const fixturePath = process.env.FREECODA_RECOVERY_VERIFY_PATH;
   const fixtureHash = process.env.FREECODA_RECOVERY_VERIFY_SHA256;
@@ -330,6 +352,22 @@ try {
   admin = new LocalDatabase("postgres");
   for (let attempt = 0; ; attempt++) {
     try {
+      // The official image briefly exposes a temporary Unix-socket-only server
+      // during initdb. TCP readiness waits for the final server after restart.
+      const ready = command(
+        [
+          "pg_isready",
+          "-h",
+          "127.0.0.1",
+          "-U",
+          "freecoda_restore",
+          "-d",
+          "postgres",
+        ],
+        "",
+      );
+      ready.child.stdout.resume();
+      await ready.completed;
       await admin.query("SELECT 1 AS ready");
       break;
     } catch {
@@ -372,7 +410,7 @@ try {
     throw new Error("Recovery key directory resolves inside backup directory");
   await chmod(directory, 0o700);
   await chmod(keyDirectory, 0o700);
-  const key = randomBytes(32),
+  const key = retainedArchiveKey || randomBytes(32),
     iv = randomBytes(12);
   await writeFile(keyFile, key, { mode: 0o600, flag: "wx" });
   const snapshotClient = await source.connect();
@@ -591,13 +629,14 @@ try {
     await control(["rm", "--force", "--volumes", container]);
     containerCreated = false;
   }
+  const completedAt = new Date();
   await writeFile(
     manifestFile,
     JSON.stringify(
       {
-        completedAt: new Date().toISOString(),
+        completedAt: completedAt.toISOString(),
         retentionExpiresAt: new Date(
-          Date.now() + 7 * 24 * 60 * 60_000,
+          completedAt.getTime() + 7 * 24 * 60 * 60_000,
         ).toISOString(),
         status: "verified",
         productionVersion,
