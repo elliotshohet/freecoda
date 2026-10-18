@@ -95,18 +95,35 @@ const textWidth = (value: string) =>
     (sum, item) => sum + width(item.segment),
     0,
   );
-const SLASH_COMMANDS = [
-  "/help",
-  "/theme",
-  "/new",
-  "/clear",
-  "/usage",
-  "/status",
-  "/model",
-  "/mode",
-  "/plan",
-  "/review",
-  "/exit",
+export const TERMINAL_COMMANDS = [
+  { command: "/help", description: "Show commands and keyboard shortcuts" },
+  { command: "/new", description: "Start a new task in this project" },
+  { command: "/resume", description: "Open a saved task" },
+  { command: "/model", description: "List or choose the active model" },
+  {
+    command: "/mode",
+    description: "Choose build, plan, or review",
+    argument: true,
+  },
+  {
+    command: "/plan",
+    description: "Plan a change without editing files",
+    argument: true,
+  },
+  {
+    command: "/review",
+    description: "Review the project without editing files",
+  },
+  {
+    command: "/theme",
+    description: "Choose auto, light, or dark",
+    argument: true,
+  },
+  { command: "/usage", description: "Check the free allowance and reset time" },
+  { command: "/status", description: "Show project, model, and permissions" },
+  { command: "/clear", description: "Clear the visible conversation" },
+  { command: "/update", description: "Show update instructions" },
+  { command: "/exit", description: "Close Freecoda" },
 ];
 type Entry = {
   role: "you" | "freecoda" | "tool" | "approval" | "notice" | "error";
@@ -133,6 +150,7 @@ export class TerminalScreen {
   private historyIndex = -1;
   private draft = "";
   private scroll = 0;
+  private commandIndex = 0;
   private timer?: ReturnType<typeof setTimeout>;
   private keyStream = new PassThrough();
   private decoder = new StringDecoder("utf8");
@@ -147,6 +165,7 @@ export class TerminalScreen {
   private model = "";
   private mode = "build";
   private permissions = "Ask before writes and commands";
+  private sessionPermissions = new Set<string>();
   private sponsor: SponsorBanner = {
     label: "Freecoda announcement",
     headline: "Free forever. Supported by sponsors.",
@@ -241,7 +260,14 @@ export class TerminalScreen {
     this.schedule();
   }
   permit(kind: string) {
-    this.permissions = `${kind} allowed this session · other actions ask`;
+    this.sessionPermissions.add(kind);
+    this.permissions =
+      this.sessionPermissions.has("write") &&
+      this.sessionPermissions.has("shell")
+        ? "Writes and commands allowed this session"
+        : this.sessionPermissions.has("write")
+          ? "Writes allowed this session · ask before commands"
+          : "Commands allowed this session · ask before writes";
     this.schedule();
   }
   showSponsor(ad: SponsorBanner) {
@@ -296,6 +322,7 @@ export class TerminalScreen {
     this.cursor += inserted.length;
     this.value = chars.join("");
     this.historyIndex = -1;
+    this.commandIndex = 0;
     this.schedule();
   }
   private onData = (data: Buffer) => {
@@ -348,6 +375,11 @@ export class TerminalScreen {
       this.insert(text.replace(/\r\n?/g, "\n"));
     else this.keyStream.write(text);
   }
+  private commandMatches() {
+    return this.question?.kind === "composer" && /^\/[a-z]*$/.test(this.value)
+      ? TERMINAL_COMMANDS.filter((item) => item.command.startsWith(this.value))
+      : [];
+  }
   private onKey = (str: string, key: Key = {}) => {
     if (key.ctrl && key.name === "o") {
       this.onOpenSponsor?.(this.sponsor.href);
@@ -380,6 +412,7 @@ export class TerminalScreen {
     if (key.name === "escape") {
       if (this.question?.kind === "approval") {
         this.submit("n");
+        this.onCancel?.();
         return;
       }
       if (this.busy) this.onCancel?.();
@@ -412,6 +445,31 @@ export class TerminalScreen {
     }
     if (!this.question) return;
     const chars = Array.from(this.value);
+    const commands = this.commandMatches();
+    this.commandIndex = Math.min(
+      this.commandIndex,
+      Math.max(0, commands.length - 1),
+    );
+    if (commands.length && (key.name === "up" || key.name === "down")) {
+      this.commandIndex =
+        (this.commandIndex + (key.name === "down" ? 1 : commands.length - 1)) %
+        commands.length;
+      this.schedule();
+      return;
+    }
+    if (
+      commands.length &&
+      (key.name === "tab" || (key.name === "return" && !key.meta && !key.shift))
+    ) {
+      const selected = commands[this.commandIndex]!;
+      this.value =
+        selected.command + (selected.argument || key.name === "tab" ? " " : "");
+      this.cursor = this.value.length;
+      if (key.name === "return" && !selected.argument)
+        this.submit(selected.command);
+      else this.schedule();
+      return;
+    }
     if (key.name === "return" && !key.meta && !key.shift) {
       this.submit(this.value);
       return;
@@ -500,21 +558,6 @@ export class TerminalScreen {
       this.schedule();
       return;
     }
-    if (
-      key.name === "tab" &&
-      this.value.startsWith("/") &&
-      !this.value.includes(" ")
-    ) {
-      const matches = SLASH_COMMANDS.filter((command) =>
-        command.startsWith(this.value),
-      );
-      if (matches.length === 1) {
-        this.value = matches[0] + " ";
-        this.cursor = this.value.length;
-        this.schedule();
-      } else if (matches.length) this.append("notice", matches.join("  "));
-      return;
-    }
     if (!key.ctrl && !key.meta && str && !str.includes("\x1b"))
       this.insert(str);
   };
@@ -537,19 +580,29 @@ export class TerminalScreen {
     const columns = Math.max(40, Math.min(240, process.stdout.columns || 80));
     const rows = Math.max(16, process.stdout.rows || 24);
     const inner = columns - 4;
+    const inputRowCount = rows < 20 ? 2 : 3;
     const lines: string[] = [];
-    lines.push(
-      c.bold(palette.accent("  ▰ freecoda")) +
-        palette.muted(`  ${CLI_VERSION}`) +
-        palette.muted(clip("  " + this.status, columns - 24)),
+    const cardWidth = Math.min(columns, 76);
+    const card = (text: string, accent = false) => {
+      const content = clip(text, cardWidth - 4);
+      return (
+        palette.muted("│ ") +
+        (accent ? c.bold(palette.accent(content)) : content) +
+        " ".repeat(Math.max(0, cardWidth - 3 - textWidth(content))) +
+        palette.muted("│")
+      );
+    };
+    lines.push(palette.muted("╭" + "─".repeat(cardWidth - 2) + "╮"));
+    lines.push(card(`▰ freecoda (v${CLI_VERSION})`, true));
+    lines.push(card(`model:     ${this.model}`));
+    lines.push(card(`directory: ${this.root}`));
+    lines.push(palette.muted("╰" + "─".repeat(cardWidth - 2) + "╯"));
+    const commands = this.commandMatches();
+    const menuSize = Math.min(
+      commands.length,
+      Math.max(1, Math.min(5, rows - 22)),
     );
-    lines.push(palette.muted("  " + clip(this.root, columns - 3)));
-    lines.push(
-      "  " +
-        palette.info(this.mode.toUpperCase()) +
-        palette.muted(" · " + clip(this.model, columns - 14)),
-    );
-    lines.push(palette.muted("─".repeat(columns)));
+    const menuRows = commands.length ? menuSize + 1 : 0;
     const transcript: string[] = [];
     for (const entry of this.entries) {
       const label = {
@@ -586,7 +639,7 @@ export class TerminalScreen {
       }
       transcript.push("");
     }
-    const contentRows = rows - 14;
+    const contentRows = Math.max(0, rows - 12 - inputRowCount - menuRows);
     this.scroll = Math.min(
       this.scroll,
       Math.max(0, transcript.length - contentRows),
@@ -595,13 +648,36 @@ export class TerminalScreen {
     const visible = transcript.slice(Math.max(0, end - contentRows), end);
     while (visible.length < contentRows) visible.unshift("");
     lines.push(...visible);
+    if (commands.length) {
+      this.commandIndex = Math.min(this.commandIndex, commands.length - 1);
+      const offset = Math.max(0, this.commandIndex - menuSize + 1);
+      lines.push(
+        palette.muted("  Commands · ↑/↓ choose · Enter run · Tab complete"),
+      );
+      for (const [i, item] of commands
+        .slice(offset, offset + menuSize)
+        .entries()) {
+        const selected = i + offset === this.commandIndex;
+        const text = clip(
+          `${selected ? "›" : " "} ${item.command.padEnd(10)} ${item.description}`,
+          columns - 2,
+        );
+        lines.push(
+          "  " +
+            (selected ? c.bold(palette.accent(text)) : palette.muted(text)),
+        );
+      }
+    }
     lines.push(palette.muted("─".repeat(columns)));
     lines.push(
       "  " +
         c.bold(
           clip(
-            this.question?.label ||
-              (this.busy ? "Working · Esc or Ctrl+C to cancel" : "Ready"),
+            this.question?.kind === "approval"
+              ? this.question.label
+              : this.busy
+                ? `${this.status} · Esc to interrupt`
+                : `${this.mode === "build" ? "Agent" : this.mode === "plan" ? "Plan" : "Review"} · ${this.permissions}`,
             inner,
           ),
         ),
@@ -628,9 +704,9 @@ export class TerminalScreen {
     }
     const inputLines = wrapTerminalText(this.value, inner);
     while (inputLines.length <= cursorRow) inputLines.push("");
-    const inputStart = Math.max(0, cursorRow - 2);
+    const inputStart = Math.max(0, cursorRow - inputRowCount + 1);
     const inputScreenRow = lines.length + 1;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < inputRowCount; i++) {
       const line = inputLines[inputStart + i] || "";
       lines.push((inputStart + i === 0 ? palette.accent("› ") : "  ") + line);
     }
@@ -653,7 +729,9 @@ export class TerminalScreen {
     );
     lines.push(palette.muted("  " + clip(this.sponsor.description, inner)));
     lines.push(
-      palette.muted("  " + clip("Ctrl+O open · " + this.sponsor.href, inner)),
+      palette.muted(
+        "  " + clip("Ctrl+O sponsor · " + this.sponsor.href, inner),
+      ),
     );
     process.stdout.write(
       "\x1b[?25l\x1b[H" +

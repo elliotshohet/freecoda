@@ -64,7 +64,8 @@ def send(text):
    except OSError:break
 try:
  wait_for('Your local coding workspace')
- send('/theme light');send('\r');wait_for('Theme: light')
+ send('/');wait_for('Commands ·');send('\x1b[B');send('\r');wait_for('New task. /resume')
+ send('/th');wait_for('Choose auto, light, or dark');send('\t');send('light');send('\r');wait_for('Theme: light')
  assert json.load(open(os.path.join(config,'config.json')))['theme']=='light','Theme preference was not saved'
  send('/theme dark');send('\r');wait_for('Theme: dark')
  assert b'\x1b[38;5;55m' in output and b'\x1b[38;5;147m' in output,'Both terminal palettes were not rendered'
@@ -86,6 +87,8 @@ try:
  wait_for('conversation saved locally',start)
  assert 'a + b' in open(os.path.join(root,'sum.ts')).read(),'Approved write did not change source'
  wait_for('House sponsor fixture')
+ start=len(output);send('/new');send('\r');wait_for('New task. /resume',start)
+ start=len(output);send('/resume 2');send('\r');wait_for('Resumed task: Fix addition',start)
  send('/exit');send('\r')
  child.wait(timeout=5)
  assert child.returncode==0,'CLI returned a failure'

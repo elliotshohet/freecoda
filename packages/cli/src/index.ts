@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { realpath, readFile, unlink } from "node:fs/promises";
+import { realpath } from "node:fs/promises";
 import { platform, arch } from "node:os";
 import c from "picocolors";
 import open from "open";
@@ -12,13 +12,7 @@ import {
   redactSecrets,
 } from "@freecoda/core";
 import type { ModelMessage, LanguageModel } from "ai";
-import {
-  loadConfig,
-  saveConfig,
-  historyFile,
-  savePrivate,
-  type ThemePreference,
-} from "./config";
+import { loadConfig, saveConfig, type ThemePreference } from "./config";
 import {
   ask,
   secret,
@@ -31,14 +25,31 @@ import {
   resolveTerminalTheme,
 } from "./ui";
 import { showSponsor } from "./ads";
-import { CLI_VERSION, checkUpdate, newerVersion, installCommand, installUpdate } from "./update";
+import {
+  loadConversation,
+  saveConversation,
+  newConversation,
+  listConversations,
+  clearConversations,
+} from "./threads";
+import {
+  CLI_VERSION,
+  checkUpdate,
+  newerVersion,
+  installCommand,
+  installUpdate,
+} from "./update";
 const program = new Command()
   .name("freecoda")
   .description("A local coding agent. Your code, your choices.")
   .version(CLI_VERSION);
-program.command("update")
+program
+  .command("update")
   .description("Check npm for a newer Freecoda CLI")
-  .option("--install", "Explicitly install the latest stable release globally using npm")
+  .option(
+    "--install",
+    "Explicitly install the latest stable release globally using npm",
+  )
   .action(async (opts) => {
     const latest = await checkUpdate();
     if (!newerVersion(latest)) {
@@ -49,7 +60,9 @@ program.command("update")
     console.log(installCommand(latest));
     if (opts.install) {
       await installUpdate(latest);
-      console.log("Updated. Start a new Freecoda session to use the new version.");
+      console.log(
+        "Updated. Start a new Freecoda session to use the new version.",
+      );
     }
   });
 async function api(path: string, body?: unknown) {
@@ -173,11 +186,9 @@ program
   .command("clear")
   .description("Delete saved conversations for the current repository")
   .action(async () => {
-    const root = await realpath(process.cwd());
-    await unlink(historyFile(root)).catch((e) => {
-      if (e.code !== "ENOENT") throw e;
-    });
-    console.log("Local conversation deleted for this repository.");
+    const root = await realpath(program.opts().cwd || process.cwd());
+    await clearConversations(root);
+    console.log("All local tasks deleted for this repository.");
   });
 program
   .option("--cwd <path>", "Workspace directory")
@@ -249,17 +260,11 @@ program
       modelLabel = `${chosen.id} · hosted via ${chosen.provider}`;
     }
     await selectModel(opts.model);
-    let messages: ModelMessage[] = [];
-    if (opts.resume) {
-      try {
-        const saved = JSON.parse(await readFile(historyFile(root), "utf8"));
-        if (saved.root === root && Array.isArray(saved.messages))
-          messages = saved.messages;
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT")
-          throw new Error("Could not resume the local conversation.");
-      }
-    }
+    const latest = await loadConversation(root);
+    // Preserve legacy single-session history before the latest-task pointer changes.
+    if (latest.messages.length) await saveConversation(latest);
+    let conversation = opts.resume ? latest : newConversation(root);
+    let messages: ModelMessage[] = conversation.messages;
     const screen =
       !opts.prompt && !opts.plain && TerminalScreen.available()
         ? new TerminalScreen(root, modelLabel, config.theme).start()
@@ -307,9 +312,15 @@ program
       notice("Resumed the conversation saved locally for this workspace.");
     }
     let sessionOpen = true;
-    if (screen) void checkUpdate().then((latest) => {
-      if (sessionOpen && newerVersion(latest)) notice(`Freecoda ${latest} is available. Exit this session, then run freecoda update --install.`);
-    }).catch(() => {});
+    if (screen)
+      void checkUpdate()
+        .then((latest) => {
+          if (sessionOpen && newerVersion(latest))
+            notice(
+              `Freecoda ${latest} is available. Exit this session, then run freecoda update --install.`,
+            );
+        })
+        .catch(() => {});
     if (screen) void showSponsor(config.server, (ad) => screen.showSponsor(ad));
     if (screen)
       screen.onOpenSponsor = (href) => {
@@ -350,13 +361,15 @@ program
           continue;
         }
         if (input === "/update" || input.startsWith("/update ")) {
-          notice("Exit this session, then run freecoda update to check or freecoda update --install to install. Updates never replace the CLI during an active session.");
+          notice(
+            "Exit this session, then run freecoda update to check or freecoda update --install to install. Updates never replace the CLI during an active session.",
+          );
           if (opts.prompt) break;
           continue;
         }
         if (input === "/help") {
           notice(
-            "/plan <task>  Read-only plan\n/review <task>  Read-only code review\n/mode build|plan|review  Set the default mode\n/model [id]  List or select models\n/theme auto|dark|light  Save the terminal palette\n/update  Check/install instructions (exit session first)\n/usage  Hosted allowance and reset time\n/status  Current workspace and provider\n/new  Clear the model conversation\n/clear  Clear the visible transcript\n/exit  Exit Freecoda\n\nEnter sends. Ctrl+J adds a newline. Paste never submits automatically. Up/Down recalls input. PageUp/PageDown scrolls. Escape or Ctrl+C cancels a running request. Approval: y once, s category for this session, n decline.",
+            "/plan <task>  Read-only plan\n/review <task>  Read-only code review\n/mode build|plan|review  Set the default mode\n/model [id]  List or select models\n/theme auto|dark|light  Save the terminal palette\n/update  Check/install instructions (exit session first)\n/usage  Hosted allowance and reset time\n/status  Current workspace and provider\n/new  Start a new saved task\n/resume [number or id]  List or reopen saved tasks\n/clear  Clear the visible transcript\n/exit  Exit Freecoda\n\nEnter sends. Ctrl+J adds a newline. Paste never submits automatically. Up/Down recalls input. PageUp/PageDown scrolls. Escape or Ctrl+C cancels a running request. Approval: y once, s category for this session, n decline.",
           );
           if (opts.prompt) break;
           continue;
@@ -368,9 +381,74 @@ program
           continue;
         }
         if (input === "/new") {
+          conversation = await saveConversation({ ...conversation, messages });
+          conversation = newConversation(root);
           messages = [];
-          await savePrivate(historyFile(root), { root, messages });
-          notice("New conversation. Existing project files are unchanged.");
+          await saveConversation(conversation);
+          screen?.clear();
+          notice("New task. /resume opens earlier tasks in this project.");
+          if (opts.prompt) break;
+          continue;
+        }
+        if (input === "/resume" || input.startsWith("/resume ")) {
+          try {
+            const saved = await listConversations(root);
+            const selected = input.slice(7).trim();
+            if (!selected)
+              notice(
+                saved.length
+                  ? saved
+                      .map(
+                        (item, index) =>
+                          `${index + 1}. ${item.title}\n   /resume ${item.id}`,
+                      )
+                      .join("\n")
+                  : "No saved tasks in this project yet.",
+              );
+            else {
+              const item = /^\d+$/.test(selected)
+                ? saved[Number(selected) - 1]
+                : saved.find((item) => item.id === selected);
+              if (!item)
+                error(
+                  "Task not found. Use /resume to list tasks in this project.",
+                );
+              else {
+                await saveConversation({ ...conversation, messages });
+                conversation = await loadConversation(root, item.id);
+                messages = conversation.messages;
+                await saveConversation(conversation);
+                screen?.clear();
+                for (const message of messages
+                  .filter(
+                    (item) => item.role === "user" || item.role === "assistant",
+                  )
+                  .slice(-10)) {
+                  const text =
+                    typeof message.content === "string"
+                      ? message.content
+                      : message.content
+                          .filter((part) => part.type === "text")
+                          .map((part) => part.text)
+                          .join("");
+                  if (text)
+                    screen
+                      ? screen.append(
+                          message.role === "user" ? "you" : "freecoda",
+                          text.slice(-6000),
+                        )
+                      : notice(text.slice(-6000));
+                }
+                notice("Resumed task: " + conversation.title);
+              }
+            }
+          } catch (e) {
+            error(
+              redactSecrets(
+                e instanceof Error ? e.message : "Could not open local tasks.",
+              ),
+            );
+          }
           if (opts.prompt) break;
           continue;
         }
@@ -430,7 +508,7 @@ program
           if (opts.prompt) break;
           continue;
         }
-        if (input.startsWith("/mode ")) {
+        if (input === "/mode" || input.startsWith("/mode ")) {
           const selected = input.slice(6).trim();
           if (!["build", "plan", "review"].includes(selected))
             error("Use /mode build, /mode plan, or /mode review.");
@@ -495,7 +573,7 @@ program
             },
           });
           messages = result.messages;
-          await savePrivate(historyFile(root), { root, messages });
+          conversation = await saveConversation({ ...conversation, messages });
           notice(
             `${result.usage.totalTokens ?? "?"} tokens · conversation saved locally`,
           );

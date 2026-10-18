@@ -18,7 +18,7 @@ freecoda
 
 ## Terminal workspace
 
-An interactive terminal opens the full-screen interface automatically. `--theme auto|dark|light` and `/theme auto|dark|light` save your preferred palette locally. Auto uses the terminal's `COLORFGBG` background hint when available, otherwise the dark palette. Both palettes inherit the terminal's background; Freecoda does not force a black screen or change your terminal profile. `NO_COLOR` remains respected. It shows the project directory, model, current mode, streamed conversation, tool activity, and approval diffs. Its composer supports multiline messages and input history. A labeled sponsor or Freecoda announcement stays in the footer.
+An interactive terminal opens the full-screen interface automatically. `--theme auto|dark|light` and `/theme auto|dark|light` save your preferred palette locally. Auto uses the terminal's `COLORFGBG` background hint when available, otherwise the dark palette. Both palettes inherit the terminal's background; Freecoda does not force a black screen or change your terminal profile. `NO_COLOR` remains respected. It shows the project directory, model, current mode, streamed conversation, tool activity, and approval diffs. Its composer supports multiline messages and input history. Type `/` to open the command menu, use Up/Down to choose, Enter to run, or Tab to complete. `/new` starts a saved task; `/resume` lists tasks for this project and `/resume <number or id>` reopens one. A labeled sponsor or Freecoda announcement stays in the footer.
 
 | Control                                        | Action                                     |
 | ---------------------------------------------- | ------------------------------------------ |
@@ -80,7 +80,7 @@ The first command checks availability. `--install` explicitly invokes npm to ins
 
 Freecoda asks you to trust a repository before reading context. Repository tools exclude common credential files and respect `.gitignore` and `.freecodaignore`. Writes show a diff; shell commands show the requested command. Approve with `y` once, `s` for that action category during this session, or `n` to decline. Plan and review modes expose only read tools. Shell execution is not an OS sandbox, so review commands before allowing them.
 
-Conversation history and optional direct provider keys are stored under `~/.config/freecoda` with owner-only permissions. `FREECODA_CONFIG_DIR` overrides that directory. `history clear` removes the saved conversation for the current repository; `logout` revokes the hosted terminal token. Model context can contain relevant repository excerpts and is sent to your selected provider.
+Conversation history and optional direct provider keys are stored under `~/.config/freecoda` with owner-only permissions. `FREECODA_CONFIG_DIR` overrides that directory. `history clear` removes all saved tasks for the current repository; `logout` revokes the hosted terminal token. Model context can contain relevant repository excerpts and is sent to your selected provider.
 
 ## Sponsor placements
 
