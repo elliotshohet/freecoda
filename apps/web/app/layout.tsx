@@ -8,11 +8,11 @@ import { Header, Footer } from "@/components/chrome";
 export const metadata: Metadata = {
   metadataBase: new URL("https://freecoda.com"),
   title: {
-    default: "Freecoda — Your code. Your next big thing.",
+    default: "Freecoda — A little room to think.",
     template: "%s · Freecoda",
   },
   description:
-    "Plan, build, and review code in your browser or terminal. Free forever, supported by sponsors, with clear usage limits.",
+    "Chat, write, learn, and build with Freecoda. Free forever, supported by clearly labeled sponsors, with clear usage limits.",
 };
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (

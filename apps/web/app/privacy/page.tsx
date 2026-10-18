@@ -9,7 +9,7 @@ export default function Privacy() {
           <br />
           to you.
         </h1>
-        <p className="legal-updated">Preview policy · October 17, 2026</p>
+        <p className="legal-updated">Preview policy · October 18, 2026</p>
         <p>
           Freecoda is built around local execution, clear permissions, and
           straightforward data use. We do not sell your source code or
@@ -22,6 +22,18 @@ export default function Privacy() {
           conversation history stay on your machine. When you use your own API
           key, the key is stored locally with restrictive file permissions.
           Direct provider requests bypass Freecoda.
+        </p>
+        <h2>Browser conversations</h2>
+        <p>
+          Browser chat saves conversations in this browser's local storage. They
+          do not sync between devices. Anyone with access to your browser profile
+          may be able to read that history; avoid sensitive information on shared
+          devices. Delete a conversation from the sidebar to remove its local
+          copy. Sending a message shares that conversation's context with Freecoda,
+          Vercel AI Gateway, and the selected model provider. We retain usage
+          accounting, but do not save browser chat content in our application
+          database. Deleting local history does not delete provider operational
+          records described below. Advertisers do not receive your messages.
         </p>
         <h2 id="cloud-workspaces">Cloud workspaces</h2>
         <p>

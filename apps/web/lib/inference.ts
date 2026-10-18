@@ -151,6 +151,27 @@ export async function inference(req: Request) {
       403,
       "Hosted inference requires an authorized CLI device.",
     );
+  return executeInference(req, user);
+}
+export function inferenceCancellation(req: Request, abortOnDisconnect = false) {
+  const controller = new AbortController();
+  const timeout = AbortSignal.timeout(105000);
+  return {
+    signal: abortOnDisconnect
+      ? AbortSignal.any([timeout, req.signal, controller.signal])
+      : timeout,
+    cancel: () => {
+      if (abortOnDisconnect) controller.abort();
+    },
+  };
+}
+export async function executeInference(
+  req: Request,
+  user: { id: string },
+  behavior: { abortOnDisconnect?: boolean } = {},
+) {
+  if (!publicConfig().hostedEnabled || !publicConfig().inference)
+    throw new ApiError(503, "Hosted AI is currently unavailable.");
   await requireInvite(user.id);
   await rateLimit(`inference:${user.id}`, 30, 60);
   const body = await jsonBody(req, modelCallSchema);
@@ -165,9 +186,10 @@ export async function inference(req: Request) {
   const bytes = Buffer.byteLength(JSON.stringify(options));
   const maximum = maxRequestCost(config, bytes, options.maxOutputTokens!);
   const model = hostedProviderModel(config);
+  if (behavior.abortOnDisconnect) req.signal.throwIfAborted();
   const reservation = await reserve(user.id, config.id, maximum);
-  const timeout = AbortSignal.timeout(105000);
-  options.abortSignal = timeout;
+  const cancellation = inferenceCancellation(req, behavior.abortOnDisconnect);
+  options.abortSignal = cancellation.signal;
   let generationId: string | undefined;
   async function record(
     result:
@@ -251,7 +273,9 @@ export async function inference(req: Request) {
         }
       },
       cancel() {
-        cancelled = true; /* Keep draining provider usage until settlement or timeout. */
+        cancelled = true;
+        cancellation.cancel();
+        // Continue consuming any final usage; a missing finish keeps the reservation uncertain.
       },
     });
     return new Response(stream, {
