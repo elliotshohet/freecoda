@@ -47,7 +47,7 @@ node packages/cli/dist/index.js login
 node packages/cli/dist/index.js --cwd /path/to/project
 ```
 
-The CLI is published as `freecoda`; install with `npm install --global freecoda@0.1.3`. Sign in to use the free sponsored hosted allowance without an API key. Hosted access requires server configuration and a beta invitation; daily and shared capacity limits apply. `login`, `usage`, and `hosted` connect to the hosted service when available.
+The CLI is published as `freecoda`; install with `npm install --global freecoda@0.1.4`. Sign in to use the free sponsored hosted allowance without an API key. Hosted access requires server configuration and a beta invitation; daily and shared capacity limits apply. `login`, `usage`, and `hosted` connect to the hosted service when available.
 
 <details>
 <summary>Advanced settings: optional API key</summary>

@@ -1,11 +1,11 @@
 // Public npm release verified before enabling installation instructions.
 export const CLI_PUBLISHED = true;
-export const CLI_RELEASE_VERSION = "0.1.3";
+export const CLI_RELEASE_VERSION = "0.1.4";
 export const CLI_INSTALL_COMMAND = `npm install --global freecoda@${CLI_RELEASE_VERSION}`;
 
 // Public release assets and checksums verified before exposing downloads.
 export const DESKTOP_PUBLISHED = true;
-export const DESKTOP_RELEASE_VERSION = "0.1.2";
+export const DESKTOP_RELEASE_VERSION = "0.1.3";
 export const DESKTOP_RELEASE_URL = `https://github.com/elliotshohet/freecoda-releases/releases/tag/v${DESKTOP_RELEASE_VERSION}`;
 const desktopAssetBase = `https://github.com/elliotshohet/freecoda-releases/releases/download/v${DESKTOP_RELEASE_VERSION}`;
 export const DESKTOP_CHECKSUMS_URL = `${desktopAssetBase}/SHA256SUMS.txt`;
