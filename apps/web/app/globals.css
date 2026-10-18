@@ -1851,3 +1851,418 @@ input:-webkit-autofill {
     grid-template-columns: 1fr;
   }
 }
+
+/* Product-first Freecoda surfaces: neutral canvas, precise violet identity. */
+:root {
+  --paper: light-dark(#ffffff, #212121);
+  --ink: light-dark(#242424, #ececec);
+  --muted: light-dark(#747474, #a4a4a4);
+  --line: light-dark(#e8e8e8, #383838);
+  --pale: light-dark(#f1eef9, #302b3b);
+}
+.product-home {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 0 28px;
+}
+.product-entry {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr) 270px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  min-height: 680px;
+  overflow: hidden;
+}
+.entry-sidebar {
+  background: light-dark(#f7f7f7, #191919);
+  padding: 24px 14px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+}
+.entry-sidebar-title {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 650;
+  margin-bottom: 28px;
+}
+.entry-sidebar-title .brand-symbol {
+  transform: scale(0.7);
+}
+.entry-sidebar > a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  font-size: 11px;
+  border-radius: 7px;
+  color: var(--muted);
+}
+.entry-sidebar > .entry-new {
+  background: light-dark(#eaeaea, #303030);
+  color: var(--ink);
+  margin-bottom: 28px;
+}
+.entry-sidebar > a:hover {
+  background: light-dark(#ededed, #303030);
+  color: var(--ink);
+}
+.entry-sidebar-section {
+  color: var(--muted);
+  font-size: 9px;
+  padding: 0 12px 12px;
+}
+.entry-sidebar-bottom {
+  margin-top: auto;
+  padding: 70px 10px 0;
+}
+.entry-free {
+  font-size: 11px;
+  font-weight: 600;
+}
+.entry-sidebar-bottom p {
+  font-size: 10px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+.entry-sidebar-bottom a {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.entry-center {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+.entry-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  color: var(--muted);
+  font-size: 10px;
+  gap: 12px;
+}
+.entry-welcome {
+  margin: auto;
+  width: 100%;
+  padding: 35px 32px 60px;
+  text-align: center;
+}
+.entry-mark {
+  display: inline-flex;
+  margin-bottom: 20px;
+}
+.entry-mark .brand-symbol {
+  transform: scale(1.1);
+}
+.entry-welcome h1 {
+  font-size: clamp(27px, 2.7vw, 42px);
+  letter-spacing: -1.6px;
+  line-height: 1.2;
+  font-weight: 550;
+  margin: 0 0 15px;
+}
+.entry-welcome > p {
+  font-size: 12px;
+  line-height: 1.9;
+  color: var(--muted);
+}
+.entry-composer {
+  display: block;
+  max-width: 650px;
+  margin: 32px auto 14px;
+  border: 1px solid light-dark(#dedede, #474747);
+  border-radius: 20px;
+  padding: 20px 20px 12px;
+  text-align: left;
+  box-shadow: 0 3px 12px #00000004;
+  background: light-dark(#fff, #2d2d2d);
+}
+.entry-composer > span {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  min-height: 55px;
+}
+.entry-composer > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.entry-composer > div > span:first-child {
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+.entry-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 31px;
+  height: 31px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+}
+.entry-composer:hover {
+  border-color: var(--purple);
+}
+.entry-prompts {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.entry-prompts a {
+  font-size: 9px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  padding: 9px 11px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 8px;
+}
+.entry-prompts a:hover {
+  background: var(--pale);
+  color: var(--purple);
+}
+.entry-welcome > .entry-caption {
+  margin: 22px 0 0;
+  font-size: 9px;
+}
+.entry-sponsor {
+  padding: 0 24px 20px;
+}
+.entry-sponsor .sponsor {
+  margin: 0;
+  padding: 13px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: light-dark(#fafafa, #242424);
+  gap: 16px;
+}
+.entry-sponsor .sponsor-label {
+  font-size: 8px;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 0;
+  background: transparent;
+}
+.entry-sponsor .sponsor-copy strong {
+  font-size: 11px;
+}
+.entry-sponsor .sponsor-copy p {
+  font-size: 10px;
+  line-height: 1.6;
+  margin: 4px 0 0;
+}
+.entry-sponsor .sponsor-link {
+  font-size: 9px;
+  padding: 0;
+  white-space: nowrap;
+}
+.entry-review {
+  background: light-dark(#fcfcfc, #1d1d1d);
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+}
+.entry-review-tabs {
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  font-size: 10px;
+  color: var(--muted);
+}
+.entry-review-content {
+  padding: 36px 24px;
+}
+.entry-review-content > svg {
+  color: var(--muted);
+}
+.entry-review h2 {
+  margin: 22px 0 14px;
+  font-size: 20px;
+  font-weight: 550;
+  letter-spacing: -0.7px;
+  line-height: 1.4;
+}
+.entry-review p {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.9;
+}
+.entry-review ul {
+  padding-left: 16px;
+  font-size: 10px;
+  line-height: 2.3;
+  color: var(--muted);
+  margin: 25px 0;
+}
+.entry-review-content a {
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.entry-privacy {
+  margin-top: auto;
+  padding: 24px;
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+}
+.entry-privacy svg {
+  flex-shrink: 0;
+  color: var(--purple);
+  margin-top: 4px;
+}
+.entry-privacy p {
+  margin: 0;
+  font-size: 9px;
+  line-height: 1.8;
+}
+.product-local {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 80px 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 70px;
+  align-items: center;
+}
+.product-local h2 {
+  font-size: 25px;
+  font-weight: 550;
+  letter-spacing: -0.9px;
+  line-height: 1.4;
+  margin: 0 0 14px;
+}
+.product-local p {
+  font-size: 12px;
+  color: var(--muted);
+}
+.product-local > div > a {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  margin-top: 12px;
+}
+.product-local .install-command {
+  font-size: 11px;
+}
+@media (max-width: 1150px) {
+  .product-entry {
+    grid-template-columns: 180px minmax(0, 1fr);
+  }
+  .entry-review {
+    display: none;
+  }
+}
+@media (max-width: 700px) {
+  .product-home {
+    padding: 0 12px;
+  }
+  .product-entry {
+    display: flex;
+    flex-direction: column;
+    min-height: 650px;
+  }
+  .entry-sidebar {
+    padding: 10px 14px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .entry-sidebar-title {
+    margin: 0;
+    flex: 1;
+  }
+  .entry-sidebar > .entry-new {
+    margin: 0;
+    font-size: 10px;
+    padding: 8px;
+  }
+  .entry-sidebar > a:not(.entry-new),
+  .entry-sidebar-section,
+  .entry-sidebar-bottom {
+    display: none;
+  }
+  .entry-context {
+    padding: 16px 18px;
+    font-size: 9px;
+  }
+  .entry-welcome {
+    padding: 42px 17px 35px;
+  }
+  .entry-welcome h1 {
+    font-size: 30px;
+    letter-spacing: -1.1px;
+    max-width: 310px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .entry-welcome > p {
+    font-size: 11px;
+  }
+  .entry-composer {
+    margin-top: 24px;
+    padding: 17px 15px 12px;
+  }
+  .entry-composer > span {
+    font-size: 11px;
+  }
+  .entry-prompts {
+    gap: 6px;
+  }
+  .entry-prompts a {
+    font-size: 9px;
+    padding: 8px;
+  }
+  .entry-sponsor {
+    padding: 0 14px 14px;
+  }
+  .entry-sponsor .sponsor {
+    flex-wrap: wrap;
+    gap: 9px;
+    padding: 12px;
+  }
+  .entry-sponsor .sponsor-label {
+    width: 100%;
+  }
+  .entry-sponsor .sponsor-copy {
+    flex: 1;
+  }
+  .entry-sponsor .sponsor-copy p {
+    font-size: 9px;
+  }
+  .product-local {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 45px 12px;
+    gap: 28px;
+  }
+  .product-local h2 {
+    font-size: 25px;
+  }
+}
+.entry-sponsor .sponsor-label {
+  margin-bottom: 0;
+  min-width: 0;
+}

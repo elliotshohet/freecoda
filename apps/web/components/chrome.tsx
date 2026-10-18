@@ -1,4 +1,6 @@
+"use client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ThemeControl } from "./theme-control";
 import { ArrowUpRight, Command } from "lucide-react";
 export function Mark() {
@@ -11,6 +13,8 @@ export function Mark() {
   );
 }
 export function Header() {
+  const pathname = usePathname();
+  if (pathname === "/app" || pathname.startsWith("/app/")) return null;
   return (
     <header className="site-header">
       <Link href="/" className="brand">
@@ -33,6 +37,8 @@ export function Header() {
   );
 }
 export function Footer() {
+  const pathname = usePathname();
+  if (pathname === "/app" || pathname.startsWith("/app/")) return null;
   return (
     <footer className="site-footer">
       <div>

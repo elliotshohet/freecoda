@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft,
   ArrowUpRight,
   Check,
   ChevronRight,
@@ -26,6 +25,9 @@ import {
   X,
 } from "lucide-react";
 import styles from "./workspace.module.css";
+import { Mark } from "@/components/chrome";
+import { ThemeControl } from "@/components/theme-control";
+import { SponsorPlacement } from "@/components/sponsor-placement";
 
 type Status = {
   enabled: boolean;
@@ -133,6 +135,7 @@ export function CloudWorkspace() {
   const [project, setProject] = useState<Project | null>(null);
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [fileFilter, setFileFilter] = useState("");
+  const [projectsOpen, setProjectsOpen] = useState(false);
   const [file, setFile] = useState<{
     path: string;
     content: string;
@@ -143,8 +146,8 @@ export function CloudWorkspace() {
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState("build");
   const [consent, setConsent] = useState(false);
-  const [tab, setTab] = useState<"chat" | "changes" | "preview" | "output">(
-    "chat",
+  const [tab, setTab] = useState<"files" | "changes" | "preview" | "output">(
+    "files",
   );
   const [changes, setChanges] = useState<Changes | null>(null);
   const [output, setOutput] = useState("");
@@ -545,7 +548,6 @@ export function CloudWorkspace() {
       setPrompt("");
       eventCursor.current = 0;
       setRunId(data.run.id);
-      setTab("chat");
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -795,16 +797,22 @@ export function CloudWorkspace() {
     : "Free capacity is limited. Projects may pause when the daily capacity is used.";
   return (
     <div className={styles.shell}>
-      <div className={styles.heading}>
-        <div>
-          <Link href="/dashboard" className={styles.back}>
-            <ArrowLeft size={14} /> Account & allowance
-          </Link>
-          <h1>A little room to build.</h1>
-          <p>Your files, your agent, one cloud workspace.</p>
+      <h1 className="sr-only">Freecoda coding workspace</h1>
+      <header className={styles.heading}>
+        <Link href="/" className={styles.wordmark} aria-label="Freecoda home">
+          <Mark /> freecoda
+        </Link>
+        <div className={styles.appTitle}>
+          <span>Workspace</span>
+          <span className={styles.free}>Free forever</span>
         </div>
-        <span className={styles.free}>Free forever</span>
-      </div>
+        <div className={styles.topActions}>
+          <ThemeControl />
+          <Link href="/dashboard">
+            Account & allowance <ArrowUpRight size={13} />
+          </Link>
+        </div>
+      </header>
       {error && (
         <div className={styles.error} role="alert">
           {error}
@@ -830,48 +838,70 @@ export function CloudWorkspace() {
           <h2>Opening your workspace…</h2>
         </div>
       ) : !available ? (
-        <section className={styles.setup}>
-          <div className={styles.setupIcon}>
-            <Code2 size={34} />
-          </div>
-          <h2>
-            {!status
-              ? "Could not load your workspace."
-              : status.authenticated === false
-                ? "Sign in to your workspace."
-                : status?.invited === false
-                  ? "Cloud access is opening gradually."
-                  : "Your cloud workspace is getting ready."}
-          </h2>
-          <p>
-            {status?.reason ||
-              status?.message ||
-              (!status
-                ? "Refresh to check cloud availability. You can also open your account or use the local CLI."
-                : "Cloud execution is not enabled on this instance yet. You can keep building with the local CLI while the cloud service is configured.")}
-          </p>
-          <div className={styles.actions}>
-            <Link className="button purple" href="/dashboard">
-              {status?.authenticated === false
-                ? "Continue with GitHub"
-                : "View account & allowance"}
-            </Link>
-            <Link className="button secondary" href="/docs">
-              Use the local CLI
-            </Link>
-            <button
-              className={styles.iconButton}
-              onClick={() => void load()}
-              aria-label="Refresh service availability"
-            >
-              <RefreshCw size={17} />
-            </button>
-          </div>
-          <p className={styles.footnote}>
-            One free plan, shared capacity, no paid upgrades. No cloud project
-            has been created.
-          </p>
-        </section>
+        <div className={styles.workbench}>
+          <aside className={styles.projects}>
+            <div className={styles.sectionHead}>
+              <strong>Your projects</strong>
+              <FolderGit2 size={16} />
+            </div>
+            <p className={styles.smallEmpty}>
+              Sign in to create a project or bring a repository from GitHub.
+            </p>
+            <nav className={styles.railLinks} aria-label="Workspace resources">
+              <Link href="/docs">
+                Documentation <ArrowUpRight size={13} />
+              </Link>
+              <Link href="/docs#desktop">
+                Desktop & CLI <ArrowUpRight size={13} />
+              </Link>
+            </nav>
+            <div className={styles.railSponsor}>
+              <SponsorPlacement placement="web" />
+            </div>
+          </aside>
+          <section className={styles.setup}>
+            <div className={styles.setupIcon}>
+              <Code2 size={34} />
+            </div>
+            <h2>
+              {!status
+                ? "Could not load your workspace."
+                : status.authenticated === false
+                  ? "Let’s build something."
+                  : status?.invited === false
+                    ? "Cloud access is opening gradually."
+                    : "Your cloud workspace is getting ready."}
+            </h2>
+            <p>
+              {status?.reason ||
+                status?.message ||
+                (!status
+                  ? "Refresh to check cloud availability. You can also open your account or use the local CLI."
+                  : "Cloud execution is not enabled on this instance yet. You can keep building with the local CLI while the cloud service is configured.")}
+            </p>
+            <div className={styles.actions}>
+              <Link className="button purple" href="/dashboard">
+                {status?.authenticated === false
+                  ? "Continue with GitHub"
+                  : "View account & allowance"}
+              </Link>
+              <Link className="button secondary" href="/docs">
+                Use the local CLI
+              </Link>
+              <button
+                className={styles.iconButton}
+                onClick={() => void load()}
+                aria-label="Refresh service availability"
+              >
+                <RefreshCw size={17} />
+              </button>
+            </div>
+            <p className={styles.footnote}>
+              One free plan, shared capacity, no paid upgrades. No cloud project
+              has been created.
+            </p>
+          </section>
+        </div>
       ) : (
         <>
           <div className={styles.capacity}>
@@ -893,7 +923,16 @@ export function CloudWorkspace() {
             </span>
           </label>
           <div className={styles.workbench}>
-            <aside className={styles.projects}>
+            <aside className={styles.projects} data-mobile-open={projectsOpen}>
+              <button
+                className={styles.mobileProjectsToggle}
+                aria-expanded={projectsOpen}
+                onClick={() => setProjectsOpen((open) => !open)}
+              >
+                <FolderGit2 size={15} />
+                <span>{project?.name || "Projects"}</span>
+                <ChevronRight size={14} />
+              </button>
               <div className={styles.sectionHead}>
                 <strong>Projects</strong>
                 <button
@@ -934,6 +973,37 @@ export function CloudWorkspace() {
               >
                 <GitBranch size={15} /> Import from GitHub
               </button>
+              {project && (
+                <div className={styles.currentThread}>
+                  <span>Current thread</span>
+                  <button
+                    onClick={() =>
+                      document.getElementById("cloud-prompt")?.focus()
+                    }
+                  >
+                    <MessageSquare size={14} />
+                    <span>
+                      {messages.find((message) => message.role === "user")
+                        ?.text || "Project conversation"}
+                    </span>
+                    {running && <span className={styles.runningDot} />}
+                  </button>
+                </div>
+              )}
+              <nav
+                className={styles.railLinks}
+                aria-label="Workspace resources"
+              >
+                <Link href="/docs">
+                  Documentation <ArrowUpRight size={13} />
+                </Link>
+                <Link href="/docs#desktop">
+                  Desktop & CLI <ArrowUpRight size={13} />
+                </Link>
+              </nav>
+              <div className={styles.railSponsor}>
+                <SponsorPlacement placement="web" />
+              </div>
               <p className={styles.railNote}>
                 Only repositories you select.
                 <br />
@@ -945,7 +1015,7 @@ export function CloudWorkspace() {
                 <div className={styles.startGlyph}>
                   <Code2 size={46} strokeWidth={1.3} />
                 </div>
-                <h2>Make something yours.</h2>
+                <h2>What do you want to build?</h2>
                 <p>
                   Start with a blank project or bring a repository. Ask the
                   agent to build, fix, or help you understand it.
@@ -1002,419 +1072,473 @@ export function CloudWorkspace() {
                     </button>
                   </div>
                 </div>
-                <form
-                  className={styles.appFolder}
-                  onSubmit={changeAppDirectory}
-                  key={`${project.id}:${project.appDirectory}`}
-                >
-                  <label>
-                    App folder{" "}
-                    <input
-                      name="appDirectory"
-                      aria-label="App folder relative to repository root"
-                      defaultValue={
-                        project.appDirectory?.replace(
-                          /^\/(?:home\/project\/app|vercel\/sandbox\/project)\/?/,
-                          "",
-                        ) || "."
-                      }
-                      maxLength={300}
-                      required
-                      disabled={busy || running || inactive || !consent}
-                      placeholder=". or apps/web"
-                    />
-                  </label>
-                  <button
-                    disabled={busy || running || inactive || dirty || !consent}
-                  >
-                    Set app folder
-                  </button>
-                  <span>The folder containing your app’s package.json.</span>
-                </form>
-                <div className={styles.editorRow}>
-                  <div className={styles.files}>
-                    <div className={styles.sectionHead}>
-                      <strong>Files</strong>
-                      <button
-                        aria-label="Refresh files"
-                        disabled={busy || running || inactive}
-                        onClick={async () => {
-                          try {
-                            await refreshFiles(project.id);
-                          } catch (e) {
-                            setError(errorMessage(e));
-                          }
-                        }}
-                      >
-                        <RefreshCw size={13} />
-                      </button>
-                    </div>
-                    <input
-                      className={styles.fileFilter}
-                      aria-label="Filter project files"
-                      placeholder="Find a file…"
-                      value={fileFilter}
-                      onChange={(e) => setFileFilter(e.target.value)}
-                    />
-                    {visibleFiles.map((f) => (
-                      <button
-                        key={f.path}
-                        disabled={busy || running || inactive}
-                        className={
-                          file?.path === f.path ? styles.activeFile : ""
-                        }
-                        title={f.path}
-                        onClick={() => openFile(f.path)}
-                      >
-                        <FileCode2 size={13} />
-                        <span>{f.path}</span>
-                      </button>
-                    ))}
-                    {matchingFiles.length > 250 && (
-                      <p className={styles.smallEmpty}>
-                        Showing 250 files. Filter by path to find more.
-                      </p>
-                    )}
-                    {!!files.length && !matchingFiles.length && (
-                      <p className={styles.smallEmpty}>
-                        No files match this path.
-                      </p>
-                    )}
-                    {!files.length && (
-                      <p className={styles.smallEmpty}>
-                        No files loaded. Ask the agent to create the first file.
-                      </p>
-                    )}
-                  </div>
-                  <div className={styles.editor}>
-                    <div className={styles.editorBar}>
-                      <span>
-                        {file?.path || "Your project files"}
-                        {dirty && <b> · unsaved</b>}
-                      </span>
-                      {file && (
-                        <button
-                          disabled={
-                            busy || running || inactive || !dirty || !consent
-                          }
-                          onClick={saveFile}
-                        >
-                          Save file
-                        </button>
-                      )}
-                    </div>
-                    {file ? (
-                      <textarea
-                        aria-label={`Edit ${file.path}`}
-                        className={styles.codeEditor}
-                        spellCheck={false}
-                        autoCapitalize="off"
-                        autoCorrect="off"
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        disabled={busy || running || inactive || !consent}
-                      />
-                    ) : (
-                      <div className={styles.editorEmpty}>
-                        <FileCode2 size={27} />
-                        <p>Select a file to read and edit it.</p>
-                        <span>
-                          Changes stay in this workspace until you create a
-                          draft pull request.
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className={styles.bottom}>
-                  <div
-                    className={styles.tabs}
-                    role="tablist"
-                    aria-label="Workspace panels"
-                  >
-                    {(
-                      [
-                        ["chat", MessageSquare, "Agent"],
-                        ["changes", GitBranch, "Changes"],
-                        ["preview", Play, "Preview"],
-                        ["output", Terminal, "Output"],
-                      ] as const
-                    ).map(([key, Icon, label]) => (
-                      <button
-                        key={key}
-                        id={`tab-${key}`}
-                        role="tab"
-                        aria-selected={tab === key}
-                        aria-controls={`panel-${key}`}
-                        tabIndex={tab === key ? 0 : -1}
-                        onKeyDown={(e) => {
-                          if (e.key !== "ArrowRight" && e.key !== "ArrowLeft")
-                            return;
-                          const tabs = [
-                            "chat",
-                            "changes",
-                            "preview",
-                            "output",
-                          ] as const;
-                          const next =
-                            tabs[
-                              (tabs.indexOf(tab) +
-                                (e.key === "ArrowRight" ? 1 : 3)) %
-                                4
-                            ];
-                          setTab(next);
-                          document.getElementById(`tab-${next}`)?.focus();
-                        }}
-                        onClick={() => {
-                          if (key === "changes") void reviewChanges();
-                          else if (key === "preview") setTab("preview");
-                          else setTab(key);
-                        }}
-                      >
-                        <Icon size={15} />
-                        {label}
-                        {key === "chat" && running && (
-                          <span className={styles.runningDot} />
-                        )}
-                      </button>
-                    ))}
-                  </div>
+                <div className={styles.taskLayout}>
                   <section
-                    className={styles.panel}
-                    role="tabpanel"
-                    id={`panel-${tab}`}
-                    aria-labelledby={`tab-${tab}`}
+                    className={styles.chatColumn}
+                    aria-label="Agent conversation"
                   >
-                    {tab === "chat" && (
-                      <>
-                        <div
-                          className={styles.conversation}
-                          aria-live="polite"
-                          aria-relevant="additions text"
-                        >
-                          {!messages.length && (
-                            <div className={styles.chatEmpty}>
-                              <span className={styles.agentGlyph}>✳</span>
-                              <h3>What are we making?</h3>
-                              <p>
-                                Build something new, trace a bug, or make a
-                                plan. The agent works in this cloud project.
-                                Changes are yours to review.
-                              </p>
-                            </div>
-                          )}
-                          {messages.map((m, i) => (
-                            <div
-                              key={i}
-                              className={
-                                m.role === "user"
-                                  ? styles.userMessage
-                                  : styles.agentMessage
-                              }
-                            >
-                              <span>
-                                {m.role === "user"
-                                  ? "You"
-                                  : m.role === "assistant"
-                                    ? "Freecoda"
-                                    : "Workspace"}
-                              </span>
-                              <p>{m.text}</p>
-                            </div>
-                          ))}
-                          {running && (
-                            <p className={styles.working}>
-                              <Loader2 size={14} className={styles.spin} />{" "}
-                              Working in your project…
-                            </p>
-                          )}
-                          <div ref={endOfChat} />
-                        </div>
-                        <form className={styles.composer} onSubmit={sendPrompt}>
-                          <label className="sr-only" htmlFor="cloud-prompt">
-                            Message the coding agent
-                          </label>
-                          <textarea
-                            id="cloud-prompt"
-                            value={prompt}
-                            onChange={(e) => setPrompt(e.target.value)}
-                            rows={2}
-                            maxLength={12000}
-                            placeholder="What would you like to build?"
-                            disabled={!consent || running || inactive || busy}
-                          />
-                          <div>
-                            <label>
-                              Mode{" "}
-                              <select
-                                value={mode}
-                                onChange={(e) => setMode(e.target.value)}
-                                disabled={running}
-                              >
-                                <option value="build">Build</option>
-                                <option value="plan">Plan · read only</option>
-                                <option value="review">
-                                  Review · read only
-                                </option>
-                              </select>
-                            </label>
-                            <span>
-                              {dirty
-                                ? "Save your file before starting a run."
-                                : "Expires after seven days without activity."}
-                            </span>
-                            {running ? (
+                    <div
+                      className={styles.conversation}
+                      aria-live="polite"
+                      aria-relevant="additions text"
+                    >
+                      {!messages.length && (
+                        <div className={styles.chatEmpty}>
+                          <span className={styles.agentGlyph}>✳</span>
+                          <h3>What do you want to build?</h3>
+                          <p>
+                            Build something new, trace a bug, or make a plan.
+                            The agent works in this cloud project. Changes are
+                            yours to review.
+                          </p>
+                          <div className={styles.suggestions}>
+                            {[
+                              "Explain this project",
+                              "Plan a new feature",
+                              "Find a bug",
+                            ].map((suggestion) => (
                               <button
+                                key={suggestion}
                                 type="button"
-                                className={styles.send}
-                                disabled={busy}
-                                onClick={stopRun}
+                                onClick={() => {
+                                  setPrompt(suggestion);
+                                  document
+                                    .getElementById("cloud-prompt")
+                                    ?.focus();
+                                }}
                               >
-                                <Square size={13} /> Stop
+                                {suggestion}
                               </button>
-                            ) : (
-                              <button
-                                type="submit"
-                                className={styles.send}
-                                disabled={
-                                  busy ||
-                                  !consent ||
-                                  !prompt.trim() ||
-                                  dirty ||
-                                  inactive
-                                }
-                              >
-                                <Send size={14} /> Send
-                              </button>
-                            )}
+                            ))}
                           </div>
-                        </form>
-                      </>
-                    )}
-                    {tab === "changes" && (
-                      <div className={styles.changePanel}>
-                        <div className={styles.changeHeader}>
-                          <div>
-                            <h3>Review your changes.</h3>
-                            <p>Nothing has been pushed to GitHub.</p>
-                          </div>
+                        </div>
+                      )}
+                      {messages.map((m, i) => (
+                        <div
+                          key={i}
+                          className={
+                            m.role === "user"
+                              ? styles.userMessage
+                              : styles.agentMessage
+                          }
+                        >
+                          <span>
+                            {m.role === "user"
+                              ? "You"
+                              : m.role === "assistant"
+                                ? "Freecoda"
+                                : "Workspace"}
+                          </span>
+                          <p>{m.text}</p>
+                        </div>
+                      ))}
+                      {running && (
+                        <p className={styles.working}>
+                          <Loader2 size={14} className={styles.spin} /> Working
+                          in your project…
+                        </p>
+                      )}
+                      <div ref={endOfChat} />
+                    </div>
+                    <form className={styles.composer} onSubmit={sendPrompt}>
+                      <label className="sr-only" htmlFor="cloud-prompt">
+                        Message the coding agent
+                      </label>
+                      <textarea
+                        id="cloud-prompt"
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        onKeyDown={(event) => {
+                          if (
+                            (event.metaKey || event.ctrlKey) &&
+                            event.key === "Enter"
+                          ) {
+                            event.preventDefault();
+                            event.currentTarget.form?.requestSubmit();
+                          }
+                        }}
+                        rows={2}
+                        maxLength={12000}
+                        placeholder="What would you like to build?"
+                        disabled={!consent || running || inactive || busy}
+                      />
+                      <div>
+                        <label>
+                          Mode{" "}
+                          <select
+                            value={mode}
+                            onChange={(e) => setMode(e.target.value)}
+                            disabled={running}
+                          >
+                            <option value="build">Build</option>
+                            <option value="plan">Plan · read only</option>
+                            <option value="review">Review · read only</option>
+                          </select>
+                        </label>
+                        <span>
+                          {dirty
+                            ? "Save your file before starting a run."
+                            : "Expires after seven days without activity."}
+                        </span>
+                        {running ? (
                           <button
+                            type="button"
+                            className={styles.send}
+                            disabled={busy}
+                            onClick={stopRun}
+                          >
+                            <Square size={13} /> Stop
+                          </button>
+                        ) : (
+                          <button
+                            type="submit"
+                            className={styles.send}
                             disabled={
                               busy ||
-                              running ||
+                              !consent ||
+                              !prompt.trim() ||
                               dirty ||
-                              !changes?.diff ||
-                              !changes.reviewHash ||
-                              !project.repo
+                              inactive
                             }
-                            onClick={() => {
-                              setDialog("publish");
-                            }}
                           >
-                            <GitPullRequest size={15} /> Create draft PR
+                            <Send size={14} /> Send
                           </button>
-                        </div>
-                        {changes?.diff ? (
-                          <pre className={styles.diff}>
-                            {changes.diff.split("\n").map((line, i) => (
-                              <span
-                                key={i}
-                                className={
-                                  line.startsWith("+") &&
-                                  !line.startsWith("+++")
-                                    ? styles.added
-                                    : line.startsWith("-") &&
-                                        !line.startsWith("---")
-                                      ? styles.removed
-                                      : undefined
+                        )}
+                      </div>
+                    </form>
+                  </section>
+                  <div className={styles.bottom}>
+                    <div
+                      className={styles.tabs}
+                      role="tablist"
+                      aria-label="Workspace panels"
+                    >
+                      {(
+                        [
+                          ["files", FileCode2, "Files"],
+                          ["changes", GitBranch, "Changes"],
+                          ["preview", Play, "Preview"],
+                          ["output", Terminal, "Output"],
+                        ] as const
+                      ).map(([key, Icon, label]) => (
+                        <button
+                          key={key}
+                          id={`tab-${key}`}
+                          role="tab"
+                          aria-selected={tab === key}
+                          aria-controls={`panel-${key}`}
+                          tabIndex={tab === key ? 0 : -1}
+                          onKeyDown={(e) => {
+                            if (e.key !== "ArrowRight" && e.key !== "ArrowLeft")
+                              return;
+                            const tabs = [
+                              "files",
+                              "changes",
+                              "preview",
+                              "output",
+                            ] as const;
+                            const next =
+                              tabs[
+                                (tabs.indexOf(tab) +
+                                  (e.key === "ArrowRight" ? 1 : 3)) %
+                                  4
+                              ];
+                            e.preventDefault();
+                            if (next === "changes") void reviewChanges();
+                            else setTab(next);
+                            document.getElementById(`tab-${next}`)?.focus();
+                          }}
+                          onClick={() => {
+                            if (key === "changes") void reviewChanges();
+                            else if (key === "preview") setTab("preview");
+                            else setTab(key);
+                          }}
+                        >
+                          <Icon size={15} />
+                          {label}
+                          {key === "output" && running && (
+                            <span className={styles.runningDot} />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    <section
+                      className={styles.panel}
+                      role="tabpanel"
+                      id={`panel-${tab}`}
+                      aria-labelledby={`tab-${tab}`}
+                    >
+                      {tab === "files" && (
+                        <>
+                          <form
+                            className={styles.appFolder}
+                            onSubmit={changeAppDirectory}
+                            key={`${project.id}:${project.appDirectory}`}
+                          >
+                            <label>
+                              App folder{" "}
+                              <input
+                                name="appDirectory"
+                                aria-label="App folder relative to repository root"
+                                defaultValue={
+                                  project.appDirectory?.replace(
+                                    /^\/(?:home\/project\/app|vercel\/sandbox\/project)\/?/,
+                                    "",
+                                  ) || "."
                                 }
-                              >
-                                {line}
-                              </span>
-                            ))}
-                          </pre>
-                        ) : (
-                          <div className={styles.smallEmpty}>
-                            {busy
-                              ? "Loading changes…"
-                              : "No changes to review yet."}
-                          </div>
-                        )}
-                        {changes?.diff && (
-                          <label className={styles.reviewCheck}>
-                            <input
-                              type="checkbox"
-                              checked={reviewed}
-                              onChange={(e) => setReviewed(e.target.checked)}
-                            />
-                            I reviewed this diff and confirm it contains no
-                            secrets or workflow changes.
-                          </label>
-                        )}
-                        <p className={styles.footnote}>
-                          Publishing creates a branch and a draft pull request
-                          in your selected repository. It does not merge or
-                          deploy your changes.
-                        </p>
-                      </div>
-                    )}
-                    {tab === "output" && (
-                      <div className={styles.output}>
-                        <p>Command output from this run</p>
-                        {output ? (
-                          <pre>{output}</pre>
-                        ) : (
-                          <span>No command output yet.</span>
-                        )}
-                      </div>
-                    )}
-                    {tab === "preview" && (
-                      <div className={styles.preview}>
-                        {preview ? (
-                          <>
-                            <div className={styles.previewBar}>
-                              <ShieldCheck size={14} />
-                              <span>
-                                Private preview
-                                {preview.expiresAt
-                                  ? ` · expires ${new Date(preview.expiresAt).toLocaleTimeString()}`
-                                  : ""}
-                              </span>
-                              <button disabled={busy} onClick={openPreview}>
-                                <RefreshCw size={14} /> Refresh access
-                              </button>
-                            </div>
-                            <iframe
-                              title={`${project.name} private preview`}
-                              src={preview.url}
-                              sandbox="allow-scripts allow-forms allow-same-origin"
-                              referrerPolicy="no-referrer"
-                            />
-                          </>
-                        ) : (
-                          <div className={styles.editorEmpty}>
-                            <Play size={28} />
-                            <p>
-                              {busy
-                                ? "Starting your private preview…"
-                                : "Your preview is not running yet."}
-                            </p>
-                            <span>
-                              Dependencies are installed in the isolated
-                              workspace when needed. Preview access is private
-                              and expires automatically.
-                            </span>
+                                maxLength={300}
+                                required
+                                disabled={
+                                  busy || running || inactive || !consent
+                                }
+                                placeholder=". or apps/web"
+                              />
+                            </label>
                             <button
-                              disabled={busy || inactive || running || !consent}
-                              onClick={openPreview}
+                              disabled={
+                                busy || running || inactive || dirty || !consent
+                              }
                             >
-                              Install dependencies & open preview
+                              Set app folder
+                            </button>
+                            <span>
+                              The folder containing your app’s package.json.
+                            </span>
+                          </form>
+                          <div className={styles.editorRow}>
+                            <div className={styles.files}>
+                              <div className={styles.sectionHead}>
+                                <strong>Files</strong>
+                                <button
+                                  aria-label="Refresh files"
+                                  disabled={busy || running || inactive}
+                                  onClick={async () => {
+                                    try {
+                                      await refreshFiles(project.id);
+                                    } catch (e) {
+                                      setError(errorMessage(e));
+                                    }
+                                  }}
+                                >
+                                  <RefreshCw size={13} />
+                                </button>
+                              </div>
+                              <input
+                                className={styles.fileFilter}
+                                aria-label="Filter project files"
+                                placeholder="Find a file…"
+                                value={fileFilter}
+                                onChange={(e) => setFileFilter(e.target.value)}
+                              />
+                              {visibleFiles.map((f) => (
+                                <button
+                                  key={f.path}
+                                  disabled={busy || running || inactive}
+                                  className={
+                                    file?.path === f.path
+                                      ? styles.activeFile
+                                      : ""
+                                  }
+                                  title={f.path}
+                                  onClick={() => openFile(f.path)}
+                                >
+                                  <FileCode2 size={13} />
+                                  <span>{f.path}</span>
+                                </button>
+                              ))}
+                              {matchingFiles.length > 250 && (
+                                <p className={styles.smallEmpty}>
+                                  Showing 250 files. Filter by path to find
+                                  more.
+                                </p>
+                              )}
+                              {!!files.length && !matchingFiles.length && (
+                                <p className={styles.smallEmpty}>
+                                  No files match this path.
+                                </p>
+                              )}
+                              {!files.length && (
+                                <p className={styles.smallEmpty}>
+                                  No files loaded. Ask the agent to create the
+                                  first file.
+                                </p>
+                              )}
+                            </div>
+                            <div className={styles.editor}>
+                              <div className={styles.editorBar}>
+                                <span>
+                                  {file?.path || "Your project files"}
+                                  {dirty && <b> · unsaved</b>}
+                                </span>
+                                {file && (
+                                  <button
+                                    disabled={
+                                      busy ||
+                                      running ||
+                                      inactive ||
+                                      !dirty ||
+                                      !consent
+                                    }
+                                    onClick={saveFile}
+                                  >
+                                    Save file
+                                  </button>
+                                )}
+                              </div>
+                              {file ? (
+                                <textarea
+                                  aria-label={`Edit ${file.path}`}
+                                  className={styles.codeEditor}
+                                  spellCheck={false}
+                                  autoCapitalize="off"
+                                  autoCorrect="off"
+                                  value={draft}
+                                  onChange={(e) => setDraft(e.target.value)}
+                                  disabled={
+                                    busy || running || inactive || !consent
+                                  }
+                                />
+                              ) : (
+                                <div className={styles.editorEmpty}>
+                                  <FileCode2 size={27} />
+                                  <p>Select a file to read and edit it.</p>
+                                  <span>
+                                    Changes stay in this workspace until you
+                                    create a draft pull request.
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                      {tab === "changes" && (
+                        <div className={styles.changePanel}>
+                          <div className={styles.changeHeader}>
+                            <div>
+                              <h3>Review your changes.</h3>
+                              <p>Nothing has been pushed to GitHub.</p>
+                            </div>
+                            <button
+                              disabled={
+                                busy ||
+                                running ||
+                                dirty ||
+                                !changes?.diff ||
+                                !changes.reviewHash ||
+                                !project.repo
+                              }
+                              onClick={() => {
+                                setDialog("publish");
+                              }}
+                            >
+                              <GitPullRequest size={15} /> Create draft PR
                             </button>
                           </div>
-                        )}
-                      </div>
-                    )}
-                  </section>
+                          {changes?.diff ? (
+                            <pre className={styles.diff}>
+                              {changes.diff.split("\n").map((line, i) => (
+                                <span
+                                  key={i}
+                                  className={
+                                    line.startsWith("+") &&
+                                    !line.startsWith("+++")
+                                      ? styles.added
+                                      : line.startsWith("-") &&
+                                          !line.startsWith("---")
+                                        ? styles.removed
+                                        : undefined
+                                  }
+                                >
+                                  {line}
+                                </span>
+                              ))}
+                            </pre>
+                          ) : (
+                            <div className={styles.smallEmpty}>
+                              {busy
+                                ? "Loading changes…"
+                                : "No changes to review yet."}
+                            </div>
+                          )}
+                          {changes?.diff && (
+                            <label className={styles.reviewCheck}>
+                              <input
+                                type="checkbox"
+                                checked={reviewed}
+                                onChange={(e) => setReviewed(e.target.checked)}
+                              />
+                              I reviewed this diff and confirm it contains no
+                              secrets or workflow changes.
+                            </label>
+                          )}
+                          <p className={styles.footnote}>
+                            Publishing creates a branch and a draft pull request
+                            in your selected repository. It does not merge or
+                            deploy your changes.
+                          </p>
+                        </div>
+                      )}
+                      {tab === "output" && (
+                        <div className={styles.output}>
+                          <p>Command output from this run</p>
+                          {output ? (
+                            <pre>{output}</pre>
+                          ) : (
+                            <span>No command output yet.</span>
+                          )}
+                        </div>
+                      )}
+                      {tab === "preview" && (
+                        <div className={styles.preview}>
+                          {preview ? (
+                            <>
+                              <div className={styles.previewBar}>
+                                <ShieldCheck size={14} />
+                                <span>
+                                  Private preview
+                                  {preview.expiresAt
+                                    ? ` · expires ${new Date(preview.expiresAt).toLocaleTimeString()}`
+                                    : ""}
+                                </span>
+                                <button disabled={busy} onClick={openPreview}>
+                                  <RefreshCw size={14} /> Refresh access
+                                </button>
+                              </div>
+                              <iframe
+                                title={`${project.name} private preview`}
+                                src={preview.url}
+                                sandbox="allow-scripts allow-forms allow-same-origin"
+                                referrerPolicy="no-referrer"
+                              />
+                            </>
+                          ) : (
+                            <div className={styles.editorEmpty}>
+                              <Play size={28} />
+                              <p>
+                                {busy
+                                  ? "Starting your private preview…"
+                                  : "Your preview is not running yet."}
+                              </p>
+                              <span>
+                                Dependencies are installed in the isolated
+                                workspace when needed. Preview access is private
+                                and expires automatically.
+                              </span>
+                              <button
+                                disabled={
+                                  busy || inactive || running || !consent
+                                }
+                                onClick={openPreview}
+                              >
+                                Install dependencies & open preview
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </section>
+                  </div>
                 </div>
               </section>
             )}
