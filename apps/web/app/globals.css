@@ -843,6 +843,7 @@ h3 {
 }
 .footer-links {
   display: flex;
+  flex-wrap: wrap;
   gap: 25px;
   font-size: 10px;
   color: light-dark(#81798b, #b7adc5);
