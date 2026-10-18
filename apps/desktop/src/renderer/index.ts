@@ -102,6 +102,13 @@ function workspaceName() {
 }
 function updateControls() {
   const chat = isChat();
+  text("sidebar-heading-label", chat ? "Your chats" : "Workspace");
+  hide("coding-section-label", chat);
+  text("sidebar-new-task", chat ? "＋ New chat" : "＋ New task");
+  if (chat) {
+    text("folder-name", "Coding workspace");
+    text("folder-path", "Chat history stays on this computer.");
+  }
   const ready = (chat || trusted()) && !running && !actionBusy;
   const safe = !chat && trusted() && !running && !actionBusy;
   const readOnly = state?.permissionPreset === "read-only";
@@ -156,8 +163,10 @@ function updateControls() {
     .forEach((node) => {
       node.hidden = node.dataset.conversation !== (chat ? "chat" : "coding");
     });
-  for (const id of ["toggle-workbench", "sidebar-files", "sidebar-output"])
+  for (const id of ["toggle-workbench", "sidebar-files", "sidebar-output"]) {
     button(id).disabled = chat || running || actionBusy;
+    hide(id, chat);
+  }
   const preset = state?.permissionPreset || "default";
   text(
     "permissions-open",
@@ -630,6 +639,8 @@ async function newConversation() {
     !window.confirm("Keep unsaved editor changes and start a new task?")
   )
     return;
+  actionBusy = true;
+  updateControls();
   try {
     renderState(await bridge.createThread());
     prompt.value = "";
@@ -637,6 +648,9 @@ async function newConversation() {
     notify("New task started. Previous conversations are saved locally.");
   } catch (error) {
     showError(error);
+  } finally {
+    actionBusy = false;
+    updateControls();
   }
 }
 async function sendPrompt(event?: Event) {
@@ -1236,12 +1250,17 @@ function renderThreads() {
       async () => {
         if (running || actionBusy || thread.id === state?.activeThreadId)
           return;
+        actionBusy = true;
+        updateControls();
         try {
           renderState(await bridge.openThread(thread.id));
           prompt.value = "";
           updateControls();
         } catch (error) {
           showError(error);
+        } finally {
+          actionBusy = false;
+          updateControls();
         }
       },
       { signal },
@@ -1262,10 +1281,15 @@ function renderThreads() {
           !window.confirm("Delete this conversation from this computer?")
         )
           return;
+        actionBusy = true;
+        updateControls();
         try {
           renderState(await bridge.deleteThread(thread.id));
         } catch (error) {
           showError(error);
+        } finally {
+          actionBusy = false;
+          updateControls();
         }
       },
       { signal },
