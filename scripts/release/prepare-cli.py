@@ -23,12 +23,12 @@ def prepare(source: Path, output: Path, version: str) -> None:
     if source.is_symlink() or not source.is_dir():
         raise ValueError('Incoming directory required')
     entries = list(source.iterdir())
-    if {entry.name for entry in entries} != {archive_name, 'SHA256SUMS'}:
-        raise ValueError('Exactly the archive and SHA256SUMS are required')
+    if {entry.name for entry in entries} != {archive_name, 'SHA256SUMS.txt'}:
+        raise ValueError('Exactly the archive and SHA256SUMS.txt are required')
     if any(entry.is_symlink() or not entry.is_file() for entry in entries):
         raise ValueError('Regular release files required')
     archive = source / archive_name
-    manifest = source / 'SHA256SUMS'
+    manifest = source / 'SHA256SUMS.txt'
     if not 0 < archive.stat().st_size <= MAX_ARCHIVE or manifest.stat().st_size > 1024:
         raise ValueError('Release file size limit exceeded')
     with archive.open('rb') as stream:
@@ -61,7 +61,7 @@ def prepare(source: Path, output: Path, version: str) -> None:
         raise ValueError('Missing package files')
     # Never merge into an existing directory or overwrite unrelated files.
     output.mkdir(parents=True, exist_ok=False)
-    for name in (archive_name, 'SHA256SUMS'):
+    for name in (archive_name, 'SHA256SUMS.txt'):
         shutil.copyfile(source / name, output / name)
 
 

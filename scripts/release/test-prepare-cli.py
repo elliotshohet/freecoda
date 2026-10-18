@@ -34,7 +34,7 @@ class CliRelease(unittest.TestCase):
 
     def checksum(self, source):
         archive = source / 'freecoda-0.1.5.tgz'
-        (source / 'SHA256SUMS').write_text(hashlib.sha256(archive.read_bytes()).hexdigest() + '  ' + archive.name + '\n')
+        (source / 'SHA256SUMS.txt').write_text(hashlib.sha256(archive.read_bytes()).hexdigest() + '  ' + archive.name + '\n')
 
     def test_valid_copies_only_two_assets(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -88,7 +88,7 @@ class CliRelease(unittest.TestCase):
                 if wrong == 'tamper':
                     (source / 'freecoda-0.1.5.tgz').write_bytes(b'changed')
                 elif wrong == 'extra-manifest':
-                    with (source / 'SHA256SUMS').open('a') as stream:
+                    with (source / 'SHA256SUMS.txt').open('a') as stream:
                         stream.write('unexpected\n')
                 elif wrong == 'extra-file':
                     (source / 'private.env').write_text('never publish')
