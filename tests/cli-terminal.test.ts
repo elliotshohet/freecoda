@@ -64,6 +64,14 @@ def send(text):
    except OSError:break
 try:
  wait_for('Your local coding workspace')
+ start=len(output);send('/permissions');send('\r');wait_for('Permissions · ↑/↓ choose',start)
+ send('\x1b[A');send('\r');wait_for('Permissions: Read only',start)
+ start=len(output);send('/status');send('\r');wait_for('effective: plan',start)
+ start=len(output);send('/permissions full-access');send('\r');wait_for('Permissions: Full access',start)
+ start=len(output);send('/permissions');send('\r');wait_for('Permissions · ↑/↓ choose',start)
+ send('\x1b');wait_for('Permissions unchanged: Full access',start)
+ start=len(output);send('/permissions 2');send('\r');wait_for('Permissions: Default',start)
+ assert 'permission' not in json.dumps(json.load(open(os.path.join(config,'config.json')))).lower(),'Session policy persisted to disk'
  send('/');wait_for('Commands ·');send('\x1b[B');send('\r');wait_for('New task. /resume')
  send('/th');wait_for('Choose auto, light, or dark');send('\t');send('light');send('\r');wait_for('Theme: light')
  assert json.load(open(os.path.join(config,'config.json')))['theme']=='light','Theme preference was not saved'

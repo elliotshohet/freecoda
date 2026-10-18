@@ -24,6 +24,7 @@ import {
   safeTerminalText,
   resolveTerminalTheme,
 } from "./ui";
+import { permissionPreset } from "./permissions";
 import { showSponsor } from "./ads";
 import {
   loadConversation,
@@ -328,7 +329,7 @@ program
           notice("Could not open the sponsor link. Visit " + href),
         );
       };
-    const approve = approvals();
+    const permissions = approvals();
     let defaultMode: "build" | "plan" | "review" = "build";
     try {
       for (;;) {
@@ -343,6 +344,32 @@ program
         }
         if (!input) continue;
         if (["/exit", "/quit"].includes(input)) break;
+        if (input === "/permissions" || input.startsWith("/permissions ")) {
+          let selected = input.slice(12).trim();
+          if (!selected && screen)
+            selected = await screen.choosePermissions(permissions.preset);
+          else if (!selected && process.stdin.isTTY)
+            selected = await ask(
+              "Permissions: 1 Read only / 2 Default / 3 Full access (edits and commands without asking), Enter cancel: ",
+            );
+          const preset = permissionPreset(selected);
+          if (preset) {
+            permissions.setPreset(preset);
+            screen?.setMode(permissions.effectiveMode(defaultMode));
+            notice(
+              `Permissions: ${permissions.describe()}. Previous category grants cleared. Session only; Plan and Review always stay read-only.`,
+            );
+          } else if (selected)
+            error(
+              "Use /permissions read-only, default, full-access, or 1/2/3.",
+            );
+          else
+            notice(
+              `Permissions unchanged: ${permissions.describe()}. Use /permissions read-only, default, or full-access.`,
+            );
+          if (opts.prompt) break;
+          continue;
+        }
         if (input === "/theme" || input.startsWith("/theme ")) {
           const value = input.slice(6).trim();
           if (value && !["auto", "dark", "light"].includes(value))
@@ -369,7 +396,7 @@ program
         }
         if (input === "/help") {
           notice(
-            "/plan <task>  Read-only plan\n/review <task>  Read-only code review\n/mode build|plan|review  Set the default mode\n/model [id]  List or select models\n/theme auto|dark|light  Save the terminal palette\n/update  Check/install instructions (exit session first)\n/usage  Hosted allowance and reset time\n/status  Current workspace and provider\n/new  Start a new saved task\n/resume [number or id]  List or reopen saved tasks\n/clear  Clear the visible transcript\n/exit  Exit Freecoda\n\nEnter sends. Ctrl+J adds a newline. Paste never submits automatically. Up/Down recalls input. PageUp/PageDown scrolls. Escape or Ctrl+C cancels a running request. Approval: y once, s category for this session, n decline.",
+            "/plan <task>  Read-only plan\n/review <task>  Read-only code review\n/mode build|plan|review  Set the default mode\n/model [id]  List or select models\n/permissions [read-only|default|full-access]  Session tool permissions\n/theme auto|dark|light  Save the terminal palette\n/update  Check/install instructions (exit session first)\n/usage  Hosted allowance and reset time\n/status  Current workspace and provider\n/new  Start a new saved task\n/resume [number or id]  List or reopen saved tasks\n/clear  Clear the visible transcript\n/exit  Exit Freecoda\n\nEnter sends. Ctrl+J adds a newline. Paste never submits automatically. Up/Down recalls input. PageUp/PageDown scrolls. Escape or Ctrl+C cancels a running request. Approval: y once, s category for this session, n decline.",
           );
           if (opts.prompt) break;
           continue;
@@ -454,7 +481,7 @@ program
         }
         if (input === "/status") {
           notice(
-            `Workspace: ${root}\nModel: ${modelLabel}\nMode: ${defaultMode}\nTheme: ${config.theme}\nConversation: ${messages.length} messages saved locally\nPlan: free forever, supported by sponsors. Hosted fair-use limits apply.`,
+            `Workspace: ${root}\nModel: ${modelLabel}\nMode: ${defaultMode} (effective: ${permissions.effectiveMode(defaultMode)})\nPermissions: ${permissions.describe()}\nTheme: ${config.theme}\nConversation: ${messages.length} messages saved locally\nPlan: free forever, supported by sponsors. Hosted fair-use limits apply.`,
           );
           if (opts.prompt) break;
           continue;
@@ -514,7 +541,7 @@ program
             error("Use /mode build, /mode plan, or /mode review.");
           else {
             defaultMode = selected as typeof defaultMode;
-            screen?.setMode(defaultMode);
+            screen?.setMode(permissions.effectiveMode(defaultMode));
             notice("Default mode: " + defaultMode);
           }
           if (opts.prompt) break;
@@ -541,7 +568,7 @@ program
           { role: "user", content: prompt },
         ];
         screen?.append("you", input);
-        screen?.setMode(mode);
+        screen?.setMode(permissions.effectiveMode(mode));
         screen?.setBusy(true, "Working");
         const controller = new AbortController();
         const abort = () => {
@@ -557,8 +584,8 @@ program
             root,
             model: model!,
             messages: next,
-            mode,
-            approve,
+            mode: permissions.effectiveMode(mode),
+            approve: permissions.approve,
             signal: controller.signal,
             onText: (text) =>
               screen
@@ -598,7 +625,7 @@ program
           if (screen) {
             screen.onCancel = undefined;
             screen.setBusy(false);
-            screen.setMode(defaultMode);
+            screen.setMode(permissions.effectiveMode(defaultMode));
           }
         }
         if (opts.prompt) break;

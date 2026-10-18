@@ -20,22 +20,22 @@ freecoda
 
 An interactive terminal opens the full-screen interface automatically. `--theme auto|dark|light` and `/theme auto|dark|light` save your preferred palette locally. Auto uses the terminal's `COLORFGBG` background hint when available, otherwise the dark palette. Both palettes inherit the terminal's background; Freecoda does not force a black screen or change your terminal profile. `NO_COLOR` remains respected. It shows the project directory, model, current mode, streamed conversation, tool activity, and approval diffs. Its composer supports multiline messages and input history. Type `/` to open the command menu, use Up/Down to choose, Enter to run, or Tab to complete. `/new` starts a saved task; `/resume` lists tasks for this project and `/resume <number or id>` reopens one. A labeled sponsor or Freecoda announcement stays in the footer.
 
-| Control                                        | Action                                     |
-| ---------------------------------------------- | ------------------------------------------ |
-| Enter                                          | Submit the composer or approval response   |
-| Ctrl+J                                         | Insert a newline                           |
-| Left / Right, Home / End                       | Move the composer cursor                   |
-| Up / Down                                      | Recall submitted messages                  |
-| Ctrl+A / Ctrl+E                                | Move to the beginning / end                |
-| Ctrl+U / Ctrl+K                                | Delete before / after the cursor           |
-| Ctrl+W                                         | Delete the previous word                   |
-| PageUp / PageDown                              | Scroll the visible transcript              |
-| Tab                                            | Complete an unambiguous slash command      |
-| Escape / Ctrl+C during a request               | Cancel the current request                 |
-| Escape during approval                         | Decline that operation                     |
-| Ctrl+C with composer text                      | Clear the composer                         |
-| Ctrl+C twice with an empty composer, or Ctrl+D | Exit                                       |
-| Ctrl+O                                         | Open the visible sponsor/announcement link |
+| Control                                        | Action                                       |
+| ---------------------------------------------- | -------------------------------------------- |
+| Enter                                          | Submit the composer or approval response     |
+| Ctrl+J                                         | Insert a newline                             |
+| Left / Right, Home / End                       | Move the composer cursor                     |
+| Up / Down                                      | Recall submitted messages                    |
+| Ctrl+A / Ctrl+E                                | Move to the beginning / end                  |
+| Ctrl+U / Ctrl+K                                | Delete before / after the cursor             |
+| Ctrl+W                                         | Delete the previous word                     |
+| PageUp / PageDown                              | Scroll the visible transcript                |
+| Tab                                            | Complete an unambiguous slash command        |
+| Escape / Ctrl+C during a request               | Cancel the current request                   |
+| Escape during approval                         | Decline the operation and cancel the request |
+| Ctrl+C with composer text                      | Clear the composer                           |
+| Ctrl+C twice with an empty composer, or Ctrl+D | Exit                                         |
+| Ctrl+O                                         | Open the visible sponsor/announcement link   |
 
 Bracketed paste is inserted as text, including embedded newlines and slash commands; it does not submit automatically. The terminal's normal screen and cursor are restored on exit. `--plain` selects a traditional scrolling transcript. Small terminals and noninteractive output use the plain interface automatically.
 
@@ -50,7 +50,8 @@ Bracketed paste is inserted as text, including embedded newlines and slash comma
 - `/theme auto|dark|light`: save the terminal palette; `/theme` shows the current preference.
 - `/update`: show instructions to check and install an update after leaving the session.
 - `/usage`: show hosted allowance and reset information.
-- `/status`: show the current directory, provider, model, and conversation size.
+- `/permissions`: choose Read only, Default, or Full access with Up/Down and Enter. Escape cancels. `/permissions read-only|default|full-access` and numeric arguments `1|2|3` also work.
+- `/status`: show the current directory, provider, model, permissions/category grants, effective mode, and conversation size.
 - `/new`: reset the model conversation without changing project files.
 - `/clear`: clear the visible transcript while retaining model context.
 - `/exit`: leave the application.
@@ -64,6 +65,12 @@ freecoda --cwd /path/to/project -p "Explain how authentication works"
 ```
 
 Repository trust must already be granted when input is noninteractive. Noninteractive writes and shell commands are declined; there is no implicit permission bypass.
+
+## Session permissions
+
+Every launch starts in **Default**: edits and shell commands ask for approval. Approve once with `y`, grant that category for this session with `s`, or decline with `n`. **Read only** permits reading project files but exposes no edit or shell tools. **Full access** explicitly allows edits and shell commands without approval prompts; commands run as your user, without an OS sandbox. Plan and Review always expose only read tools, including under Full access.
+
+Changing the preset clears all previously granted categories. Presets and category grants last only for the current process; they are never saved to configuration or conversation history. `/new` and `/resume` change the task, not the current session permission preset. The composer and `/status` show the active policy. Noninteractive sessions keep the default deny-without-approval behavior.
 
 ## Updates
 

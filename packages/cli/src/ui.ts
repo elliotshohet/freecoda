@@ -4,7 +4,11 @@ import { PassThrough } from "node:stream";
 import { StringDecoder } from "node:string_decoder";
 import c from "picocolors";
 import { CLI_VERSION } from "./version";
-import type { Approval } from "@freecoda/core";
+import {
+  SessionPermissions,
+  PERMISSION_PRESETS,
+  type PermissionPreset,
+} from "./permissions";
 import type { ThemePreference } from "./config";
 
 export function resolveTerminalTheme(
@@ -120,6 +124,10 @@ export const TERMINAL_COMMANDS = [
     argument: true,
   },
   { command: "/usage", description: "Check the free allowance and reset time" },
+  {
+    command: "/permissions",
+    description: "Choose this session’s tool permissions",
+  },
   { command: "/status", description: "Show project, model, and permissions" },
   { command: "/clear", description: "Clear the visible conversation" },
   { command: "/update", description: "Show update instructions" },
@@ -131,7 +139,7 @@ type Entry = {
 };
 type Question = {
   label: string;
-  kind: "composer" | "approval";
+  kind: "composer" | "approval" | "permissions";
   resolve: (value: string) => void;
   reject: (error: Error) => void;
 };
@@ -164,8 +172,8 @@ export class TerminalScreen {
   private status = "Ready";
   private model = "";
   private mode = "build";
-  private permissions = "Ask before writes and commands";
-  private sessionPermissions = new Set<string>();
+  private permissions = "Default · ask before edits and commands";
+  private permissionIndex = 1;
   private sponsor: SponsorBanner = {
     label: "Freecoda announcement",
     headline: "Free forever. Supported by sponsors.",
@@ -259,16 +267,15 @@ export class TerminalScreen {
     this.mode = value;
     this.schedule();
   }
-  permit(kind: string) {
-    this.sessionPermissions.add(kind);
-    this.permissions =
-      this.sessionPermissions.has("write") &&
-      this.sessionPermissions.has("shell")
-        ? "Writes and commands allowed this session"
-        : this.sessionPermissions.has("write")
-          ? "Writes allowed this session · ask before commands"
-          : "Commands allowed this session · ask before writes";
+  setPermissions(description: string) {
+    this.permissions = description;
     this.schedule();
+  }
+  choosePermissions(preset: PermissionPreset) {
+    this.permissionIndex = PERMISSION_PRESETS.findIndex(
+      (item) => item.id === preset,
+    );
+    return this.prompt("Permissions · this session only", "permissions");
   }
   showSponsor(ad: SponsorBanner) {
     if (this.closed) return false;
@@ -384,6 +391,33 @@ export class TerminalScreen {
     if (key.ctrl && key.name === "o") {
       this.onOpenSponsor?.(this.sponsor.href);
       return;
+    }
+    if (this.question?.kind === "permissions") {
+      if (key.name === "escape" || (key.ctrl && key.name === "c")) {
+        this.submit("");
+        return;
+      }
+      if (key.name === "up" || key.name === "down") {
+        this.permissionIndex =
+          (this.permissionIndex + (key.name === "down" ? 1 : 2)) % 3;
+        this.value = "";
+        this.cursor = 0;
+        this.schedule();
+        return;
+      }
+      if (/^[123]$/.test(str)) {
+        this.permissionIndex = Number(str) - 1;
+        this.value = "";
+        this.cursor = 0;
+        this.schedule();
+        return;
+      }
+      if (key.name === "return") {
+        this.submit(
+          this.value.trim() || PERMISSION_PRESETS[this.permissionIndex]!.id,
+        );
+        return;
+      }
     }
     if (key.ctrl && key.name === "c") {
       if (this.busy) {
@@ -602,7 +636,12 @@ export class TerminalScreen {
       commands.length,
       Math.max(1, Math.min(5, rows - 22)),
     );
-    const menuRows = commands.length ? menuSize + 1 : 0;
+    const menuRows =
+      this.question?.kind === "permissions"
+        ? 4
+        : commands.length
+          ? menuSize + 1
+          : 0;
     const transcript: string[] = [];
     for (const entry of this.entries) {
       const label = {
@@ -668,16 +707,36 @@ export class TerminalScreen {
         );
       }
     }
+    if (this.question?.kind === "permissions") {
+      lines.push(
+        palette.muted(
+          "  Permissions · ↑/↓ choose · Enter confirm · Esc cancel",
+        ),
+      );
+      for (const [index, item] of PERMISSION_PRESETS.entries()) {
+        const text = clip(
+          `${index === this.permissionIndex ? "›" : " "} ${index + 1}. ${item.label} · ${item.description}`,
+          inner,
+        );
+        lines.push(
+          "  " +
+            (index === this.permissionIndex
+              ? c.bold(palette.accent(text))
+              : palette.muted(text)),
+        );
+      }
+    }
     lines.push(palette.muted("─".repeat(columns)));
     lines.push(
       "  " +
         c.bold(
           clip(
-            this.question?.kind === "approval"
+            this.question?.kind === "approval" ||
+              this.question?.kind === "permissions"
               ? this.question.label
               : this.busy
                 ? `${this.status} · Esc to interrupt`
-                : `${this.mode === "build" ? "Agent" : this.mode === "plan" ? "Plan" : "Review"} · ${this.permissions}`,
+                : `${this.mode === "build" ? "Agent" : this.mode === "plan" ? "Plan" : "Review"} · ${this.mode === "build" ? this.permissions : "read-only turn · " + this.permissions}`,
             inner,
           ),
         ),
@@ -716,7 +775,9 @@ export class TerminalScreen {
           clip(
             this.question?.kind === "approval"
               ? "y once · s this category/session · n decline"
-              : `Enter send · Ctrl+J newline · ↑ history · PgUp scroll · /help · ${this.permissions}`,
+              : this.question?.kind === "permissions"
+                ? "1–3 select · Enter confirm · Esc keeps current permissions"
+                : `Enter send · Ctrl+J newline · ↑ history · PgUp scroll · /help · ${this.permissions}`,
             inner,
           ),
       ),
@@ -801,21 +862,16 @@ export async function secret(prompt: string) {
     stdin.on("data", onData);
   });
 }
-export function approvals(): Approval {
-  const allowed = new Set<string>();
-  return async (kind, description) => {
-    if (allowed.has(kind)) return true;
-    if (active) active.append("approval", description);
-    else console.log(c.dim("\n" + safeTerminalText(description)));
-    if (!process.stdin.isTTY) return false;
-    const answer = await ask(
-      `Allow ${kind}? [y] once / [s] this category for the session / [n] no:`,
-    );
-    if (answer.toLowerCase() === "s") {
-      allowed.add(kind);
-      active?.permit(kind);
-      return true;
-    }
-    return answer.toLowerCase() === "y";
-  };
+export function approvals() {
+  return new SessionPermissions(
+    async (kind, description) => {
+      if (active) active.append("approval", description);
+      else console.log(c.dim("\n" + safeTerminalText(description)));
+      if (!process.stdin.isTTY) return "n";
+      return ask(
+        `Allow ${kind}? [y] once / [s] this category for the session / [n] no:`,
+      );
+    },
+    (description) => active?.setPermissions(description),
+  );
 }
