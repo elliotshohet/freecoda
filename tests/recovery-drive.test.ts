@@ -155,10 +155,18 @@ test("upload replay repairs interrupted pairs without duplicate objects and reje
     const drive = new RecoveryDrive("fixture-token", folder, fake);
     await expect(drive.upload(archive, validManifest)).rejects.toThrow();
     expect(objects).toHaveLength(1);
-    await drive.upload(archive, validManifest);
+    expect(await drive.upload(archive, validManifest)).toEqual({
+      uploaded: 1,
+      reused: 1,
+      downloadVerified: 2,
+    });
     expect(objects).toHaveLength(2);
     expect(posts).toBe(3);
-    await drive.upload(archive, validManifest);
+    expect(await drive.upload(archive, validManifest)).toEqual({
+      uploaded: 0,
+      reused: 2,
+      downloadVerified: 2,
+    });
     expect(posts).toBe(3);
     objects[0].appProperties.sha256 = "0".repeat(64);
     await expect(drive.upload(archive, validManifest)).rejects.toThrow(
