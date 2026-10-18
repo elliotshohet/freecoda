@@ -22,6 +22,8 @@ const api: DesktopBridge = {
   login: () => ipcRenderer.invoke("desktop:login"),
   logout: () => ipcRenderer.invoke("desktop:logout"),
   usage: () => ipcRenderer.invoke("desktop:usage"),
+  setPermissions: (preset) =>
+    ipcRenderer.invoke("desktop:setPermissions", preset),
   createThread: () => ipcRenderer.invoke("desktop:createThread"),
   openThread: (id) => ipcRenderer.invoke("desktop:openThread", id),
   clearHistory: () => ipcRenderer.invoke("desktop:clearHistory"),

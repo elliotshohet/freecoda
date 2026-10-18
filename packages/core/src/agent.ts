@@ -87,7 +87,7 @@ export async function runAgent(options: {
           }),
           shell: tool({
             description:
-              "Propose a shell command for tests or project checks. Always requires user approval. Not sandboxed.",
+              "Run a shell command for tests or project checks when the user's selected permissions allow it. Not sandboxed.",
             inputSchema: z.object({ command: z.string() }),
             execute: async ({ command }) => {
               const result = await runShell(

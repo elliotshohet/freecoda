@@ -26,6 +26,7 @@ import {
 import type { ModelMessage } from "ai";
 import type {
   DesktopState,
+  DesktopPermissionPreset,
   DesktopSponsor,
   DesktopWorkspace,
   DesktopEvent,
@@ -97,6 +98,7 @@ export class LocalAgentService {
   private initialized?: Promise<void>;
   private config: Config;
   private root: string | null = null;
+  private permissionPreset: DesktopPermissionPreset = "default";
   private messages: ModelMessage[] = [];
   private threads: {
     id: string;
@@ -263,6 +265,7 @@ export class LocalAgentService {
         ...(this.selectedModel ? { model: this.selectedModel } : {}),
       },
       running: !!this.activeController,
+      permissionPreset: this.permissionPreset,
       threads: this.threads.map(({ id, title, updatedAt }) => ({
         id,
         title: this.clean(title),
@@ -312,6 +315,7 @@ export class LocalAgentService {
       this.threads = [];
       this.activeThreadId = undefined;
       this.sessionApprovals.clear();
+      this.permissionPreset = "default";
       this.config.recentRoots = [
         root,
         ...this.config.recentRoots.filter((item) => item !== root),
@@ -406,10 +410,24 @@ export class LocalAgentService {
       readOnly: content !== file.content,
     };
   }
+  async setPermissions(preset: DesktopPermissionPreset): Promise<DesktopState> {
+    await this.initialize();
+    this.trustedRoot();
+    if (this.activeController || this.workspaceChanging || this.authChanging)
+      throw Error("Finish the current action before changing permissions.");
+    if (!["read-only", "default", "full-access"].includes(preset))
+      throw Error("Invalid permission preset.");
+    this.permissionPreset = preset;
+    this.sessionApprovals.clear();
+    await this.emitState();
+    return this.getState();
+  }
   private approval(controller: AbortController, runId?: string): Approval {
     return async (kind, description) => {
       controller.signal.throwIfAborted();
       const root = this.trustedRoot();
+      if (this.permissionPreset === "read-only") return false;
+      if (this.permissionPreset === "full-access") return true;
       if (this.sessionApprovals.has(kind)) return true;
       const id = randomUUID();
       return new Promise<boolean>((resolve) => {
@@ -597,7 +615,10 @@ export class LocalAgentService {
           root,
           model: hostedModel(this.server, chosen.id, this.config.token!),
           messages: next,
-          mode: input.mode,
+          mode:
+            this.permissionPreset === "read-only" && input.mode === "build"
+              ? "plan"
+              : input.mode,
           approve: this.approval(controller, id),
           signal: controller.signal,
           redactText: (value) => this.clean(value),

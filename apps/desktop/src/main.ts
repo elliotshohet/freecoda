@@ -125,6 +125,9 @@ function installIPC() {
     login: () => service.login(),
     logout: () => service.logout(),
     usage: () => service.usage(),
+    setPermissions: (
+      preset: Parameters<LocalAgentService["setPermissions"]>[0],
+    ) => service.setPermissions(preset),
     createThread: () => service.createThread(),
     openThread: (id: string) => service.openThread(id),
     clearHistory: () => service.clearHistory(),

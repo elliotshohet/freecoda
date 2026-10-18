@@ -2,6 +2,10 @@
 
 Electron desktop application for Freecoda. Application ID: `com.freecoda.desktop`; product name: **Freecoda**; initial version: **0.1.0**. Packaging is built from this private monorepo. Hosted account access and fair-use allowances remain the same as the website.
 
+## Session permissions
+
+Type `/permissions` in the conversation composer to select **Read only**, **Default**, or **Full access**. Read only blocks file changes and shell commands. Default asks for approval before changes and commands. Full access allows both without individual prompts; shell commands run on your computer without an OS sandbox. Changing this setting clears earlier category grants. The selection is session-only and resets when switching workspaces or restarting. Plan and Review remain read-only at every permission level.
+
 ## Build and package
 
 From the repository root, with Bun 1.3.5 or newer and Node.js 24:

@@ -485,3 +485,130 @@ test("desktop threads migrate legacy history, persist selection and isolate trus
     await rm(f.root, { recursive: true, force: true });
   }
 });
+
+test("desktop permission presets enforce manual actions and reset for each workspace session", async () => {
+  const f = await fixture(),
+    events: DesktopEvent[] = [];
+  let service = new LocalAgentService({
+    dataDirectory: f.data,
+    emit: (e) => events.push(e),
+    openExternal: async () => {},
+  });
+  try {
+    await service.selectWorkspace(f.repository);
+    await expect(service.setPermissions("full-access")).rejects.toThrow(
+      "Trust",
+    );
+    await service.trustWorkspace({
+      root: await realpath(f.repository),
+      consent: true,
+    });
+    expect((await service.getState()).permissionPreset).toBe("default");
+    await expect(service.setPermissions("invalid" as any)).rejects.toThrow(
+      "Invalid",
+    );
+    await service.setPermissions("read-only");
+    const file = await service.readFile("answer.ts");
+    await expect(
+      service.saveFile({
+        path: file.path,
+        content: "changed",
+        expectedHash: file.hash,
+      }),
+    ).rejects.toThrow("declined");
+    const denied = await service.runCommand({
+      command: "echo permission-fixture",
+    });
+    expect(denied.output).toContain("declined");
+    expect(await readFile(path.join(f.repository, "answer.ts"), "utf8")).toBe(
+      file.content,
+    );
+    expect(events.filter((e) => e.type === "approval")).toHaveLength(0);
+    await service.setPermissions("full-access");
+    await service.saveFile({
+      path: file.path,
+      content: "approved automatically",
+      expectedHash: file.hash,
+    });
+    expect(
+      (await service.runCommand({ command: "echo permission-fixture" })).output,
+    ).toContain("permission-fixture");
+    expect(events.filter((e) => e.type === "approval")).toHaveLength(0);
+    await service.setPermissions("default");
+    const next = await service.readFile(file.path);
+    const saving = service.saveFile({
+      path: file.path,
+      content: "must ask",
+      expectedHash: next.hash,
+    });
+    await until(() => events.some((e) => e.type === "approval"));
+    await expect(service.setPermissions("full-access")).rejects.toThrow(
+      "current action",
+    );
+    const approval = events.find((e) => e.type === "approval")!;
+    if (approval.type !== "approval") throw Error("approval");
+    await service.respondApproval({
+      id: approval.id,
+      approved: false,
+      scope: "once",
+    });
+    await expect(saving).rejects.toThrow("declined");
+    // A real category grant must work, then disappear after changing presets.
+    const approvalsBeforeGrant = events.filter(
+      (e) => e.type === "approval",
+    ).length;
+    const granting = service.runCommand({
+      command: "echo session-permission-fixture",
+    });
+    await until(
+      () =>
+        events.filter((e) => e.type === "approval").length >
+        approvalsBeforeGrant,
+    );
+    const grant = events.filter((e) => e.type === "approval").at(-1)!;
+    if (grant.type !== "approval") throw Error("approval");
+    await service.respondApproval({
+      id: grant.id,
+      approved: true,
+      scope: "session",
+    });
+    expect((await granting).output).toContain("session-permission-fixture");
+    await service.runCommand({ command: "echo session-permission-fixture" });
+    expect(events.filter((e) => e.type === "approval")).toHaveLength(
+      approvalsBeforeGrant + 1,
+    );
+    await service.setPermissions("read-only");
+    await service.setPermissions("default");
+    const afterRoundtrip = service.runCommand({
+      command: "echo session-permission-fixture",
+    });
+    await until(
+      () =>
+        events.filter((e) => e.type === "approval").length >
+        approvalsBeforeGrant + 1,
+    );
+    const freshApproval = events.filter((e) => e.type === "approval").at(-1)!;
+    if (freshApproval.type !== "approval") throw Error("approval");
+    await service.respondApproval({
+      id: freshApproval.id,
+      approved: false,
+      scope: "once",
+    });
+    expect((await afterRoundtrip).output).toContain("declined");
+    await service.setPermissions("full-access");
+    await service.selectWorkspace(f.repository);
+    expect((await service.getState()).permissionPreset).toBe("default");
+    await service.setPermissions("full-access");
+    await service.dispose();
+    service = new LocalAgentService({
+      dataDirectory: f.data,
+      emit: (e) => events.push(e),
+      openExternal: async () => {},
+    });
+    await service.selectWorkspace(f.repository);
+    expect((await service.getState()).permissionPreset).toBe("default");
+  } finally {
+    await service.dispose();
+    await rm(f.root, { recursive: true, force: true });
+  }
+});

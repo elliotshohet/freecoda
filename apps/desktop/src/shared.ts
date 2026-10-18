@@ -1,4 +1,5 @@
 export type AgentMode = "build" | "plan" | "review";
+export type DesktopPermissionPreset = "read-only" | "default" | "full-access";
 export type ApprovalKind = "write" | "shell";
 export type DesktopFileEntry = { path: string; type: "file" };
 export type DesktopWorkspace = {
@@ -25,6 +26,7 @@ export type DesktopState = {
   recentFolders: { root: string; name: string; trusted: boolean }[];
   auth: { signedIn: boolean; server: string; model?: string };
   running: boolean;
+  permissionPreset: DesktopPermissionPreset;
   threads?: { id: string; title: string; updatedAt: string }[];
   activeThreadId?: string;
   conversation?: { role: "user" | "assistant"; text: string }[];
@@ -68,6 +70,7 @@ export interface DesktopBridge {
   getSponsor(): Promise<DesktopSponsor>;
   reportSponsorVisible(): Promise<void>;
   openSponsor(): Promise<void>;
+  setPermissions(preset: DesktopPermissionPreset): Promise<DesktopState>;
   setTheme(theme: "system" | "light" | "dark"): Promise<void>;
   getState(): Promise<DesktopState>;
   openFolder(): Promise<DesktopWorkspace | null>;
