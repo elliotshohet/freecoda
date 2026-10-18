@@ -30,6 +30,7 @@ export function Header() {
         <Link href="/#how-it-works">How it works</Link>
         <Link href="/pricing">Free access</Link>
         <Link href="/docs">Docs</Link>
+        <a href="https://github.com/elliotshohet/freecoda">GitHub</a>
         <Link href="/app">Build in your browser</Link>
       </nav>
       <div className="header-actions">
@@ -60,6 +61,8 @@ export function Footer() {
       </div>
       <div className="footer-links">
         <Link href="/docs">Documentation</Link>
+        <a href="https://github.com/elliotshohet/freecoda">Source on GitHub</a>
+        <a href="https://github.com/elliotshohet/freecoda-releases">Downloads & updates</a>
         <Link href="/advertise">Sponsor Freecoda</Link>
         <Link href="/privacy">Privacy</Link>
         <Link href="/terms">Terms</Link>

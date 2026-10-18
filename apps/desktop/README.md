@@ -56,8 +56,9 @@ A successful packaging job establishes that installers were produced. Interactiv
 References: [electron-builder CLI](https://www.electron.build/docs/cli/), [macOS packaging](https://www.electron.build/docs/mac/), [GitHub-hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners), and [Actions artifacts](https://github.com/actions/upload-artifact).
 ## Public release updates
 
-The source repository stays private. Installers and updater metadata belong in
-the separate public `elliotshohet/freecoda-releases` repository. The **Prepare
+The canonical source and release-preparation repository is public at
+`elliotshohet/freecoda`. Existing installed applications still use the public
+`elliotshohet/freecoda-releases` compatibility feed for installers and updater metadata. The **Prepare
 public desktop release** workflow accepts a successful Desktop packages run ID,
 its full source SHA, and the matching stable desktop version. It validates all
 four native artifacts and their checksums, combines both macOS architectures in
@@ -66,7 +67,7 @@ checksums into a draft release. It never copies source files.
 
 Configure the `desktop-release` environment and its `FREECODA_RELEASE_TOKEN`
 secret: a fine-grained GitHub token restricted to **Contents: read and write**
-on `elliotshohet/freecoda-releases` only. The private repository's default
+on `elliotshohet/freecoda-releases` only. The source repository's default
 `GITHUB_TOKEN` cannot publish across repositories. No credential is bundled in
 the app. Review the draft assets and checksums, then publish the release to make
 it visible to the public updater. Never replace an already published version.

@@ -130,6 +130,22 @@ export default function Home() {
           </div>
         </aside>
       </section>
+      <section className="product-open-source" id="open-source">
+        <div>
+          <h2>Built in the open.</h2>
+          <p>Freecoda is open source under Apache 2.0. Explore the code, report a bug, or contribute.</p>
+        </div>
+        <div className="repository-links">
+          <a href="https://github.com/elliotshohet/freecoda">
+            <strong>Freecoda on GitHub <ArrowUpRight size={16} /></strong>
+            <span>Source, development, documentation & contributions</span>
+          </a>
+          <a href="https://github.com/elliotshohet/freecoda-releases">
+            <strong>Downloads & update compatibility <ArrowUpRight size={16} /></strong>
+            <span>Existing desktop installers, checksums & update feed</span>
+          </a>
+        </div>
+      </section>
       <section className="product-local" id="how-it-works">
         <div>
           <h2>The same room to build. Wherever you work.</h2>

@@ -1,4 +1,4 @@
-name: Prepare public desktop release
+name: Prepare compatibility desktop release
 on:
   workflow_dispatch:
     inputs:

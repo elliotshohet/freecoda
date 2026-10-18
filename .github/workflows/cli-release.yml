@@ -19,6 +19,9 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish:
+    permissions:
+      actions: read
+      contents: write
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     environment: desktop-release
@@ -26,6 +29,7 @@ jobs:
       RUN_ID: ${{ inputs.run_id }}
       SOURCE_SHA: ${{ inputs.commit_sha }}
       CLI_VERSION: ${{ inputs.version }}
+      RELEASE_REPOSITORY: elliotshohet/freecoda
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
@@ -56,17 +60,17 @@ jobs:
           python3 scripts/release/prepare-cli.py incoming-cli public-cli "$CLI_VERSION"
       - name: Publish archive without changing the desktop latest release
         env:
-          GH_TOKEN: ${{ secrets.FREECODA_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          test -n "$GH_TOKEN" || { echo 'Configure the existing binary-repository release token'; exit 1; }
+          test -n "$GH_TOKEN" || { echo 'The canonical repository release token is required'; exit 1; }
           tag="cli-v$CLI_VERSION"
-          if gh release view "$tag" --repo elliotshohet/freecoda-releases --json isDraft,body > existing-cli.json; then
+          if gh release view "$tag" --repo "$RELEASE_REPOSITORY" --json isDraft,body > existing-cli.json; then
             python3 -c 'import json,os; r=json.load(open("existing-cli.json")); assert r["isDraft"], "Published archives are immutable; use a new version"; assert "Source commit: "+os.environ["SOURCE_SHA"]+"." in r["body"], "Draft belongs to a different source"'
           else
-            gh release create "$tag" --repo elliotshohet/freecoda-releases --draft --title "Freecoda CLI $CLI_VERSION" --notes "Freecoda CLI $CLI_VERSION. Source commit: $SOURCE_SHA. General chat is the default, without repository tools or automatic project context. Coding modes remain available with explicit repository trust; conversations are separated by mode. Free forever, supported by labeled sponsors. Verify SHA256SUMS.txt before installation. Install the attached archive with npm install --global /path/to/freecoda-$CLI_VERSION.tgz --ignore-scripts. This is a public GitHub archive release; npm registry publication remains separate."
+            gh release create "$tag" --repo "$RELEASE_REPOSITORY" --draft --title "Freecoda CLI $CLI_VERSION" --notes "Freecoda CLI $CLI_VERSION. Source commit: $SOURCE_SHA. General chat is the default, without repository tools or automatic project context. Coding modes remain available with explicit repository trust; conversations are separated by mode. Free forever, supported by labeled sponsors. Verify SHA256SUMS.txt before installation. Install the attached archive with npm install --global /path/to/freecoda-$CLI_VERSION.tgz --ignore-scripts. This is a public GitHub archive release; npm registry publication remains separate."
           fi
-          gh release upload "$tag" public-cli/* --repo elliotshohet/freecoda-releases --clobber
-          gh api "repos/elliotshohet/freecoda-releases/releases/tags/$tag" > uploaded-cli.json
+          gh release upload "$tag" public-cli/* --repo "$RELEASE_REPOSITORY" --clobber
+          gh api "repos/$RELEASE_REPOSITORY/releases/tags/$tag" > uploaded-cli.json
           python3 - <<'PY'
           import os,json,pathlib,hashlib
           assets=json.load(open('uploaded-cli.json'))['assets']
@@ -76,5 +80,5 @@ jobs:
             p=expected[a['name']]
             assert a['size']==p.stat().st_size and a['digest']=='sha256:'+hashlib.sha256(p.read_bytes()).hexdigest(), 'Uploaded bytes do not match validated package'
           PY
-          gh release edit "$tag" --repo elliotshohet/freecoda-releases --draft=false --latest=false
+          gh release edit "$tag" --repo "$RELEASE_REPOSITORY" --draft=false --latest=false
           echo "Public archive published; npm registry and desktop latest release unchanged."

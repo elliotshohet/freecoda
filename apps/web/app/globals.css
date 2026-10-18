@@ -2018,6 +2018,18 @@ input:-webkit-autofill {
 .entry-sign-in {
   margin: 22px 0;
 }
+.product-open-source {
+  max-width: 1160px;
+  padding: 48px 24px 0;
+  margin: 0 auto;
+}
+.product-open-source h2 { font-size: 28px; letter-spacing: -1px; }
+.product-open-source p { color: var(--muted); line-height: 1.7; }
+.repository-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: 16px; margin-top: 24px; }
+.repository-links a { border: 1px solid var(--line); border-radius: 14px; padding: 22px; display: grid; gap: 12px; }
+.repository-links a:hover { background: var(--pale); }
+.repository-links strong { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.repository-links span { color: var(--muted); font-size: 13px; }
 .account-settings > .panel {
   margin-bottom: 22px;
   scroll-margin-top: 100px;

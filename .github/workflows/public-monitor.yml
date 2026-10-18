@@ -1,0 +1,40 @@
+name: Freecoda public readiness
+on:
+  schedule:
+    - cron: "43 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: freecoda-public-readiness
+  cancel-in-progress: false
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Check public website and database maintenance readiness
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const check = async () => {
+            const landing = await fetch('https://freecoda.com/', { redirect: 'error', signal: AbortSignal.timeout(15000) });
+            await landing.body?.cancel();
+            if (landing.status !== 200) throw new Error('Landing unavailable');
+            const response = await fetch('https://freecoda.com/api/readiness', { redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(15000) });
+            const body = await response.json();
+            if (response.status !== 200 || body.ready !== true || Object.keys(body).length !== 1) throw new Error('Readiness unavailable');
+          };
+          try { await check(); }
+          catch {
+            // Daily maintenance temporarily reports not-ready while running.
+            // Retry after its bounded sweep; never call the privileged job.
+            console.log('Public readiness failed; retrying in two minutes.');
+            await new Promise(resolve => setTimeout(resolve, 120000));
+            try { await check(); }
+            catch { console.error('Freecoda public HTTP/database/maintenance readiness failed twice.'); process.exitCode = 1; }
+          }
+          NODE
