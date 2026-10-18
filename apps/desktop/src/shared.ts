@@ -25,6 +25,8 @@ export type DesktopState = {
   recentFolders: { root: string; name: string; trusted: boolean }[];
   auth: { signedIn: boolean; server: string; model?: string };
   running: boolean;
+  threads?: { id: string; title: string; updatedAt: string }[];
+  activeThreadId?: string;
   conversation?: { role: "user" | "assistant"; text: string }[];
 };
 export type DesktopEvent =
@@ -77,6 +79,8 @@ export interface DesktopBridge {
   logout(): Promise<void>;
   usage(): Promise<unknown>;
   clearHistory(): Promise<void>;
+  createThread(): Promise<DesktopState>;
+  openThread(id: string): Promise<DesktopState>;
   openCloud(): Promise<void>;
   onEvent(listener: (event: DesktopEvent) => void): () => void;
 }

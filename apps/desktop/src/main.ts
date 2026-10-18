@@ -119,6 +119,8 @@ function installIPC() {
     login: () => service.login(),
     logout: () => service.logout(),
     usage: () => service.usage(),
+    createThread: () => service.createThread(),
+    openThread: (id: string) => service.openThread(id),
     clearHistory: () => service.clearHistory(),
     openCloud: () => openExternal("https://freecoda.com/app"),
   };

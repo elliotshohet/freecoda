@@ -380,6 +380,7 @@ test("desktop cancellation waits for an approved manual command to exit", async 
     const command = `"${process.execPath}" -e "${script}"`;
     const running = service.runCommand({ command });
     await until(() => events.some((event) => event.type === "approval"));
+    await expect(service.createThread()).rejects.toThrow("current action");
     const approval = events.find((event) => event.type === "approval")!;
     if (approval.type !== "approval") throw new Error("Missing approval");
     await service.respondApproval({
@@ -410,3 +411,77 @@ test("desktop cancellation waits for an approved manual command to exit", async 
     await rm(f.root, { recursive: true, force: true });
   }
 }, 10000);
+
+test("desktop threads migrate legacy history, persist selection and isolate trusted repositories", async () => {
+  const f = await fixture();
+  const { createHash } = await import("node:crypto");
+  const canonical = await realpath(f.repository),
+    filename = path.join(
+      f.data,
+      "sessions",
+      createHash("sha256").update(canonical).digest("hex") + ".json",
+    );
+  await mkdir(path.dirname(filename), { recursive: true });
+  await writeFile(
+    filename,
+    JSON.stringify({
+      root: canonical,
+      messages: [
+        { role: "user", content: "Existing local task" },
+        { role: "assistant", content: "Preserved answer" },
+      ],
+    }),
+    { mode: 0o600 },
+  );
+  const options = {
+    dataDirectory: f.data,
+    emit: () => {},
+    openExternal: async () => {},
+  };
+  let service = new LocalAgentService(options);
+  try {
+    await service.selectWorkspace(f.repository);
+    await expect(service.createThread()).rejects.toThrow("Trust");
+    await service.trustWorkspace({ root: canonical, consent: true });
+    const previous = await service.getState(),
+      oldId = previous.activeThreadId!;
+    expect(previous.conversation?.[1]?.text).toBe("Preserved answer");
+    const fresh = await service.createThread();
+    expect(fresh.threads).toHaveLength(2);
+    expect(fresh.activeThreadId).not.toBe(oldId);
+    expect(fresh.conversation).toEqual([]);
+    const freshId = fresh.activeThreadId!;
+    await service.openThread(oldId);
+    expect((await service.getState()).conversation?.[0]?.text).toBe(
+      "Existing local task",
+    );
+    await service.dispose();
+    service = new LocalAgentService(options);
+    await service.selectWorkspace(f.repository);
+    expect((await service.getState()).activeThreadId).toBe(oldId);
+    expect((await service.getState()).threads).toHaveLength(2);
+    await service.openThread(freshId);
+    await service.clearHistory();
+    await service.openThread(oldId);
+    expect((await service.getState()).conversation).toHaveLength(2);
+    await expect(service.openThread("../desktop.json")).rejects.toThrow(
+      "Invalid",
+    );
+    const other = path.join(f.root, "other");
+    await mkdir(other);
+    await service.selectWorkspace(other);
+    await service.trustWorkspace({
+      root: await realpath(other),
+      consent: true,
+    });
+    expect((await service.getState()).threads).toEqual([]);
+    await expect(service.openThread(oldId)).rejects.toThrow(
+      "selected repository",
+    );
+    const info = await stat(filename);
+    if (process.platform !== "win32") expect(info.mode & 0o777).toBe(0o600);
+  } finally {
+    await service.dispose();
+    await rm(f.root, { recursive: true, force: true });
+  }
+});

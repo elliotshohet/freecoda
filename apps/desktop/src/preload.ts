@@ -5,21 +5,26 @@ const api: DesktopBridge = {
   setTheme: (theme) => ipcRenderer.invoke("desktop:setTheme", theme),
   getState: () => ipcRenderer.invoke("desktop:getState"),
   openFolder: () => ipcRenderer.invoke("desktop:openFolder"),
-  trustWorkspace: (input) => ipcRenderer.invoke("desktop:trustWorkspace", input),
+  trustWorkspace: (input) =>
+    ipcRenderer.invoke("desktop:trustWorkspace", input),
   listFiles: () => ipcRenderer.invoke("desktop:listFiles"),
   readFile: (path) => ipcRenderer.invoke("desktop:readFile", path),
   saveFile: (input) => ipcRenderer.invoke("desktop:saveFile", input),
   runCommand: (input) => ipcRenderer.invoke("desktop:runCommand", input),
   runAgent: (input) => ipcRenderer.invoke("desktop:runAgent", input),
   cancelRun: () => ipcRenderer.invoke("desktop:cancelRun"),
-  respondApproval: (input) => ipcRenderer.invoke("desktop:respondApproval", input),
+  respondApproval: (input) =>
+    ipcRenderer.invoke("desktop:respondApproval", input),
   login: () => ipcRenderer.invoke("desktop:login"),
   logout: () => ipcRenderer.invoke("desktop:logout"),
   usage: () => ipcRenderer.invoke("desktop:usage"),
+  createThread: () => ipcRenderer.invoke("desktop:createThread"),
+  openThread: (id) => ipcRenderer.invoke("desktop:openThread", id),
   clearHistory: () => ipcRenderer.invoke("desktop:clearHistory"),
   openCloud: () => ipcRenderer.invoke("desktop:openCloud"),
   onEvent: (listener) => {
-    const handler = (_event: Electron.IpcRendererEvent, data: DesktopEvent) => listener(data);
+    const handler = (_event: Electron.IpcRendererEvent, data: DesktopEvent) =>
+      listener(data);
     ipcRenderer.on("desktop:event", handler);
     return () => ipcRenderer.removeListener("desktop:event", handler);
   },

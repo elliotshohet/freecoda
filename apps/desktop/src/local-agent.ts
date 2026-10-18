@@ -97,6 +97,13 @@ export class LocalAgentService {
   private config: Config;
   private root: string | null = null;
   private messages: ModelMessage[] = [];
+  private threads: {
+    id: string;
+    title: string;
+    updatedAt: string;
+    messages: ModelMessage[];
+  }[] = [];
+  private activeThreadId?: string;
   private selectedModel?: string;
   private activeController?: AbortController;
   private manualCompletion?: Promise<void>;
@@ -255,6 +262,12 @@ export class LocalAgentService {
         ...(this.selectedModel ? { model: this.selectedModel } : {}),
       },
       running: !!this.activeController,
+      threads: this.threads.map(({ id, title, updatedAt }) => ({
+        id,
+        title: this.clean(title),
+        updatedAt,
+      })),
+      activeThreadId: this.activeThreadId,
       conversation: this.messages
         .flatMap((message) => {
           if (message.role !== "user" && message.role !== "assistant")
@@ -295,6 +308,8 @@ export class LocalAgentService {
         throw new Error("Choose a repository folder.");
       this.root = root;
       this.messages = [];
+      this.threads = [];
+      this.activeThreadId = undefined;
       this.sessionApprovals.clear();
       this.config.recentRoots = [
         root,
@@ -645,39 +660,140 @@ export class LocalAgentService {
     await Promise.all([this.activeRun?.completion, this.manualCompletion]);
   }
   private async restoreHistory() {
+    this.messages = [];
+    this.threads = [];
+    this.activeThreadId = undefined;
     try {
-      const filename = this.historyFile();
-      const info = await lstat(filename);
+      const filename = this.historyFile(),
+        info = await lstat(filename);
       if (!info.isFile() || info.isSymbolicLink() || info.size > MAX_HISTORY)
-        throw new Error("Invalid saved conversation.");
+        throw Error("Invalid saved conversation.");
       const saved = JSON.parse(await readFile(filename, "utf8"));
-      if (
-        saved.root !== this.root ||
-        !Array.isArray(saved.messages) ||
-        saved.messages.length > 500
-      )
-        throw new Error("Invalid saved conversation.");
-      this.messages = saved.messages;
+      if (saved.root !== this.root) throw Error("Invalid saved conversation.");
+      if (Array.isArray(saved.threads)) {
+        if (
+          saved.threads.length > 100 ||
+          saved.threads.some(
+            (t: any) =>
+              !t ||
+              typeof t.id !== "string" ||
+              !/^[a-f0-9-]{36}$/.test(t.id) ||
+              typeof t.title !== "string" ||
+              t.title.length > 120 ||
+              !Number.isFinite(Date.parse(t.updatedAt)) ||
+              !Array.isArray(t.messages) ||
+              t.messages.length > 500,
+          ) ||
+          new Set(saved.threads.map((t: any) => t.id)).size !==
+            saved.threads.length
+        )
+          throw Error("Invalid saved thread history.");
+        this.threads = saved.threads;
+        this.activeThreadId = this.threads.some(
+          (t) => t.id === saved.activeThreadId,
+        )
+          ? saved.activeThreadId
+          : this.threads[0]?.id;
+      } else {
+        if (!Array.isArray(saved.messages) || saved.messages.length > 500)
+          throw Error("Invalid saved conversation.");
+        const thread = {
+          id: randomUUID(),
+          title: "Previous conversation",
+          updatedAt: new Date().toISOString(),
+          messages: saved.messages,
+        };
+        this.threads = [thread];
+        this.activeThreadId = thread.id;
+      }
+      this.messages =
+        this.threads.find((t) => t.id === this.activeThreadId)?.messages || [];
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
   }
   private async saveHistory() {
-    const value = { root: this.root, messages: this.messages };
+    if (!this.activeThreadId) {
+      this.activeThreadId = randomUUID();
+      this.threads.push({
+        id: this.activeThreadId,
+        title: "New conversation",
+        updatedAt: new Date().toISOString(),
+        messages: [],
+      });
+    }
+    const thread = this.threads.find((t) => t.id === this.activeThreadId)!;
+    thread.messages = this.messages;
+    thread.updatedAt = new Date().toISOString();
+    const first = this.messages.find((m) => m.role === "user");
+    if (first && typeof first.content === "string")
+      thread.title =
+        this.clean(first.content).replace(/\s+/g, " ").trim().slice(0, 120) ||
+        "New conversation";
+    const value = {
+      root: this.root,
+      activeThreadId: this.activeThreadId,
+      threads: this.threads,
+    };
     if (Buffer.byteLength(JSON.stringify(value)) > MAX_HISTORY)
-      throw new Error(
-        "Conversation history reached its limit. Clear history before starting a new task.",
+      throw Error(
+        "Conversation history reached its limit. Clear a thread before starting a new task.",
       );
     await this.savePrivate(this.historyFile(), value);
   }
-  async clearHistory() {
-    await this.initialize();
+  private threadChangeAllowed() {
     this.trustedRoot();
-    if (this.activeController)
-      throw new Error("Cancel the current task before clearing history.");
-    this.messages = [];
-    await unlink(this.historyFile()).catch((error) => {
-      if (error.code !== "ENOENT") throw error;
+    if (this.activeController || this.workspaceChanging || this.authChanging)
+      throw Error("Finish the current action before switching conversations.");
+  }
+  private async changeThread<T>(action: () => Promise<T>): Promise<T> {
+    await this.initialize();
+    this.threadChangeAllowed();
+    this.workspaceChanging = true;
+    try {
+      return await action();
+    } finally {
+      this.workspaceChanging = false;
+    }
+  }
+  async createThread(): Promise<DesktopState> {
+    return this.changeThread(async () => {
+      if (this.threads.length >= 100)
+        throw Error("The conversation limit has been reached.");
+      this.messages = [];
+      this.activeThreadId = randomUUID();
+      this.threads.unshift({
+        id: this.activeThreadId,
+        title: "New conversation",
+        updatedAt: new Date().toISOString(),
+        messages: [],
+      });
+      await this.saveHistory();
+      await this.emitState();
+      return this.getState();
+    });
+  }
+  async openThread(id: string): Promise<DesktopState> {
+    return this.changeThread(async () => {
+      if (typeof id !== "string" || !/^[a-f0-9-]{36}$/.test(id))
+        throw Error("Invalid conversation.");
+      const thread = this.threads.find((t) => t.id === id);
+      if (!thread)
+        throw Error("Conversation does not belong to the selected repository.");
+      this.activeThreadId = id;
+      this.messages = thread.messages;
+      await this.saveHistory();
+      await this.emitState();
+      return this.getState();
+    });
+  }
+  async clearHistory() {
+    return this.changeThread(async () => {
+      this.messages = [];
+      const t = this.threads.find((t) => t.id === this.activeThreadId);
+      if (t) t.title = "New conversation";
+      await this.saveHistory();
+      await this.emitState();
     });
   }
   private async api(endpoint: string, body?: unknown, signal?: AbortSignal) {
