@@ -1692,3 +1692,23 @@
   margin-bottom: 0;
   min-width: 0;
 }
+@media (max-width: 650px) {
+  /* The single sponsor stays visible when project navigation is collapsed. */
+  .railSponsor :global(.sponsor) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 5px 10px;
+  }
+  .railSponsor :global(.sponsor-label) {
+    grid-column: 1 / -1;
+    width: auto;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .railSponsor :global(.sponsor-copy strong) {
+    font-size: 11px;
+  }
+  .railSponsor :global(.sponsor-link) {
+    font-size: 10px;
+  }
+}
