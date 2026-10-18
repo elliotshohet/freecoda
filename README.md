@@ -8,21 +8,21 @@ A coding workspace for your own projects: edit files, plan and build with an age
 
 ## Downloads
 
-The current public desktop beta is **0.1.2**. Choose the installer for your operating system and processor:
+The current public desktop beta is **0.1.3**. Choose the installer for your operating system and processor:
 
 | Platform | Download |
 | --- | --- |
-| macOS · Apple silicon (M1 and newer) | [DMG · arm64](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.2/Freecoda-0.1.2-mac-arm64.dmg) |
-| macOS · Intel | [DMG · x64](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.2/Freecoda-0.1.2-mac-x64.dmg) |
-| Windows · 64-bit | [Installer · x64](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.2/Freecoda-0.1.2-win-x64.exe) |
-| Linux · x86_64 | [AppImage](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.2/Freecoda-0.1.2-linux-x86_64.AppImage) |
-| Debian / Ubuntu · amd64 | [DEB package](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.2/Freecoda-0.1.2-linux-amd64.deb) |
+| macOS · Apple silicon (M1 and newer) | [DMG · arm64](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.3/Freecoda-0.1.3-mac-arm64.dmg) |
+| macOS · Intel | [DMG · x64](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.3/Freecoda-0.1.3-mac-x64.dmg) |
+| Windows · 64-bit | [Installer · x64](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.3/Freecoda-0.1.3-win-x64.exe) |
+| Linux · x86_64 | [AppImage](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.3/Freecoda-0.1.3-linux-x86_64.AppImage) |
+| Debian / Ubuntu · amd64 | [DEB package](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.3/Freecoda-0.1.3-linux-amd64.deb) |
 
 These installers are **unsigned beta builds**. macOS builds are not notarized and may be blocked by Gatekeeper. Windows may show a SmartScreen warning. Verify your download before opening it. Make the Linux AppImage executable before launch; it needs the FUSE 2 runtime. Use the DEB on Debian/Ubuntu when the AppImage runtime is unavailable.
 
 ### Verify a download
 
-Compare the SHA-256 hash of your installer with the matching filename in [SHA256SUMS.txt for 0.1.2](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.2/SHA256SUMS.txt). For later versions, use the checksum file attached to that same release.
+Compare the SHA-256 hash of your installer with the matching filename in [SHA256SUMS.txt for 0.1.3](https://github.com/elliotshohet/freecoda-releases/releases/download/v0.1.3/SHA256SUMS.txt). For later versions, use the checksum file attached to that same release.
 
 On macOS:
 
@@ -54,6 +54,12 @@ Replace the example path with the file you downloaded. The entire hash must matc
 Files and approved commands run on your computer as your user. Local shell commands are not an operating-system sandbox. Relevant project context is sent to the selected AI provider. See the [privacy policy](https://freecoda.com/privacy) for hosted and cloud-workspace details.
 
 The app can also open the [browser workspace](https://freecoda.com/app), where invited users can create or import projects, run private previews, and review draft pull requests within the displayed cloud limits.
+
+## Session permissions
+
+Desktop 0.1.3 starts with **Default** permissions: edits and commands ask for approval. Choose **Read only** to allow reading files without edits or shell commands, or **Full access** to run edits and shell commands without asking. Plan and Review always use read-only tools. The preset lasts for the current app process; changing it clears earlier session grants. Commands run as your user, without an OS sandbox.
+
+The published CLI 0.1.4 has the same presets through `/permissions`, with arrow-key selection or `/permissions read-only|default|full-access`. See the [CLI installation guide](https://freecoda.com/docs#installation).
 
 ## Updates
 
