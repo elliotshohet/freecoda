@@ -7,7 +7,7 @@ A local coding agent with a full-screen terminal workspace, streamed replies, re
 Install the Freecoda CLI with Node.js 22 or newer:
 
 ```sh
-npm install --global freecoda@0.1.2
+npm install --global freecoda
 freecoda --help
 freecoda login
 cd /path/to/project
@@ -15,6 +15,22 @@ freecoda
 ```
 
 `login` connects your hosted account using a short-lived device code approved in your browser. Hosted access still requires an invited account and an available approved model. Use `provider configure` instead to connect an OpenAI-compatible provider directly. Its pricing and data policies apply. Set `FREECODA_PROVIDER_KEY` to supply a direct provider key without storing it in configuration.
+
+## Build from source
+
+Fork [elliotshohet/freecoda](https://github.com/elliotshohet/freecoda) on GitHub, then clone your fork (or clone that repository directly). From the monorepo root with Bun 1.3.5+ and Node.js 24:
+
+```sh
+git clone https://github.com/YOUR_GITHUB_USERNAME/freecoda.git
+cd freecoda
+bun install --frozen-lockfile
+bun run build:cli
+node packages/cli/dist/index.js --help
+node packages/cli/dist/index.js login
+node packages/cli/dist/index.js --cwd /path/to/project
+```
+
+The bundled Node entry point is `packages/cli/dist/index.js`; `bun run cli` runs the TypeScript source during development. Source builds use the production hosted service by default. To use your own local web service, configure it as described in the [root README](../../README.md), then run `node packages/cli/dist/index.js login --server http://127.0.0.1:3010`. Login saves the server connection for subsequent commands. A local build does not bypass hosted invitations, model approval, or account limits.
 
 ## Terminal workspace
 

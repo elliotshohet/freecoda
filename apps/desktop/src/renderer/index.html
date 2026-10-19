@@ -373,6 +373,7 @@ Command output will appear here. Your permission preset controls local command e
           <span aria-hidden="true">◇</span> You approve every file change and
           shell command.
         </p>
+        <p class="model-privacy-note" id="model-privacy-note">Hosted Beam Free may retain prompts and code and use them for training. Do not send sensitive content.</p>
         <aside
           class="house-ad"
           id="sponsor-placement"
@@ -503,24 +504,21 @@ Command output will appear here. Your permission preset controls local command e
         </div>
       </form>
     </dialog>
-    <dialog id="approval-dialog" aria-labelledby="approval-title">
-      <div class="approval-header">
-        <span class="dialog-icon" aria-hidden="true">◇</span
-        ><span id="approval-kind">Permission request</span>
+    <dialog id="approval-dialog" aria-labelledby="approval-title" aria-describedby="approval-description approval-warning">
+      <div class="approval-header"><span class="approval-status" aria-hidden="true"></span><span id="approval-kind">Permission request</span></div>
+      <h2 id="approval-title">Allow this action?</h2>
+      <p id="approval-description">Review the action before continuing.</p>
+      <div class="approval-details">
+        <div class="approval-detail-heading"><span id="approval-detail-label">Command</span><span id="approval-workspace"></span></div>
+        <pre id="approval-content" class="approval-content" tabindex="0" aria-label="Requested action details"></pre>
       </div>
-      <h2 id="approval-title">Review before continuing.</h2>
-      <p id="approval-description">
-        The agent is asking to change your project.
-      </p>
-      <pre id="approval-content" class="approval-content" tabindex="0"></pre>
       <p id="approval-warning" class="approval-warning"></p>
-      <div class="dialog-actions">
-        <button id="deny-tool" class="button secondary">Deny</button
-        ><button id="approve-tool" class="button purple">Allow once</button>
+      <div class="approval-choices" role="group" aria-label="Choose approval scope">
+        <button id="approve-tool" class="approval-choice"><span class="approval-key" aria-hidden="true">1</span><span><strong>Yes, allow once</strong><small>Only this action</small></span></button>
+        <button id="approve-session-tool" class="approval-choice"><span class="approval-key" aria-hidden="true">2</span><span><strong id="approval-session-label">Allow this category for this session</strong><small id="approval-session-detail">Resets when you change projects or restart</small></span></button>
+        <button id="deny-tool" class="approval-choice"><span class="approval-key" aria-hidden="true">3</span><span><strong>No, decline</strong><small>Do not perform this action</small></span></button>
       </div>
-      <p class="dialog-caption">
-        A refusal applies to this kind of action for the rest of this turn.
-      </p>
+      <p class="approval-footer">↑ ↓ to navigate · Enter to select · Esc to decline</p>
     </dialog>
     <dialog id="account-dialog" aria-labelledby="account-title">
       <button

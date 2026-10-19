@@ -306,6 +306,11 @@ function renderState(next: DesktopState) {
   renderFiles();
   renderThreads();
   text("model-label", next.auth.model || "Freecoda model");
+  text("model-privacy-note", next.auth.allowPromptTraining === false
+    ? "Provider prompt training is disallowed for this hosted model. Provider operational retention may still apply."
+    : next.auth.allowPromptTraining === true || !next.auth.model
+      ? "Hosted Beam Free may retain prompts and code and use them for training. Do not send sensitive content."
+      : "Provider training and retention policy is unavailable. Do not send sensitive content.");
   updateControls();
   renderAccount();
   if (
@@ -818,6 +823,13 @@ function showApproval() {
       : "Review the proposed file change before allowing the agent to write.",
   );
   text("approval-content", request.description);
+  text("approval-detail-label", request.kind === "shell" ? "Command" : "Proposed changes");
+  text("approval-workspace", state?.workspace?.root || "Local workspace");
+  text("approval-session-label", request.kind === "shell"
+    ? "Allow all shell commands this session"
+    : "Allow all file changes this session");
+  text("approval-session-detail", "This category only · resets on project change or restart");
+  dialog.dataset.kind = request.kind;
   text(
     "approval-warning",
     request.kind === "shell"
@@ -825,20 +837,22 @@ function showApproval() {
       : "Only allow a change you understand. Your existing checks should still be run afterward.",
   );
   button("approve-tool").disabled = false;
+  button("approve-session-tool").disabled = false;
   button("deny-tool").disabled = false;
   if (!dialog.open) dialog.showModal();
   button("deny-tool").focus();
 }
-async function decideApproval(approved: boolean) {
+async function decideApproval(approved: boolean, scope: "once" | "session" = "once") {
   const id = currentApproval;
   if (!id) return;
   button("approve-tool").disabled = true;
+  button("approve-session-tool").disabled = true;
   button("deny-tool").disabled = true;
   try {
     const result = await bridge.respondApproval({
       id,
       approved,
-      scope: "once",
+      scope,
     });
     if (!result.accepted)
       throw new Error("This permission request is no longer active.");
@@ -848,6 +862,7 @@ async function decideApproval(approved: boolean) {
   } catch (error) {
     showError(error);
     button("approve-tool").disabled = false;
+    button("approve-session-tool").disabled = false;
     button("deny-tool").disabled = false;
   }
 }
@@ -1473,6 +1488,19 @@ button("approve-tool").addEventListener(
   () => void decideApproval(true),
   { signal },
 );
+button("approve-session-tool").addEventListener("click", () => void decideApproval(true, "session"), { signal });
+el<HTMLDialogElement>("approval-dialog").addEventListener("keydown", (event) => {
+  const choices = [button("approve-tool"), button("approve-session-tool"), button("deny-tool")];
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    const index = choices.indexOf(document.activeElement as HTMLButtonElement);
+    choices[(index + (event.key === "ArrowDown" ? 1 : -1) + choices.length) % choices.length].focus();
+  }
+  if (!event.ctrlKey && !event.metaKey && !event.altKey && ["1", "2", "3"].includes(event.key)) {
+    event.preventDefault();
+    choices[Number(event.key) - 1].focus();
+  }
+}, { signal });
 el<HTMLDialogElement>("approval-dialog").addEventListener(
   "cancel",
   (event) => {

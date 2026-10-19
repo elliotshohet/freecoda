@@ -24,7 +24,7 @@ export type DesktopLogin = {
 export type DesktopState = {
   workspace: DesktopWorkspace | null;
   recentFolders: { root: string; name: string; trusted: boolean }[];
-  auth: { signedIn: boolean; server: string; model?: string };
+  auth: { signedIn: boolean; server: string; model?: string; allowPromptTraining?: boolean };
   running: boolean;
   permissionPreset: DesktopPermissionPreset;
   conversationMode: "chat" | "coding";

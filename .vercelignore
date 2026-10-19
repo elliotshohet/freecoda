@@ -1,0 +1,12 @@
+.git/
+.data/
+.agents/
+node_modules/
+**/node_modules/
+**/.next/
+**/dist/
+apps/desktop/release/
+.env*
+**/.env*
+*.tgz
+**/*.tsbuildinfo

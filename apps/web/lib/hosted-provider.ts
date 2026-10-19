@@ -6,6 +6,10 @@ import { gatewayConfigured } from "./config";
 
 // Verified against https://ai-gateway.vercel.sh/v1/models.
 // USD per million tokens equals micro-USD per token.
+export const GATEWAY_FREE_MODEL = "reflection/beam-free";
+export const GATEWAY_FREE_PROVIDER = "reflection";
+export const FREE_MODEL_CONTEXT = 1_048_576;
+
 export const GATEWAY_OPENAI_MODEL = "openai/gpt-5-mini";
 export const OPENAI_INPUT_RATE = 0.25;
 export const OPENAI_OUTPUT_RATE = 2;
@@ -31,6 +35,12 @@ export function hostedProviderModel(
       config.maxContextTokens > 400_000)
   )
     throw new ApiError(503, "The hosted model configuration needs review.");
+  if (config.id === GATEWAY_FREE_MODEL &&
+      (config.byok || config.provider !== GATEWAY_FREE_PROVIDER ||
+       config.inputMicrosPerToken !== 0 || config.outputMicrosPerToken !== 0 ||
+       !Number.isSafeInteger(config.maxContextTokens) ||
+       config.maxContextTokens <= 0 || config.maxContextTokens > FREE_MODEL_CONTEXT))
+    throw new ApiError(503, "The free hosted model configuration needs review.");
   // Every hosted request goes through Gateway; provider keys are only BYOK
   // options and can never become direct provider authentication.
   return createGateway({
@@ -48,7 +58,8 @@ export function gatewayProviderOptions(config: ModelConfig) {
   return {
     gateway: {
       only: [config.provider],
-      disallowPromptTraining: true,
+      // The explicitly selected free endpoint may retain and train on prompts.
+      disallowPromptTraining: !config.allowPromptTraining,
       user: "freecoda",
       tags: ["freecoda", "sponsor-supported"],
       ...(config.byok

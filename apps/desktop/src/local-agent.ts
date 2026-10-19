@@ -109,6 +109,7 @@ export class LocalAgentService {
   }[] = [];
   private activeThreadId?: string;
   private selectedModel?: string;
+  private allowPromptTraining?: boolean;
   private activeController?: AbortController;
   private manualCompletion?: Promise<void>;
   private authChanging = false;
@@ -279,6 +280,7 @@ export class LocalAgentService {
         signedIn: !!this.config.token,
         server: this.server,
         ...(this.selectedModel ? { model: this.selectedModel } : {}),
+        ...(this.allowPromptTraining === undefined ? {} : { allowPromptTraining: this.allowPromptTraining }),
       },
       running: !!this.activeController,
       permissionPreset: this.permissionPreset,
@@ -641,7 +643,7 @@ export class LocalAgentService {
           "models",
           undefined,
           controller.signal,
-        )) as { models?: { id: string }[]; hostedEnabled?: boolean };
+        )) as { models?: { id: string; allowPromptTraining?: boolean }[]; hostedEnabled?: boolean };
         const chosen = catalog.models?.[0];
         if (
           !catalog.hostedEnabled ||
@@ -653,6 +655,7 @@ export class LocalAgentService {
             "Hosted models are not available for this account yet.",
           );
         this.selectedModel = chosen.id;
+        this.allowPromptTraining = chosen.allowPromptTraining;
         const next: ModelMessage[] = [
           ...this.messages,
           { role: "user", content: prompt },
@@ -1193,6 +1196,7 @@ export class LocalAgentService {
     }
     delete this.config.token;
     this.selectedModel = undefined;
+    this.allowPromptTraining = undefined;
     await this.saveConfig();
     this.emit({
       type: "auth",

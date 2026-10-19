@@ -245,6 +245,7 @@ program
     let model: LanguageModel | undefined;
     let modelLabel = "";
     let modelId = "";
+    let modelPolicy = "";
     async function selectModel(requested?: string) {
       if (config.provider) {
         const p = config.provider;
@@ -255,6 +256,7 @@ program
           process.env.FREECODA_PROVIDER_KEY || p.apiKey || "",
         );
         modelLabel = `${modelId} · direct ${new URL(p.baseURL).host}`;
+        modelPolicy = "Direct provider: requests bypass Freecoda. Your provider’s policies and charges apply.";
         return;
       }
       if (!config.token)
@@ -276,6 +278,9 @@ program
       modelId = chosen.id;
       model = hostedModel(config.server, chosen.id, config.token);
       modelLabel = `${chosen.id} · hosted via ${chosen.provider}`;
+      modelPolicy = chosen.allowPromptTraining
+        ? "Hosted provider may retain prompts, source excerpts and responses and use them for training. Avoid sensitive material. Free fair-use limits apply."
+        : "Hosted prompt training is disallowed. Provider retention may apply. Free fair-use limits apply.";
     }
     await selectModel(opts.model);
     const latest = await loadConversation(scope);
@@ -302,15 +307,9 @@ program
       notice(
         modelLabel +
           "\n" +
-          (config.provider
-            ? "Your provider’s policies and charges apply."
-            : "Hosted prompt training is disallowed. Free fair-use limits apply."),
+          modelPolicy,
       );
-    } else if (config.provider)
-      screen.append(
-        "notice",
-        "Direct provider: requests bypass Freecoda. Your provider’s policies and charges apply.",
-      );
+    } else screen.append("notice", modelPolicy);
     if (screen && messages.length) {
       for (const message of messages
         .filter((item) => item.role === "user" || item.role === "assistant")
@@ -514,7 +513,7 @@ program
         }
         if (input === "/status") {
           notice(
-            `Workspace: ${root}\nModel: ${modelLabel}\nMode: ${defaultMode} (effective: ${permissions.effectiveMode(defaultMode)})\nAccess: ${defaultMode === "chat" ? "Chat has no project access or tools. Coding preset: " : "Coding preset: "}${permissions.describe()}\nTheme: ${config.theme}\nConversation: ${messages.length} messages saved locally\nPlan: free forever, supported by sponsors. Hosted fair-use limits apply.`,
+            `Workspace: ${root}\nModel: ${modelLabel}\nData policy: ${modelPolicy}\nMode: ${defaultMode} (effective: ${permissions.effectiveMode(defaultMode)})\nAccess: ${defaultMode === "chat" ? "Chat has no project access or tools. Coding preset: " : "Coding preset: "}${permissions.describe()}\nTheme: ${config.theme}\nConversation: ${messages.length} messages saved locally\nPlan: free forever, supported by sponsors. Hosted fair-use limits apply.`,
           );
           if (opts.prompt) break;
           continue;
@@ -542,7 +541,7 @@ program
             if (requested) {
               await selectModel(requested);
               screen?.setModel(modelLabel);
-              notice("Selected " + modelLabel);
+              notice("Selected " + modelLabel + "\n" + modelPolicy);
             } else if (config.provider)
               notice(
                 `Current model: ${modelId}. Use /model <exact-provider-model-id> to switch.`,

@@ -62,7 +62,7 @@ export function Footer() {
       <div className="footer-links">
         <Link href="/docs">Documentation</Link>
         <a href="https://github.com/elliotshohet/freecoda">Source on GitHub</a>
-        <a href="https://github.com/elliotshohet/freecoda-releases">Downloads & updates</a>
+        <a href="https://github.com/elliotshohet/freecoda/releases">Downloads & updates</a>
         <Link href="/advertise">Sponsor Freecoda</Link>
         <Link href="/privacy">Privacy</Link>
         <Link href="/terms">Terms</Link>

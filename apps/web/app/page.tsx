@@ -140,9 +140,9 @@ export default function Home() {
             <strong>Freecoda on GitHub <ArrowUpRight size={16} /></strong>
             <span>Source, development, documentation & contributions</span>
           </a>
-          <a href="https://github.com/elliotshohet/freecoda-releases">
-            <strong>Downloads & update compatibility <ArrowUpRight size={16} /></strong>
-            <span>Existing desktop installers, checksums & update feed</span>
+          <a href="https://github.com/elliotshohet/freecoda/releases">
+            <strong>Downloads & updates <ArrowUpRight size={16} /></strong>
+            <span>Desktop installers, checksums & release history</span>
           </a>
         </div>
       </section>

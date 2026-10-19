@@ -1889,3 +1889,59 @@ textarea {
   font-size: 10px;
   margin: 8px 0;
 }
+
+/* Approval review follows the terminal's explicit, single-action hierarchy. */
+#approval-dialog {
+  --approval-surface: light-dark(#fff, #202020);
+  --approval-muted: light-dark(#606060, #b5b5b5);
+  --approval-line: light-dark(#dedede, #414141);
+  width: 620px;
+  padding: 24px;
+  border: 1px solid var(--approval-line);
+  border-radius: 16px;
+  background: var(--approval-surface);
+  color: light-dark(#202020, #ededed);
+  box-shadow: 0 20px 70px #0003;
+}
+#approval-dialog::backdrop { background: #0006; backdrop-filter: blur(2px); }
+#approval-dialog .approval-header { color: var(--approval-muted); font-size: 12px; gap: 8px; }
+.approval-status { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+#approval-dialog h2 { font-size: 20px; font-weight: 600; letter-spacing: -.45px; margin: 14px 0 8px; }
+#approval-dialog p { color: var(--approval-muted); font-size: 13px; line-height: 1.55; }
+.approval-details { margin: 20px 0 12px; border: 1px solid var(--approval-line); border-radius: 9px; overflow: hidden; }
+.approval-detail-heading { display: flex; justify-content: space-between; gap: 16px; padding: 10px 12px; border-bottom: 1px solid var(--approval-line); color: var(--approval-muted); font-size: 11px; }
+#approval-workspace { max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+#approval-dialog .approval-content { background: light-dark(#f7f7f7, #171717); color: inherit; border: 0; border-radius: 0; margin: 0; padding: 14px; font: 12px/1.65 var(--mono); max-height: min(260px, 30vh); tab-size: 2; }
+#approval-dialog .approval-warning { font-size: 12px !important; color: var(--approval-muted) !important; margin-bottom: 18px; }
+.approval-choices { display: grid; gap: 5px; }
+.approval-choice { width: 100%; min-height: 58px; display: flex; align-items: center; gap: 13px; text-align: left; padding: 10px 12px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: inherit; }
+.approval-choice:hover { background: light-dark(#f4f4f4, #303030); }
+#approval-dialog .approval-choice:focus-visible { outline: 2px solid light-dark(#292929, #dedede); outline-offset: -2px; background: light-dark(#f4f4f4, #303030); }
+.approval-key { display: grid; place-items: center; width: 25px; height: 25px; flex-shrink: 0; border: 1px solid var(--approval-line); border-radius: 5px; font: 11px var(--mono); color: var(--approval-muted); }
+.approval-choice strong { display: block; font-size: 13px; font-weight: 550; }
+.approval-choice small { display: block; margin-top: 4px; font-size: 12px; line-height: 1.4; color: var(--approval-muted); }
+#approval-dialog .approval-footer { border-top: 1px solid var(--approval-line); margin: 16px 0 0; padding-top: 14px; font-size: 11px; }
+@media (max-width: 560px) {
+  #approval-dialog { max-width: calc(100vw - 24px); padding: 18px; }
+  .approval-detail-heading { flex-direction: column; gap: 5px; }
+  #approval-workspace { max-width: 100%; }
+}
+
+#permissions-dialog {
+  background: light-dark(#fff, #202020);
+  color: light-dark(#202020, #ededed);
+  border-color: light-dark(#dedede, #414141);
+  padding: 24px;
+  border-radius: 16px;
+}
+#permissions-dialog h2 { font-size: 20px; font-weight: 600; letter-spacing: -.45px; margin: 0 0 12px; }
+#permissions-dialog p, #permissions-dialog small { color: light-dark(#606060, #b5b5b5); font-size: 12px; line-height: 1.6; }
+#permissions-dialog .permissions-options { gap: 6px; }
+#permissions-dialog .permissions-options label { padding: 14px; border-color: transparent; border-radius: 8px; }
+#permissions-dialog .permissions-options label:has(input:checked) { border-color: light-dark(#c2c2c2, #626262); background: light-dark(#f4f4f4, #303030); }
+#permissions-dialog .permissions-options label:focus-within { outline: 2px solid light-dark(#292929, #dedede); outline-offset: 2px; }
+#permissions-dialog input { accent-color: light-dark(#242424, #dedede); }
+#permissions-dialog .dialog-actions { padding-top: 18px; border-top: 1px solid light-dark(#dedede, #414141); }
+#permissions-dialog #permissions-apply { background: light-dark(#242424, #ededed); color: light-dark(#fff, #202020); border-color: transparent; }
+
+.model-privacy-note { margin: 0 10px 10px; color: var(--muted); font-size: 11px; line-height: 1.5; }

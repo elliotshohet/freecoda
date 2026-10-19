@@ -1,18 +1,18 @@
 # Freecoda
 
-A conversational assistant and coding agent for the browser, desktop, and terminal. One plan: **free forever, supported by direct sponsors**. There are no paid credits, subscriptions, or user checkout. Hosted usage has fair-use limits and an operator spending cap.
+A conversational assistant and coding agent for the browser, desktop, and terminal. One plan: **free forever, supported by direct sponsors**. There are no paid credits, subscriptions, or user checkout. Hosted usage has fair-use limits and an operator spending cap. Source, CLI, desktop installers, updater metadata, and release automation live together in this repository.
 
 ## Browser chat
 
 The public home page introduces Freecoda and provides GitHub sign-in independently of chat availability. `/chat`, `/app`, and `/settings` require a verified browser session before showing the chat, coding workspace, or account interface. Restored tabs recheck their session; sign-out returns to the public home page. `/dashboard` redirects to `/settings` for profile, appearance, actual usage/devices, and existing GitHub repository access. Repository connections still require the configured GitHub App and cloud access; unavailable integrations report their actual state.
 
-Chat includes saved browser-local conversations, a message composer, streamed answers, and a separately labeled sponsor placement. An approved hosted invitation is required for inference. It shares the existing Gateway BYOK routing, usage reservations, rate limits, and free allowance; it does not bypass service capacity limits.
+Chat includes saved browser-local conversations, a message composer, streamed answers, and a separately labeled sponsor placement. An approved hosted invitation is required for inference. It shares the existing Gateway routing, usage reservations, rate limits, and free allowance; it does not bypass service capacity limits.
 
 Chat history stays in the current browser rather than syncing across devices. Sending a message submits its conversation context to the hosted model provider. The interface reports unavailable service configuration explicitly and never substitutes generated-looking fixture answers for a real provider response.
 
 ## Open source and downloads
 
-Development, contributions, documentation and release preparation live in [elliotshohet/freecoda](https://github.com/elliotshohet/freecoda). The release repository's Git history and distribution documents have been merged here. Existing installers and desktop updater feeds remain at [freecoda-releases](https://github.com/elliotshohet/freecoda-releases) for compatibility; a Git history merge cannot transfer GitHub Release assets or redirect installed applications. See [the consolidation and compatibility notes](distribution/README.md). Existing downloads and checksums are unchanged.
+Development, contributions, documentation, and release preparation live in [elliotshohet/freecoda](https://github.com/elliotshohet/freecoda). The former release repository’s Git history and distribution documents have been merged here. Desktop release workflows and new builds now target this repository. Historical binary migration must be verified separately before removing the former repository; older installed apps require manual reinstallation to switch updater feeds. See [the consolidation and migration notes](distribution/README.md).
 
 ## Workspace packages
 
@@ -23,21 +23,68 @@ Development, contributions, documentation and release preparation live in [ellio
 - `packages/contracts`: shared validation and allowance rules.
 - `scripts`: migrations, invitations, sponsor operations, reconciliation, and model evaluation.
 
-## Local development
+## Build from source
 
-Use Bun 1.3.5 or newer, Node.js 24, Docker, and PostgreSQL 17.
+Fork or clone the repository, install dependencies, then build any of the three apps below. Run commands from the repository root.
+
+### Fork, clone, and install
+
+Development requires Git, Bun 1.3.5 or newer, and Node.js 24. Docker is needed for the local PostgreSQL 17 service. Building desktop installers also requires a supported native operating system and electron-builder's platform dependencies.
+
+To contribute independently, use **Fork** on [GitHub](https://github.com/elliotshohet/freecoda), then clone your fork:
 
 ```sh
+git clone https://github.com/YOUR_GITHUB_USERNAME/freecoda.git
+cd freecoda
+git remote add upstream https://github.com/elliotshohet/freecoda.git
 bun install --frozen-lockfile
-# Set FREECODA_DB_PASSWORD in a private root .env file first.
-docker compose up -d
-# Copy .env.example to apps/web/.env.local and configure local DATABASE_URL,
-# BETTER_AUTH_SECRET, AD_SIGNING_SECRET, and GitHub OAuth credentials.
+```
+
+For a direct checkout, clone `https://github.com/elliotshohet/freecoda.git` instead. Forks need their own database, OAuth app, Gateway credentials, deployment project, and release configuration; credentials and account access do not transfer with source.
+
+### Build the CLI, desktop app, and web app
+
+```sh
+# CLI: produces packages/cli/dist/index.js and the npm launcher.
+bun run build:cli
+node packages/cli/dist/index.js --help
+
+# Desktop: builds Electron main, preload, and renderer bundles.
+bun run desktop:build
+bun --cwd apps/desktop start
+
+# Web: configure apps/web/.env.local as described below first.
+bun --cwd apps/web build
+bun --cwd apps/web start
+```
+
+The web app opens at http://127.0.0.1:3010. `bun run build` builds all three apps. To create a distributable desktop installer after building, run `bun run desktop:package` on the target platform; see [platform packaging commands](apps/desktop/README.md). Build output does not include hosted credentials or grant inference access; configure and sign in to a server separately.
+
+## Run the web locally
+
+```sh
+# Create these only when they do not already exist; preserve existing secrets.
+cp .env.example apps/web/.env.local
+# Create a private root .env with FREECODA_DB_PASSWORD=<your-local-password>.
+docker compose up -d --wait
+```
+
+Edit `apps/web/.env.local`: set `DATABASE_URL` to `postgresql://freecoda:YOUR_URL_ENCODED_PASSWORD@127.0.0.1:5439/freecoda`, generate separate `BETTER_AUTH_SECRET`, `AD_SIGNING_SECRET`, and `CRON_SECRET` values, and configure `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`. Keep `BETTER_AUTH_URL=http://127.0.0.1:3010`. Register the local GitHub OAuth callback as `http://127.0.0.1:3010/api/auth/callback/github`; use a separate OAuth app for production.
+
+```sh
 bun run db:migrate
 bun run dev
 ```
 
-Open http://127.0.0.1:3010. PostgreSQL binds to loopback on port 5439. The website reports actual service configuration and disables unavailable integrations. Never commit `.env` files or credentials. Use a separate OAuth callback for localhost: `http://127.0.0.1:3010/api/auth/callback/github`.
+Open http://127.0.0.1:3010. The landing page can run before model access is configured; inference requires the Gateway setup below, an approved model, the enabled hosted flag, and an invited signed-in account. PostgreSQL binds only to loopback on port 5439. Never commit `.env` files or credentials. Stop the web server with Ctrl+C and stop PostgreSQL with `docker compose stop`; the database volume persists.
+
+For a production-mode local web check, stop the dev server, run `bun --cwd apps/web build`, then `bun --cwd apps/web start`.
+
+## Use the web
+
+Visit [freecoda.com](https://freecoda.com), sign in with GitHub, and open `/chat` for general conversation. Create or reopen a conversation, enter a message, and read the streamed reply. Chat history is stored in the current browser; clearing browser storage removes it. Your submitted conversation is sent to the configured model provider. An invitation and available hosted capacity are required for inference.
+
+Open `/app` for the cloud coding workspace. When enabled for your account, consent to cloud storage, create or import a project, and review proposed changes before publishing a branch and draft pull request. Cloud workspaces require additional Sandbox, Workflow, GitHub App, and encryption configuration described below; local chat setup alone does not enable them. Use `/docs` for installation and usage instructions, `/device` to approve a CLI/desktop sign-in, and `/settings` for account settings.
 
 ## Desktop app
 
@@ -48,7 +95,7 @@ bun run desktop:build
 bun run desktop:package -- --mac dmg zip --x64
 ```
 
-See [desktop setup and installers](apps/desktop/README.md) for Linux AppImage/DEB, Windows NSIS, Intel/Apple Silicon macOS, private CI artifacts, and signing status. Opening a folder requires explicit trust before reading project files. Writes and commands require approval. Hosted sign-in opens the system browser; credentials stay in the main process.
+See [desktop setup and installers](apps/desktop/README.md) for Linux AppImage/DEB, Windows NSIS, Intel/Apple Silicon macOS, CI artifacts, and signing status. Opening a folder requires explicit trust before reading project files. Writes and commands require approval. Hosted sign-in opens the system browser; credentials stay in the main process.
 
 ## Run the CLI
 
@@ -59,7 +106,7 @@ node packages/cli/dist/index.js login
 node packages/cli/dist/index.js --cwd /path/to/project
 ```
 
-The CLI is published as `freecoda`; install with `npm install --global freecoda@0.1.4`. Sign in to use the free sponsored hosted allowance without an API key. Hosted access requires server configuration and a beta invitation; daily and shared capacity limits apply. `login`, `usage`, and `hosted` connect to the hosted service when available.
+The CLI is published as `freecoda`; install with `npm install --global freecoda`. Sign in to use the free sponsored hosted allowance without an API key. Hosted access requires server configuration and a beta invitation; daily and shared capacity limits apply. `login`, `usage`, and `hosted` connect to the hosted service when available.
 
 <details>
 <summary>Advanced settings: optional API key</summary>
@@ -85,25 +132,28 @@ Integration tests require a separate local database named `freecoda_test` and re
 
 ## Hosted launch gates
 
-Hosted inference uses Vercel AI Gateway with server-side OpenAI BYOK. Set `OPENAI_API_KEY` on the server and authenticate Gateway with Vercel OIDC or `AI_GATEWAY_API_KEY`. Vercel currently requires a valid payment card and purchased Gateway credits for BYOK; OpenAI usage is billed to the provider key, and Gateway may fall back to its system credentials. Keep the application budget active because Vercel Gateway budgets do not cap BYOK spend.
+Hosted inference uses Vercel AI Gateway with `reflection/beam-free` (provider `reflection`). Configure server-side `AI_GATEWAY_API_KEY` for local development; Vercel deployments can use their `VERCEL_OIDC_TOKEN`. No OpenAI BYOK key is needed. Zero token prices do not cover database, hosting, or Sandbox costs.
 
-Run `bun scripts/configure-openai.ts` with the intended database environment to save the candidate. Run the full evaluation with `--model openai/gpt-5-mini --provider openai --byok --max-cost-usd 1`. After reviewing a passing report, `bun scripts/configure-openai.ts --approve` approves that model; it requires a matching full-suite report less than 24 hours old. Enable `HOSTED_INFERENCE_ENABLED=true` separately and deploy.
+The suitability algorithm refreshes the live catalog and provider endpoint and checks zero pricing across all billing fields, active/nondeprecated status, context length, output limits, required tools, and provider policy. Runtime routing is pinned to the explicitly approved Beam Free configuration. Catalog inspection can score privacy guarantees, coding capabilities, context headroom, latency, throughput, and uptime, but telemetry does not switch production to another model. If Beam is unavailable, incompatible, unapproved, or no longer free, requests fail with an unavailable-service response. There is no alternative-model or paid fallback.
 
-Hosted inference stays disabled with `HOSTED_INFERENCE_ENABLED=false` until actual evaluation, provider privacy review, funding, and account authorization are verified. No model is approved automatically.
+**Privacy:** Beam Free may retain submitted prompts, conversations, and repository excerpts and use them for training. This hosted route has no no-training or zero-data-retention guarantee. Evaluation requires explicit `--allow-prompt-training`. Do not submit secrets or content that requires stronger provider guarantees.
 
 ```sh
-# Inspect exact live model IDs and pricing.
-bun run models:sync
-# Save a candidate as unapproved, using the intended environment's DATABASE_URL.
-bun --env-file=apps/web/.env.local scripts/sync-models.ts <model-id> <provider>
-# OpenAI BYOK requires OPENAI_API_KEY plus Gateway authentication.
-# Gateway models require AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN. Evaluation makes real billable requests.
-bun --env-file=.env.local scripts/evaluate.ts --model <model-id> --provider <provider> --max-cost-usd 1
+# Inspect the free candidate selection and live capabilities.
+bun --env-file=apps/web/.env.local scripts/configure-free-model.ts --discover
+# Stage the requested Beam Free model.
+bun --env-file=apps/web/.env.local scripts/configure-free-model.ts --model reflection/beam-free
+# Makes real calls across all twelve repository fixtures.
+# Beam Free permits provider training; review the privacy disclosure before this call.
+bun --env-file=apps/web/.env.local run eval --model reflection/beam-free --provider reflection --max-cost-usd 0 --allow-prompt-training
+# Approve after reviewing a passing matching report less than 24 hours old.
+bun --env-file=apps/web/.env.local scripts/configure-free-model.ts --model reflection/beam-free --approve
+bun run invite person@example.com
 ```
 
-The evaluation runs twelve disposable repository fixtures covering edits, planning, review, approval refusal, ignored credentials, traversal, and untrusted instructions. It verifies the live provider endpoint, restricts routing, disallows prompt training, and applies conservative per-request price reservations. BYOK does not imply zero data retention. The report records full-token provider cost estimates separately from Gateway-reported charges: zero Gateway cost does not mean OpenAI usage was free. A credential-free report is saved to ignored `.data/evaluation.json`. The harness never approves a model or enables inference. Authentication or billing failures stop the run and are recorded as infrastructure blockers. Passing fixtures establish a narrow launch baseline, not universal model correctness.
+The configuration command replaces previous approved defaults; recheck the catalog after selecting a new model. Set `HOSTED_INFERENCE_ENABLED=true` in the web environment and restart after approval. Repeat configuration, evaluation, and approval using the intended production database and credentials before enabling production. `bun run models:free` is the configuration shortcut and accepts the same flags. The legacy `scripts/configure-openai.ts` remains available for operators choosing OpenAI BYOK; its billing requirements differ, and it does not change the Beam-only hosted routing policy.
 
-Operators must separately inspect current provider retention/zero-data-retention terms and the selected provider’s actual cost/usage metadata, confirm supported tool calling and streaming, review the report, and approve the selected catalog record explicitly before enabling hosted inference. Hosted requests enforce daily allowance, an application-wide monthly cap, and one unresolved reservation per user. Interrupted requests retain their reservation until provider evidence reconciles them.
+The evaluation runs twelve disposable fixtures covering edits, planning, review, approval refusal, ignored credentials, traversal, and untrusted instructions. It saves a credential-free report to ignored `.data/evaluation.json`; it does not approve a model or enable inference. Review actual provider behavior and the report before approval. Authentication, unavailable capacity, and routing failures are blockers. A passing evaluation establishes this narrow baseline, not universal model correctness. Hosted requests still enforce daily allowance, an application-wide monthly cap, and unresolved reservation limits. Interrupted requests retain reservations until provider evidence reconciles them.
 
 ```sh
 bun --env-file=apps/web/.env.local scripts/reconcile.ts
@@ -123,7 +173,7 @@ Authenticated `GET /api/maintenance?status=1` returns the last start/finish time
 
 Public `GET /api/readiness` returns only `{ "ready": true }` with 200 or `{ "ready": false }` with 503. It performs a real database query and requires the most recent maintenance record to have completed successfully within 48 hours. Missing, failed, future-dated or currently running maintenance is not ready, even during a brief healthy sweep; a monitor should retry before alerting. Database acquisition and query waits are bounded, simultaneous requests share one probe, and a ten-second instance/CDN cache bounds ordinary probe load. This proves database connectivity and recent maintenance completion; it does not establish live provider billing, OAuth/GitHub API availability, or a successful end-to-end agent task.
 
-The [secretless hourly GitHub Actions monitor](https://github.com/elliotshohet/freecoda/actions/workflows/public-monitor.yml) is maintained in the canonical public source repository; the compatibility repository retains only a manual check. It checks the landing page and public readiness, retries once after two minutes to avoid a transient maintenance false alarm, and fails the job after a second failure. Production readiness returned 200 with only `{ "ready": true }` after deployment `bfaa0af3cb6df567ff656ec6b1a976df83b0cdb0`; the [first manually dispatched monitor run completed successfully](https://github.com/elliotshohet/freecoda-releases/actions/runs/39077143012) on October 17, 2026. Public monitor commit `ca64c63` adds only its workflow. No account tokens, cron secret, private source checkout or privileged maintenance calls are needed. GitHub account/repository notification settings determine whether workflow failures reach an operator; no independent pager, email or chat delivery has been configured or tested. Scheduled Actions can be delayed or disabled by GitHub, so periodically confirm that new runs continue appearing.
+The [public GitHub Actions monitor](https://github.com/elliotshohet/freecoda/actions/workflows/public-monitor.yml) lives in this repository. It checks public readiness without account tokens, cron secrets, or privileged maintenance calls. Inspect its workflow triggers and dispatch it after deployment; a checked-in workflow does not prove that recurring monitoring or notifications are enabled. GitHub notification settings determine delivery of failures. Periodically confirm that expected runs continue appearing.
 
 ### Database recovery and secret rotation
 
@@ -194,7 +244,7 @@ Campaign JSON contains `sponsor`, `headline`, `description`, HTTPS `url`, `place
 
 ## Vercel deployment
 
-The Vercel project uses `apps/web` as its root directory and the private `elliotshohet/freecoda` GitHub repository. Configure production database/auth/signing secrets in Vercel, apply migrations using the intended database URL, then deploy. Production GitHub OAuth uses `https://freecoda.com/api/auth/callback/github`. Keep secrets out of build logs and browser bundles. Vercel manages DNS through `ns1.vercel-dns.com` and `ns2.vercel-dns.com`.
+The Vercel project uses `apps/web` as its root directory and the `elliotshohet/freecoda` GitHub repository. Configure production database/auth/signing secrets in Vercel, apply migrations using the intended database URL, then deploy. Production GitHub OAuth uses `https://freecoda.com/api/auth/callback/github`. Keep secrets out of build logs and browser bundles. Vercel manages DNS through `ns1.vercel-dns.com` and `ns2.vercel-dns.com`.
 
 The website and account service can be deployed while hosted inference remains closed. A deployed landing page does not imply hosted model readiness. CLI publishing and full interactive platform validation remain separate release work.
 
@@ -202,13 +252,13 @@ The website and account service can be deployed while hosted inference remains c
 
 See LICENSE, NOTICE, and vendor/codebuff/NOTICE for the selectively reused Apache-2.0 editing helper. No Freebuff hosted services or advertising code are included.
 
-OpenAI BYOK through AI Gateway uses the server-only `OPENAI_API_KEY` environment variable. No API key is delivered to CLI users. Reservations count all input tokens at the uncached rate and all output tokens, including reasoning. Interrupted requests without final usage remain reserved for operator reconciliation.
+AI Gateway authentication stays on the server. No Gateway or provider API key is delivered to hosted CLI users. Reservations count all input tokens at the uncached rate and all output tokens, including reasoning. Interrupted requests without final usage remain reserved for operator reconciliation.
 
 ## Cloud workspace beta
 
 `/app` is the invited browser workspace. Source files and conversations are encrypted in PostgreSQL and expire seven days after activity. Users consent before creating a cloud project. Project deletion revokes access immediately, stops execution, and schedules retryable resource cleanup. Dependency and build caches are excluded from saved source; resuming reinstalls dependencies.
 
-Untrusted project code runs in Vercel Sandbox under a separate Linux user. Model calls, GitHub App credentials, encryption keys, and AI Gateway BYOK stay in the trusted backend. The exposed preview port belongs to a separate trusted proxy; short-lived signed tickets authorize HTTP and WebSocket access on a separate origin. Registry-only egress is intentional: projects requiring other external services are outside this beta.
+Untrusted project code runs in Vercel Sandbox under a separate Linux user. Model calls, GitHub App credentials, encryption keys, and AI Gateway credentials stay in the trusted backend. The exposed preview port belongs to a separate trusted proxy; short-lived signed tickets authorize HTTP and WebSocket access on a separate origin. Registry-only egress is intentional: projects requiring other external services are outside this beta.
 
 Configure the cloud variables in `.env.example`, run migrations, and link the Vercel project before enabling `CLOUD_WORKSPACES_ENABLED`. Local Sandbox calls also need a current Vercel OIDC token. Production Secrets cannot be recovered with `vercel env pull`; preserve local development credentials. Workflow orchestration passes opaque project/run IDs, while private content stays in encrypted application storage.
 

@@ -174,6 +174,8 @@ export class TerminalScreen {
   private mode = "chat";
   private permissions = "Default · ask before edits and commands";
   private permissionIndex = 1;
+  private approvalIndex = 0;
+  private approvalCategory?: "write" | "shell";
   private sponsor: SponsorBanner = {
     label: "Freecoda announcement",
     headline: "Free forever. Supported by sponsors.",
@@ -276,6 +278,18 @@ export class TerminalScreen {
       (item) => item.id === preset,
     );
     return this.prompt("Permissions · this session only", "permissions");
+  }
+  async chooseApproval(kind: "write" | "shell") {
+    this.approvalCategory = kind;
+    this.approvalIndex = 0;
+    try {
+      return await this.prompt(
+        kind === "shell" ? "Allow command execution?" : "Allow file changes?",
+        "approval",
+      );
+    } finally {
+      this.approvalCategory = undefined;
+    }
   }
   showSponsor(ad: SponsorBanner) {
     if (this.closed) return false;
@@ -391,6 +405,33 @@ export class TerminalScreen {
     if (key.ctrl && key.name === "o") {
       this.onOpenSponsor?.(this.sponsor.href);
       return;
+    }
+    if (this.question?.kind === "approval" && this.approvalCategory) {
+      if (key.name === "escape") {
+        this.submit("n");
+        return;
+      }
+      if (key.name === "up" || key.name === "down") {
+        this.approvalIndex =
+          (this.approvalIndex + (key.name === "down" ? 1 : 2)) % 3;
+        this.value = "";
+        this.cursor = 0;
+        this.schedule();
+        return;
+      }
+      if (/^[123]$/.test(str) || /^[ysn]$/i.test(str)) {
+        this.approvalIndex = /^[123]$/.test(str)
+          ? Number(str) - 1
+          : ["y", "s", "n"].indexOf(str.toLowerCase());
+        this.value = "";
+        this.cursor = 0;
+        this.schedule();
+        return;
+      }
+      if (key.name === "return") {
+        this.submit(["y", "s", "n"][this.approvalIndex]!);
+        return;
+      }
     }
     if (this.question?.kind === "permissions") {
       if (key.name === "escape" || (key.ctrl && key.name === "c")) {
@@ -637,7 +678,9 @@ export class TerminalScreen {
       Math.max(1, Math.min(5, rows - 22)),
     );
     const menuRows =
-      this.question?.kind === "permissions"
+      this.question?.kind === "approval" && this.approvalCategory
+        ? 5
+        : this.question?.kind === "permissions"
         ? 4
         : commands.length
           ? menuSize + 1
@@ -707,6 +750,27 @@ export class TerminalScreen {
         );
       }
     }
+    if (this.question?.kind === "approval" && this.approvalCategory) {
+      const category =
+        this.approvalCategory === "shell" ? "shell commands" : "file edits";
+      lines.push(palette.warning("  Approval required · review the action above"));
+      for (const [index, choice] of [
+        "Yes, allow once",
+        `Yes, allow ALL ${category} for this session`,
+        "No, decline this action",
+      ].entries()) {
+        const text = clip(
+          `${index === this.approvalIndex ? "›" : " "} ${index + 1}. ${choice}`,
+          inner,
+        );
+        lines.push(
+          "  " + (index === this.approvalIndex
+            ? c.bold(palette.accent(text))
+            : palette.muted(text)),
+        );
+      }
+      lines.push(palette.muted("  Session approval covers the entire category, not just this action."));
+    }
     if (this.question?.kind === "permissions") {
       lines.push(
         palette.muted(
@@ -774,7 +838,9 @@ export class TerminalScreen {
         "  " +
           clip(
             this.question?.kind === "approval"
-              ? "y once · s this category/session · n decline"
+              ? this.approvalCategory
+                ? "↑/↓ or 1–3 choose · Enter confirm · Esc decline · y/s/n"
+                : "Enter confirm · Esc decline"
               : this.question?.kind === "permissions"
                 ? "1–3 select · Enter confirm · Esc keeps current permissions"
                 : `Enter send · Ctrl+J newline · ↑ history · PgUp scroll · /help · ${this.mode === "chat" ? "Chat · no tools" : this.permissions}`,
@@ -868,9 +934,13 @@ export function approvals() {
       if (active) active.append("approval", description);
       else console.log(c.dim("\n" + safeTerminalText(description)));
       if (!process.stdin.isTTY) return "n";
-      return ask(
-        `Allow ${kind}? [y] once / [s] this category for the session / [n] no:`,
+      if (active) return active.chooseApproval(kind);
+      const answer = await ask(
+        `${kind === "shell" ? "Allow command execution?" : "Allow file changes?"}\n` +
+        `1. Yes, allow once\n2. Yes, allow ALL ${kind === "shell" ? "shell commands" : "file edits"} for this session\n3. No, decline this action\n` +
+        "Session approval covers the entire category. [1/y, 2/s, 3/n]: ",
       );
+      return ({ "1": "y", "2": "s", "3": "n" } as Record<string, string>)[answer] || answer;
     },
     (description) => active?.setPermissions(description),
   );

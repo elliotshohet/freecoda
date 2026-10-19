@@ -10,16 +10,23 @@ try {
   /* Follow the system if storage is unavailable. */
 }
 const media = window.matchMedia("(prefers-color-scheme: dark)");
-function apply() {
+function renderTheme() {
   document.documentElement.dataset.theme =
     preference === "system" ? (media.matches ? "dark" : "light") : preference;
   document.documentElement.dataset.themePreference = preference;
+}
+function apply() {
+  renderTheme();
   const api = (window as Window & { freecoda?: DesktopBridge }).freecoda;
-  if (api?.setTheme) void api.setTheme(preference).catch(() => {});
+  if (api?.setTheme) void api.setTheme(preference).then(() => {
+    // Electron applies nativeTheme asynchronously; resample system appearance
+    // after Chromium has processed the resulting media-query update.
+    requestAnimationFrame(renderTheme);
+  }).catch(() => {});
 }
 apply();
 media.addEventListener("change", () => {
-  if (preference === "system") apply();
+  if (preference === "system") renderTheme();
 });
 window.addEventListener("storage", (event) => {
   if (event.key !== key && event.key !== null) return;

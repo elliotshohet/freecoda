@@ -30,6 +30,7 @@ export type ModelConfig = {
   id: string;
   provider: string;
   byok?: boolean;
+  allowPromptTraining?: boolean;
   inputMicrosPerToken: number;
   outputMicrosPerToken: number;
   maxContextTokens: number;

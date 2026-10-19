@@ -15,6 +15,7 @@ import { jsonBody, ApiError, json } from "./http";
 import { identity, requireInvite, rateLimit } from "./security";
 import { reserve, settle, uncertain } from "./usage";
 import { publicConfig } from "./config";
+import { selectFreeModel } from "./free-model-selector";
 function stripProviderOptions(value: unknown): unknown {
   // Trusted SDK calls carry a live signal. Recursing through it would turn
   // it into {}, which fetch rejects before sending the model request.
@@ -176,12 +177,22 @@ export async function executeInference(
   await rateLimit(`inference:${user.id}`, 30, 60);
   const body = await jsonBody(req, modelCallSchema);
   const { rows } = await getPool().query(
-    "SELECT config FROM model_catalog WHERE id=$1",
-    [body.model],
+    "SELECT config FROM model_catalog WHERE config->>'approved'='true'",
   );
-  const config = rows[0]?.config as ModelConfig | undefined;
-  if (!config?.approved)
+  const approved = rows.map(r => r.config as ModelConfig);
+  if (!approved.some(c => c.id === body.model))
     throw new ApiError(503, "This model has not passed launch checks.");
+  let config: ModelConfig;
+  try {
+    config = (await selectFreeModel({
+      tools: Boolean(body.options.tools?.length),
+      kind: body.options.tools?.length ? "coding" : "chat",
+      contextTokens: Buffer.byteLength(JSON.stringify(body.options)) + 8192 + (body.options.maxOutputTokens || 4096),
+      outputTokens: body.options.maxOutputTokens || 4096,
+    }, approved)).config;
+  } catch {
+    throw new ApiError(503, "No evaluated free model is currently available for this request. Try again later.");
+  }
   const options = safeModelOptions(body.options, config);
   const bytes = Buffer.byteLength(JSON.stringify(options));
   const maximum = maxRequestCost(config, bytes, options.maxOutputTokens!);

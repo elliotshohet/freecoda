@@ -33,7 +33,7 @@ const evidence = path.resolve('.data/desktop-upgrade-evidence');
 await mkdir(evidence, { recursive: true });
 const req = createRequire(new URL('../package.json', import.meta.url));
 const asar = createRequire(req.resolve('electron-builder/package.json'))('@electron/asar');
-const repo = 'https://api.github.com/repos/elliotshohet/freecoda-releases';
+const repo = 'https://api.github.com/repos/elliotshohet/freecoda';
 const pause = ms => new Promise(r => setTimeout(r, ms));
 const sha = data => createHash('sha256').update(data).digest('hex');
 const events = [];
@@ -46,7 +46,7 @@ async function getJSON(url) {
   assert(r.ok, `Public release HTTP ${r.status}`); return r.json();
 }
 async function download(asset, output) {
-  assert(asset.browser_download_url.startsWith('https://github.com/elliotshohet/freecoda-releases/releases/download/'));
+  assert(asset.browser_download_url.startsWith('https://github.com/elliotshohet/freecoda/releases/download/'));
   const r = await fetch(asset.browser_download_url, { signal: AbortSignal.timeout(180_000) });
   assert(r.ok); const bytes = Buffer.from(await r.arrayBuffer());
   assert.equal(bytes.length, asset.size); assert.equal('sha256:' + sha(bytes), asset.digest);

@@ -1,6 +1,6 @@
 # Freecoda desktop
 
-Electron desktop application for Freecoda. Application ID: `com.freecoda.desktop`; product name: **Freecoda**; initial version: **0.1.0**. Packaging is built from this private monorepo. Hosted account access and fair-use allowances remain the same as the website.
+Electron desktop application for Freecoda. Application ID: `com.freecoda.desktop`; product name: **Freecoda**. Packaging is built from this monorepo. Hosted account access and fair-use allowances remain the same as the website.
 
 ## Chat and coding
 
@@ -14,11 +14,13 @@ Type `/permissions` in the conversation composer to select **Read only**, **Defa
 
 ## Build and package
 
-From the repository root, with Bun 1.3.5 or newer and Node.js 24:
+Fork [elliotshohet/freecoda](https://github.com/elliotshohet/freecoda) on GitHub and clone your fork, or clone the repository directly. From the repository root, with Bun 1.3.5 or newer and Node.js 24:
 
 ```sh
 bun install --frozen-lockfile
 bun run desktop:build
+# Launch the local Electron app (connects to the production hosted service).
+bun --cwd apps/desktop start
 # Run the matching command on the target operating system.
 bun run desktop:package -- --mac dmg zip --x64 --publish never
 bun run desktop:package -- --mac dmg zip --arm64 --publish never
@@ -28,11 +30,11 @@ bun run desktop:package -- --linux AppImage deb --x64 --publish never
 
 Packages are written to `apps/desktop/release/`. macOS x64 targets Intel Macs; arm64 targets Apple Silicon. These are separate builds, rather than a universal binary. Windows ARM64 and Linux ARM64 packages are not part of the initial matrix.
 
-## Private CI downloads
+## CI downloads
 
 The **Desktop packages** GitHub Actions workflow builds natively on Linux, Windows, Intel macOS, and Apple Silicon macOS. It runs for changes to desktop/shared code and can also be started with **Run workflow**. Each job validates its expected package formats and uploads a matching `SHA256SUMS.txt`.
 
-Open the workflow run in the private repository, select its operating-system/architecture artifact, and extract the downloaded artifact ZIP. Repository access is required. Artifacts expire after fourteen days; rerun the workflow to regenerate them. The workflow has read-only repository permissions and always passes `--publish never`. It creates no GitHub Release and uploads nothing to a public download service.
+Open the workflow run in this repository, select its operating-system/architecture artifact, and extract the downloaded artifact ZIP. GitHub may require sign-in to download Actions artifacts. Artifacts expire after fourteen days; rerun the workflow to regenerate them. The workflow has read-only repository permissions and always passes `--publish never`. It creates no GitHub Release and uploads nothing to a public download service.
 
 | System              | Included packages   | Install                                                                                                            |
 | ------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -56,21 +58,25 @@ A successful packaging job establishes that installers were produced. Interactiv
 References: [electron-builder CLI](https://www.electron.build/docs/cli/), [macOS packaging](https://www.electron.build/docs/mac/), [GitHub-hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners), and [Actions artifacts](https://github.com/actions/upload-artifact).
 ## Public release updates
 
-The canonical source and release-preparation repository is public at
-`elliotshohet/freecoda`. Existing installed applications still use the public
-`elliotshohet/freecoda-releases` compatibility feed for installers and updater metadata. The **Prepare
-public desktop release** workflow accepts a successful Desktop packages run ID,
-its full source SHA, and the matching stable desktop version. It validates all
-four native artifacts and their checksums, combines both macOS architectures in
-`latest-mac.yml`, and uploads only installers, blockmaps, updater metadata, and
-checksums into a draft release. It never copies source files.
+Source, installers, updater metadata, and monitoring now share the public
+[`elliotshohet/freecoda`](https://github.com/elliotshohet/freecoda) repository.
+The **Prepare public desktop release** workflow accepts a successful Desktop
+packages run ID, its full source SHA, and the matching stable desktop version.
+It validates all four native artifacts and checksums, combines both macOS
+architectures in `latest-mac.yml`, and creates a draft release in this repository.
 
-Configure the `desktop-release` environment and its `FREECODA_RELEASE_TOKEN`
-secret: a fine-grained GitHub token restricted to **Contents: read and write**
-on `elliotshohet/freecoda-releases` only. The source repository's default
-`GITHUB_TOKEN` cannot publish across repositories. No credential is bundled in
-the app. Review the draft assets and checksums, then publish the release to make
-it visible to the public updater. Never replace an already published version.
+The workflow retains the `desktop-release` environment and uses the repository's
+`GITHUB_TOKEN` with `contents: write`; a cross-repository `FREECODA_RELEASE_TOKEN`
+is no longer needed. Fork owners must check workflow permissions, environment
+rules, repository owner/feed settings, and artifact provenance before publishing.
+Review the draft assets and checksums, then publish the release. Never replace an
+already published version. No release credential is bundled in the application.
+
+Older installed builds point to the former `freecoda-releases` updater feed.
+Install a new build manually from [the current releases](https://github.com/elliotshohet/freecoda/releases)
+to switch feeds. Historical release assets must be copied and hash-verified before
+the old repository is removed; changing source references alone does not migrate
+those assets or redirect existing installed clients.
 
 NSIS Windows and Linux AppImage installations can use the public update feed.
 Debian installations use their package manager/manual `.deb` installer. macOS

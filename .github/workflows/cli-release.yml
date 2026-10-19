@@ -13,7 +13,7 @@ on:
         required: true
 permissions:
   actions: read
-  contents: read
+  contents: write
 concurrency:
   group: public-cli-release
   cancel-in-progress: false
@@ -70,7 +70,14 @@ jobs:
             gh release create "$tag" --repo "$RELEASE_REPOSITORY" --draft --title "Freecoda CLI $CLI_VERSION" --notes "Freecoda CLI $CLI_VERSION. Source commit: $SOURCE_SHA. General chat is the default, without repository tools or automatic project context. Coding modes remain available with explicit repository trust; conversations are separated by mode. Free forever, supported by labeled sponsors. Verify SHA256SUMS.txt before installation. Install the attached archive with npm install --global /path/to/freecoda-$CLI_VERSION.tgz --ignore-scripts. This is a public GitHub archive release; npm registry publication remains separate."
           fi
           gh release upload "$tag" public-cli/* --repo "$RELEASE_REPOSITORY" --clobber
-          gh api "repos/$RELEASE_REPOSITORY/releases/tags/$tag" > uploaded-cli.json
+          gh api --paginate --slurp "repos/$RELEASE_REPOSITORY/releases?per_page=100" > uploaded-cli-pages.json
+          python3 - <<'PYJSON'
+          import json,os
+          releases=[r for page in json.load(open('uploaded-cli-pages.json')) for r in page]
+          release=next(r for r in releases if r['tag_name']=='cli-v'+os.environ['CLI_VERSION'])
+          assert release['draft'], 'Expected the validated draft release'
+          json.dump(release,open('uploaded-cli.json','w'))
+          PYJSON
           python3 - <<'PY'
           import os,json,pathlib,hashlib
           assets=json.load(open('uploaded-cli.json'))['assets']

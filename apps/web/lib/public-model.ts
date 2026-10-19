@@ -5,6 +5,7 @@ export function publicModelConfig(config: ModelConfig): ModelConfig {
     id: config.id,
     provider: config.provider,
     ...(config.byok === undefined ? {} : { byok: config.byok }),
+    ...(config.allowPromptTraining === undefined ? {} : { allowPromptTraining: config.allowPromptTraining }),
     inputMicrosPerToken: config.inputMicrosPerToken,
     outputMicrosPerToken: config.outputMicrosPerToken,
     maxContextTokens: config.maxContextTokens,

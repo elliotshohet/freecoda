@@ -214,6 +214,16 @@ try {
       select.value = ${JSON.stringify(preference)};
       select.dispatchEvent(new Event('change', {bubbles:true}));
       await window.freecoda.setTheme(${JSON.stringify(preference)});
+      // Native theme IPC resolves before Chromium necessarily delivers its
+      // media-query change. Wait for the UI to converge, then assert all state.
+      const until = performance.now() + 2000;
+      while (performance.now() < until) {
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        const expected = ${JSON.stringify(preference)} === 'system'
+          ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+          : ${JSON.stringify(preference)};
+        if (document.documentElement.dataset.theme === expected) break;
+      }
       return { preference: document.documentElement.dataset.themePreference,
         theme: document.documentElement.dataset.theme,
         stored: localStorage.getItem('freecoda-theme'),

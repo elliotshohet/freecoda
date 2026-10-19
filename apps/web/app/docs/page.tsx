@@ -45,6 +45,16 @@ export default function Docs() {
           Hosted access is currently invite-only. Signing in creates an account;
           it does not grant an invitation or bypass capacity limits.
         </p>
+        <h2>Hosted model and privacy</h2>
+        <p>
+          Hosted chat and coding use Reflection Beam Free through Vercel AI
+          Gateway. The provider may retain submitted conversations, source
+          excerpts, and tool output and use them for training. This route has no
+          no-training or zero-data-retention guarantee. Do not submit secrets or
+          private customer data. Read the <Link href="/privacy">privacy policy</Link>
+          {" "}before sending content. If Beam is unavailable or no longer free,
+          hosted requests stop rather than switch to another model.
+        </p>
         <h2 id="browser">Build in your browser</h2>
         <p>
           Open the <Link href="/app">browser workspace</Link>, sign in with

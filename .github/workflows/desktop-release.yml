@@ -13,7 +13,7 @@ on:
         required: true
 permissions:
   actions: read
-  contents: read
+  contents: write
 concurrency:
   group: desktop-public-release
   cancel-in-progress: false
@@ -45,6 +45,8 @@ jobs:
           assert run['path']=='.github/workflows/desktop.yml', 'Wrong workflow'
           package=api(f'repos/{repo}/contents/apps/desktop/package.json?ref={sha}')
           assert json.loads(base64.b64decode(package['content']))['version']==version, 'Version does not match source'
+          checks=api(f'repos/{repo}/actions/workflows/checks.yml/runs?head_sha={sha}&event=push&per_page=10')['workflow_runs']
+          assert any(c['conclusion']=='success' and c['head_branch']=='main' for c in checks), 'Matching Checks workflow must pass'
           for platform,arch in [('linux','x64'),('win','x64'),('mac','x64'),('mac','arm64')]:
             name=f"freecoda-desktop-{platform}-{arch}-{run['run_number']}"
             subprocess.run(['gh','run','download',run_id,'--repo',repo,'--name',name,'--dir',f'incoming/{platform}-{arch}'],check=True)
@@ -53,16 +55,13 @@ jobs:
       - run: python3 scripts/release/test-prepare-desktop.py
       - name: Validate payloads and merge architecture metadata
         run: python3 scripts/release/prepare-desktop.py incoming public-assets
-      - name: Create public binary-only draft
-        env:
-          GH_TOKEN: ${{ secrets.FREECODA_RELEASE_TOKEN }}
+      - name: Create desktop draft in the source repository
         run: |
-          test -n "$GH_TOKEN" || { echo 'Configure FREECODA_RELEASE_TOKEN with contents-write access only to elliotshohet/freecoda-releases'; exit 1; }
           tag="v$RELEASE_VERSION"
-          if gh release view "$tag" --repo elliotshohet/freecoda-releases --json isDraft,body > existing-release.json; then
+          if gh release view "$tag" --repo elliotshohet/freecoda --json isDraft,body > existing-release.json; then
             python3 -c 'import json,os; r=json.load(open("existing-release.json")); assert r["isDraft"], "Published releases are immutable; use a new version"; assert "Source commit: "+os.environ["SOURCE_SHA"]+"." in r["body"], "Draft belongs to another source commit; use a new version"'
           else
-            gh release create "$tag" --repo elliotshohet/freecoda-releases --draft --title "Freecoda $RELEASE_VERSION" --notes "Freecoda desktop installers. Source commit: $SOURCE_SHA. Verify SHA256SUMS.txt before installation. Review platform signing and notarization status before opening an installer; checksums alone do not authenticate a publisher. macOS automatic installation requires Developer ID signing; unsigned macOS builds use manual downloads. Windows and Linux AppImage builds install downloaded updates on normal quit. Linux DEB updates use the package manager."
+            gh release create "$tag" --repo elliotshohet/freecoda --draft --title "Freecoda $RELEASE_VERSION" --notes "Freecoda desktop installers. Source commit: $SOURCE_SHA. Verify SHA256SUMS.txt before installation. Review platform signing and notarization status before opening an installer; checksums alone do not authenticate a publisher. macOS automatic installation requires Developer ID signing; unsigned macOS builds use manual downloads. Windows and Linux AppImage builds install downloaded updates on normal quit. Linux DEB updates use the package manager."
           fi
-          gh release upload "$tag" public-assets/* --repo elliotshohet/freecoda-releases --clobber
-          echo "Draft prepared: https://github.com/elliotshohet/freecoda-releases/releases"
+          gh release upload "$tag" public-assets/* --repo elliotshohet/freecoda --clobber
+          echo "Draft prepared: https://github.com/elliotshohet/freecoda/releases"

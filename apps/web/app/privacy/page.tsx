@@ -9,12 +9,13 @@ export default function Privacy() {
           <br />
           to you.
         </h1>
-        <p className="legal-updated">Preview policy · October 18, 2026</p>
+        <p className="legal-updated">Preview policy · October 19, 2026</p>
         <p>
           Freecoda is built around local execution, clear permissions, and
           straightforward data use. We do not sell your source code or
-          conversations, train models on your content, or share it with
-          advertisers.
+          conversations or share them with advertisers. Our hosted model
+          provider may retain submitted content and use it for training, as
+          described below.
         </p>
         <h2>What stays on your machine</h2>
         <p>
@@ -71,17 +72,26 @@ export default function Privacy() {
           AI inference requires sending your prompt and the relevant source
           excerpts, repository instructions, and tool output to a model
           provider. Hosted requests pass through Freecoda and Vercel AI Gateway
-          to OpenAI using our provider credentials. This is not an offline
+          to Reflection’s Beam Free model using server-side Gateway
+          authentication. This is not an offline
           product. Review your repository trust and tool approval prompts before
           sharing context.
         </p>
-        <h2>No training on hosted prompts</h2>
+        <h2>Hosted model training and retention</h2>
         <p>
-          OpenAI API requests use response storage disabled. OpenAI does not
-          train on API inputs or outputs by default; operational and
-          abuse-monitoring retention may still apply. Gateway routes must
-          disallow prompt training. This is different from zero data retention.
-          Review the provider’s data controls before sharing sensitive material.
+          Hosted inference uses Reflection Beam Free through Vercel AI Gateway.
+          This route permits provider prompt training and does not provide a
+          no-training or zero-data-retention guarantee. The provider may retain
+          and use your submitted prompts, conversation context, source excerpts,
+          tool output, and generated responses for training or operational
+          purposes. Freecoda does not train its own models on this content.
+        </p>
+        <p>
+          Do not send secrets, private customer data, or content requiring
+          stronger provider privacy guarantees. Deleting local history or a
+          Freecoda account does not establish deletion from provider records or
+          training datasets. Direct-provider CLI use follows that provider’s
+          agreement and settings instead.
         </p>
         <h2>Ads and sponsorship</h2>
         <p>

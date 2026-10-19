@@ -12,7 +12,7 @@ if (
   !args.includes("--max-cost-usd")
 ) {
   console.log(
-    "Usage: bun run eval --model <model-id> --provider <provider> --max-cost-usd <limit> [--byok] [--only fixture-a,fixture-b]",
+    "Usage: bun run eval --model <model-id> --provider <provider> --max-cost-usd <limit> [--byok] [--allow-prompt-training] [--only fixture-a,fixture-b]",
   );
   console.log(
     "Runs 12 real model fixtures in disposable workspaces. Requires Gateway authentication (AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN); --byok additionally requires OPENAI_API_KEY for provider openai. Never approves a model or enables hosted inference.",
@@ -22,11 +22,12 @@ if (
 const modelId = argument("--model");
 const provider = argument("--provider");
 const budget = Number(argument("--max-cost-usd"));
-if (!Number.isFinite(budget) || budget <= 0 || budget > 5)
+if (!Number.isFinite(budget) || budget < 0 || budget > 5)
   throw new Error(
-    "Evaluation budget must be greater than zero and at most $5.",
+    "Evaluation budget must be between zero and $5.",
   );
 const byok = args.includes("--byok");
+const allowPromptTraining = args.includes("--allow-prompt-training");
 if (byok && provider !== "openai")
   throw new Error("--byok currently supports provider openai only.");
 if (byok && !process.env.OPENAI_API_KEY)
@@ -44,7 +45,7 @@ const catalog = (await catalogResponse.json()) as {
 const pricing = catalog.data.find((model) => model.id === modelId)?.pricing;
 if (!pricing)
   throw new Error(
-    "Model pricing is unavailable. Use an exact Gateway model ID such as openai/gpt-5-mini.",
+    "Model pricing is unavailable. Use an exact ID from the live Gateway catalog.",
   );
 function rate(prefix: string) {
   const values: number[] = [];
@@ -82,7 +83,7 @@ const endpoints = (await endpointResponse.json()) as {
 const endpoint = endpoints.data.endpoints.find(
   (value) => value.provider_name === provider,
 );
-if (!endpoint?.has_no_training || (!byok && !endpoint.has_zdr))
+if (!endpoint || (!allowPromptTraining && (!endpoint.has_no_training || (!byok && !endpoint.has_zdr))))
   throw new Error(
     "Selected provider must support no training, and Gateway-funded evaluations also require zero retention.",
   );
@@ -97,6 +98,8 @@ if (
   )
 )
   throw new Error("Invalid provider pricing.");
+if (budget === 0 && (byok || inputRate !== 0 || outputRate !== 0))
+  throw new Error("A zero budget requires a verified free Gateway endpoint without BYOK.");
 const upstream = gateway(modelId);
 let reservedCost = 0;
 let calls = 0;
@@ -171,10 +174,9 @@ function guard(
     providerOptions: {
       gateway: {
         only: [provider],
-        disallowPromptTraining: true,
-        ...(!byok
-          ? { zeroDataRetention: true }
-          : { byok: { openai: [{ apiKey: process.env.OPENAI_API_KEY! }] } }),
+        disallowPromptTraining: !allowPromptTraining,
+        ...(!byok && !allowPromptTraining ? { zeroDataRetention: true } : {}),
+        ...(byok ? { byok: { openai: [{ apiKey: process.env.OPENAI_API_KEY! }] } } : {}),
         tags: ["freecoda-evaluation"],
       },
       ...(provider === "openai"
@@ -416,9 +418,11 @@ const report = {
     accountedCalls,
     providerEstimatedUsd,
     gatewayReportedUsd,
-    note: "BYOK provider charges are estimated at full token rates. A zero Gateway cost does not mean free inference.",
+    note: byok ? "BYOK provider charges are estimated at full token rates. A zero Gateway cost does not mean free inference." : "Provider rates were verified against the live Gateway catalog and endpoint before evaluation.",
   },
-  privacy: byok
+  privacy: allowPromptTraining
+    ? { zeroDataRetention: false, disallowPromptTraining: false, note: "Provider may retain prompts and outputs and use them for training." }
+    : byok
     ? {
         store: false,
         disallowPromptTraining: true,

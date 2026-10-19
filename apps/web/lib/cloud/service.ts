@@ -1,3 +1,4 @@
+import { selectFreeModel } from "../free-model-selector";
 import { streamText, tool, isStepCount, type ModelMessage } from "ai";
 import { z } from "zod";
 import { createPatch } from "diff";
@@ -337,11 +338,10 @@ export async function executeRunTurn(
       if (!claimed.rowCount) return true;
     }
     const project = await activate(userId, current.run.projectId);
-    const config = (
-      await getPool().query(
-        "SELECT config FROM model_catalog WHERE config->>'approved'='true' ORDER BY id LIMIT 1",
-      )
-    ).rows[0]?.config as ModelConfig | undefined;
+    const approvedModels = (await getPool().query(
+      "SELECT config FROM model_catalog WHERE config->>'approved'='true'",
+    )).rows.map(r => r.config as ModelConfig);
+    const config = (await selectFreeModel({ tools: true, kind: "coding", contextTokens: 16_384, outputTokens: 4096 }, approvedModels)).config;
     if (!config || !publicConfig().hostedEnabled)
       throw new ApiError(503, "Hosted model launch checks are incomplete.");
     const baseModel = hostedProviderModel(config);

@@ -83,14 +83,15 @@ try:
  assert child.poll() is None,'Pasted slash command exited the application'
  send('\x03') # clear the composer; not an exit while text exists
  start=len(output);send('Fix addition. Do not run commands.');send('\r')
- wait_for('Allow write?',start)
+ wait_for('Allow file changes?',start)
  assert 'a - b' in open(os.path.join(root,'sum.ts')).read(),'Write happened before approval'
- send('n');send('\r')
+ wait_for('2. Yes, allow ALL file edits for this session',start)
+ send('\x1b[B');send('\x1b[B');send('\r')
  wait_for('No changes approved',start)
  assert 'a - b' in open(os.path.join(root,'sum.ts')).read(),'Denied write changed source'
  start=len(output);send('Fix addition. Do not run commands.');send('\r')
- wait_for('Allow write?',start)
- send('y');send('\r')
+ wait_for('Allow file changes?',start)
+ send('1');send('\r')
  wait_for('Fixed addition',start)
  wait_for('conversation saved locally',start)
  assert 'a + b' in open(os.path.join(root,'sum.ts')).read(),'Approved write did not change source'
