@@ -5,6 +5,58 @@ import type {
   LanguageModelV4StreamPart,
   LanguageModelV4GenerateResult,
 } from "@ai-sdk/provider";
+
+export const MAX_HOSTED_REQUEST_BYTES = 80_000;
+type HostedRequest = {
+  protocol: 1;
+  operation: string;
+  model: string;
+  options: LanguageModelV4CallOptions;
+};
+
+function byteLength(value: unknown) {
+  return new TextEncoder().encode(JSON.stringify(value)).byteLength;
+}
+
+/** Drop only complete older user turns; retain system instructions and the latest request. */
+export function compactHostedRequest(request: HostedRequest): HostedRequest {
+  if (byteLength(request) <= MAX_HOSTED_REQUEST_BYTES) return request;
+  const prompt = [...request.options.prompt] as Array<{ role: string }>;
+  const instructions = prompt.filter((message) =>
+    ["system", "developer"].includes(message.role),
+  );
+  const conversation = prompt.filter(
+    (message) => !["system", "developer"].includes(message.role),
+  );
+  while (conversation.length) {
+    const nextTurn = conversation.findIndex(
+      (message, index) => index > 0 && message.role === "user",
+    );
+    if (nextTurn < 0) break;
+    conversation.splice(0, nextTurn);
+    const candidate = {
+      ...request,
+      options: {
+        ...request.options,
+        prompt: [...instructions, ...conversation] as LanguageModelV4CallOptions["prompt"],
+      },
+    };
+    if (byteLength(candidate) <= MAX_HOSTED_REQUEST_BYTES) return candidate;
+  }
+  const latestUser = conversation.findLastIndex((message) => message.role === "user");
+  const lastRequest = {
+    ...request,
+    options: {
+      ...request.options,
+      prompt: [...instructions, ...conversation.slice(Math.max(0, latestUser))] as LanguageModelV4CallOptions["prompt"],
+    },
+  };
+  if (byteLength(lastRequest) > MAX_HOSTED_REQUEST_BYTES)
+    throw new Error(
+      "This request is too large to send. Shorten the current message or reduce attached context; your conversation history has been kept.",
+    );
+  return lastRequest;
+}
 export function validateBaseURL(value: string) {
   const u = new URL(value);
   const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname);
@@ -31,13 +83,19 @@ export function hostedModel(
   const base = validateBaseURL(baseURL);
   async function call(operation: string, opts: LanguageModelV4CallOptions) {
     const { abortSignal, headers, ...options } = opts;
+    const body = compactHostedRequest({
+      protocol: 1,
+      operation,
+      model: modelId,
+      options: options as LanguageModelV4CallOptions,
+    });
     const response = await fetch(`${base}/api/v1/inference`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ protocol: 1, operation, model: modelId, options }),
+      body: JSON.stringify(body),
       signal: abortSignal,
       redirect: "error",
     });

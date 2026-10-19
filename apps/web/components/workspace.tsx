@@ -22,7 +22,7 @@ type Snapshot = {
   };
   error?: string;
 };
-export function Workspace() {
+export function Workspace({ settings = false }: { settings?: boolean } = {}) {
   const [data, setData] = useState<Snapshot | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -89,9 +89,10 @@ export function Workspace() {
         ),
       )
     : 0;
+  const AccountActions = settings ? "details" : "div";
   return (
     <>
-      <div className="dashboard-heading">
+      {!settings && <div className="dashboard-heading">
         <div>
           <h1>
             {data?.user
@@ -101,7 +102,7 @@ export function Workspace() {
           <p>Your daily allowance, your devices, your next thing.</p>
         </div>
         <span className="status-badge">Free forever</span>
-      </div>
+      </div>}
       {!data && !error ? (
         <div className="panel" role="status">
           <Loader2 size={20} aria-hidden="true" /> Loading your workspace…
@@ -173,6 +174,8 @@ export function Workspace() {
           </section>
           <aside>
             <section className="panel">
+              {settings && <details className="settings-disclosure"><summary>Service configuration</summary><p>Checks for this running instance.</p><ul className="setup-list">{data?.services.map(s => <li key={s.label}><span>{s.label}</span><span>{s.ready ? "Configured" : "Not connected"}</span></li>)}</ul></details>}
+              {!settings && <>
               <ShieldCheck size={23} color="var(--purple)" />
               <h2 style={{ marginTop: 14 }}>A clear view of the service.</h2>
               <p>
@@ -190,6 +193,7 @@ export function Workspace() {
                   </li>
                 ))}
               </ul>
+              </>}
             </section>
           </aside>
         </div>
@@ -223,6 +227,8 @@ export function Workspace() {
               terminal.
             </p>
           )}
+          <AccountActions className={settings ? "settings-disclosure" : undefined}>
+            {settings && <summary>Account actions</summary>}
           <div className="inline-form" style={{ marginTop: 25 }}>
             <button
               className="button secondary"
@@ -265,6 +271,7 @@ export function Workspace() {
               Delete account
             </button>
           </div>
+          </AccountActions>
         </section>
       )}
       <SponsorPlacement />

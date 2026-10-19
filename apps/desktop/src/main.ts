@@ -7,6 +7,7 @@ import {
   ipcMain,
   net,
   nativeTheme,
+  nativeImage,
   Notification,
   protocol,
   session,
@@ -92,10 +93,18 @@ async function chooseFolder() {
 }
 function installIPC() {
   const methods = {
+    discoverTools: (id: string) => service.discoverTools(id),
+    toolChoices: () => service.toolChoices(),
+    setToolEnabled: (input: Parameters<LocalAgentService["setToolEnabled"]>[0]) => service.setToolEnabled(input),
+    accountProfile: () => service.accountProfile(),
+    listModels: () => service.listModels(),
+    selectModel: (id: string) => service.selectModel(id),
+    syncRepository: (action: "status" | "pull") => service.syncRepository(action),
     refreshConversations: () => service.refreshConversations(),
     githubRepositories: () => service.githubRepositories(),
     saveGitHubRepositories: (repositories: Parameters<LocalAgentService["saveGitHubRepositories"]>[0]) => service.saveGitHubRepositories(repositories),
     connectGitHub: async () => { await shell.openExternal(await service.githubInstallURL()); },
+    reconnectGitHub: async () => { await openExternal("https://freecoda.com/settings#connections"); },
     listExtensions: () => service.listExtensions(),
     installExtension: (input: Parameters<LocalAgentService["installExtension"]>[0]) => service.installExtension(input),
     setExtensionEnabled: (input: Parameters<LocalAgentService["setExtensionEnabled"]>[0]) => service.setExtensionEnabled(input),
@@ -224,6 +233,17 @@ app
   .whenReady()
   .then(async () => {
     if (!hasLock) return;
+    if (process.platform === "darwin") {
+      // Keep the app tile within the same visual bounds as neighboring Dock icons.
+      const icon = nativeImage.createFromPath(path.join(assetsDirectory, "icon.png"))
+        .resize({ width: 440, height: 440, quality: "best" });
+      const pixels = icon.toBitmap();
+      const canvas = Buffer.alloc(512 * 512 * 4);
+      for (let row = 0; row < 440; row++) {
+        pixels.copy(canvas, ((row + 36) * 512 + 36) * 4, row * 440 * 4, (row + 1) * 440 * 4);
+      }
+      app.dock?.setIcon(nativeImage.createFromBitmap(canvas, { width: 512, height: 512 }));
+    }
     protocol.handle("freecoda", async (request) => {
       const asset = assetPath(request.url);
       if (!asset || request.method !== "GET")
@@ -234,7 +254,7 @@ app
       const headers = new Headers(response.headers);
       headers.set(
         "Content-Security-Policy",
-        "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'",
+        "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'",
       );
       headers.set("X-Content-Type-Options", "nosniff");
       return new Response(response.body, { status: response.status, headers });

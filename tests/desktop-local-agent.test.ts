@@ -205,7 +205,7 @@ test("desktop device login and real hosted tool loop keep tokens out of renderer
       if (url.pathname.endsWith("/models"))
         return Response.json({
           hostedEnabled: true,
-          models: [{ id: "fixture/model" }],
+          models: [{ id: "reflection/beam-free", provider: "reflection", approved: true, byok: false, inputMicrosPerToken: 0, outputMicrosPerToken: 0 }],
         });
       if (url.pathname.endsWith("/devices/logout"))
         return Response.json({ ok: true });
@@ -775,4 +775,26 @@ test("desktop cloud conversations sync structured history, preserve optimistic c
     expect(other.threads).toEqual([]); expect(other.conversation).toEqual([]);
     expect((await second.getState()).workspace).toBe(null);
   } finally { await first.dispose(); await second.dispose(); await rm(f.root, { recursive: true, force: true }); }
+});
+
+test("desktop model selection persists and tool choices never accept unknown tools", async () => {
+  const f = await fixture();
+  await mkdir(f.data, { recursive: true });
+  await writeFile(path.join(f.data, "desktop.json"), JSON.stringify({ server: "http://127.0.0.1:3999", token: "a".repeat(40), trustedRoots: [], recentRoots: [] }));
+  const options = {
+    dataDirectory: f.data, serverUrl: "http://127.0.0.1:3999", emit: () => {}, openExternal: async () => {},
+    fetch: async () => Response.json({ hostedEnabled: true, models: [{ id: "paid/model", name: "Paid model", provider: "reflection", approved: true, byok: false, inputMicrosPerToken: 1, outputMicrosPerToken: 1 }, { id: "reflection/beam-free", name: "Beam Free", provider: "reflection", approved: true, byok: false, inputMicrosPerToken: 0, outputMicrosPerToken: 0 }] }),
+  };
+  const service = new LocalAgentService(options);
+  try {
+    expect(await service.listModels()).toEqual([{ id: "reflection/beam-free", name: "Beam Free" }]);
+    await expect(service.selectModel("paid/model")).rejects.toThrow("available free model");
+    expect((await service.selectModel("reflection/beam-free")).auth.model).toBe("reflection/beam-free");
+    await expect(service.setToolEnabled({ name: "unknown", enabled: true })).rejects.toThrow("Unknown tool");
+    expect((await service.setToolEnabled({ name: "shell", enabled: false })).find(tool => tool.name === "shell")?.enabled).toBe(false);
+    await expect(service.discoverTools("missing")).rejects.toThrow("Enable this MCP server");
+    const restored = new LocalAgentService(options);
+    try { expect((await restored.getState()).auth.model).toBe("reflection/beam-free"); }
+    finally { await restored.dispose(); }
+  } finally { await service.dispose(); await rm(f.root, { recursive: true, force: true }); }
 });

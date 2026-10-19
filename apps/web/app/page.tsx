@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { getAuth } from "@/lib/auth";
 import {
   ArrowUpRight,
   ArrowUp,
@@ -11,29 +14,31 @@ import {
   ShieldCheck,
   Terminal,
 } from "lucide-react";
-import { Mark } from "@/components/chrome";
 import { Install } from "@/components/install";
 import { SponsorPlacement } from "@/components/sponsor-placement";
 import { GitHubSignIn } from "@/components/github-sign-in";
 
-export default function Home() {
+export default async function Home() {
+  let signedIn = false;
+  try {
+    signedIn = !!(await getAuth()?.api.getSession({ headers: await headers() }))?.user?.id;
+  } catch {
+    // A failed session check must keep the public landing accessible.
+  }
+  if (signedIn) redirect("/app");
   return (
     <main id="main" className="product-home">
       <section className="product-entry" aria-label="Freecoda coding workspace">
         <aside className="entry-sidebar">
           <div className="entry-sidebar-title">
-            <Mark />
             <span>Your next project</span>
           </div>
           <Link className="entry-new" href="/app">
             <Plus size={16} /> New workspace
           </Link>
           <div className="entry-sidebar-section">Build with Freecoda</div>
-          <Link href="/chat">
-            <MessageSquare size={16} /> Chat with Freecoda
-          </Link>
           <Link href="/app">
-            <MessageSquare size={16} /> Browser workspace
+            <MessageSquare size={16} /> Chat & workspace
           </Link>
           <Link href="/docs#desktop">
             <Laptop size={16} /> Desktop app
@@ -55,9 +60,6 @@ export default function Home() {
             <span>Browser · Desktop · CLI</span>
           </div>
           <div className="entry-welcome">
-            <div className="entry-mark">
-              <Mark />
-            </div>
             <h1>What do you want to build?</h1>
             <p>
               Your project, a conversation, and room to work.

@@ -15,4 +15,9 @@
 .form label { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
 .form input, .form select, .form textarea { font: inherit; border: 1px solid var(--line); border-radius: 7px; color: inherit; background: var(--background); padding: 10px; min-height: 44px; width: 100%; box-sizing: border-box; }
 .form button { justify-self: start; align-self: end; }
+.switcher { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 16px; }
+.switcher button { padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; background: transparent; color: inherit; cursor: pointer; }
+.switcher button[aria-pressed="true"] { background: var(--pale); color: var(--purple); }
+.connectionActions { display: flex; align-items: center; gap: 5px; }
+.connectionActions button { padding: 6px 9px; font-size: 12px; }
 @media (max-width: 640px) { .form { grid-template-columns: 1fr; } .panel summary { flex-wrap: wrap; } .panel summary span { margin-left: 27px; width: 100%; } }

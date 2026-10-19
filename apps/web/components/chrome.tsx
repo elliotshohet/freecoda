@@ -16,6 +16,7 @@ export function Header() {
   const pathname = usePathname();
   if (
     pathname === "/chat" ||
+    pathname === "/settings" ||
     pathname === "/app" ||
     pathname.startsWith("/app/")
   )
@@ -46,6 +47,7 @@ export function Footer() {
   const pathname = usePathname();
   if (
     pathname === "/chat" ||
+    pathname === "/settings" ||
     pathname === "/app" ||
     pathname.startsWith("/app/")
   )
@@ -54,7 +56,7 @@ export function Footer() {
     <footer className="site-footer">
       <div>
         <Link href="/" className="brand">
-          <Mark />
+          {pathname !== "/" && <Mark />}
           freecoda
         </Link>
         <p>More room for what you want to build.</p>

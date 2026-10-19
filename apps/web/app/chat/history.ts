@@ -100,3 +100,21 @@ export function chatContext(
     )
     .map(({ role, content }) => ({ role, content }));
 }
+
+/** Compact only completed earlier turns; preserve the current user request and displayed history. */
+export function boundedChatContext(
+  messages: Pick<Message, "role" | "content">[],
+  maxBytes = 80_000,
+  maxMessages = 40,
+) {
+  let context = [...messages];
+  const size = () => new TextEncoder().encode(JSON.stringify(context)).byteLength;
+  while (size() > maxBytes || context.length > maxMessages) {
+    const nextTurn = context.findIndex(
+      (message, index) => index > 0 && message.role === "user",
+    );
+    if (nextTurn < 0) return null;
+    context = context.slice(nextTurn);
+  }
+  return context;
+}

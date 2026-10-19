@@ -58,6 +58,8 @@ import {
 import { AccountThreadSync } from "./cloud-threads";
 import { createHash } from "node:crypto";
 import { registerRepoCommands } from "./repos";
+import { SessionTools } from "./session-tools";
+import { approvedFreeModels } from "./models";
 const program = new Command()
   .name("freecoda")
   .description("Your conversational assistant and local coding workspace.")
@@ -362,6 +364,7 @@ program
           "Connect your account with freecoda login, or configure a direct provider with freecoda provider configure.",
         );
       const catalog = await api("models");
+      catalog.models = approvedFreeModels(catalog.models ?? []);
       if (!catalog.models?.length)
         throw new Error(
           "Hosted models are unavailable. Your account can remain connected; try again later or configure your own provider.",
@@ -451,6 +454,9 @@ program
         );
       };
     const permissions = approvals();
+    const sessionTools = new SessionTools();
+    const captureTurn = () => ({ model: model!, modelLabel, mode: defaultMode, disabledTools: [...sessionTools.disabled] });
+    if (screen) screen.captureTurn = captureTurn;
     screen?.setMode(permissions.effectiveMode(defaultMode));
     async function switchMode(next: ConversationMode) {
       if (next !== "chat") await ensureRepositoryTrust();
@@ -481,6 +487,39 @@ program
         }
         if (!input) continue;
         if (["/exit", "/quit"].includes(input)) break;
+        if (input === "/queue" || input.startsWith("/queue ")) {
+          if (!screen) notice("Queued input is available in the full-screen interface. Plain mode sends one turn at a time.");
+          else {
+            try {
+              const args = input.slice(6).trim().split(/\s+/).filter(Boolean);
+              if (args[0] === "resume" && args.length === 1) screen.queue.paused = false;
+              else if (args[0] === "remove" && args.length === 2) screen.queue.remove(args[1]!);
+              else if (args.length) throw Error("Use /queue, /queue resume, or /queue remove <id>.");
+              notice(`${screen.queue.paused ? "Paused" : "Ready"} · ${screen.queue.items.length} queued\n` + screen.queue.items.map((item) => { const context = item.context as ReturnType<typeof captureTurn> | undefined; return `${item.id.slice(0, 8)} · ${context?.modelLabel ?? modelLabel} · ${context?.mode ?? defaultMode} · ${item.input.slice(0, 160)}`; }).join("\n") + "\n/queue resume retries queued turns; /queue remove <id> discards one. Nothing runs while paused.");
+            } catch (e) { error(e instanceof Error ? e.message : "Could not change queue."); }
+          }
+          if (opts.prompt) break;
+          continue;
+        }
+        if (input === "/mcp" || input.startsWith("/mcp ") || input === "/tools" || input.startsWith("/tools ")) {
+          try {
+            const registry = await loadExtensionRegistry(extensionFile());
+            if (input.startsWith("/mcp")) {
+              const result = await sessionTools.mcp(input.slice(4), registry);
+              if (result.registry !== registry) await saveExtensionRegistry(extensionFile(), result.registry);
+              notice(result.message);
+            } else {
+              const args = input.slice(6).trim().split(/\s+/).filter(Boolean);
+              if (args.length) {
+                if (args.length !== 2 || !["enable", "disable"].includes(args[0]!)) throw Error("Use /tools or /tools enable|disable <name>.");
+                sessionTools.select(args[1]!, args[0] === "enable", registry);
+              }
+              notice(sessionTools.names(registry).map((name) => `${sessionTools.disabled.has(name) ? "off" : "on "} ${name}`).join("\n") + "\nSelections apply to following turns in this session. Mode and permissions still restrict availability; Chat has no tools. Use /mcp discover <server-id> to list actual external tools.");
+            }
+          } catch (e) { error(redactSecrets(e instanceof Error ? e.message : "Could not update tools.")); }
+          if (opts.prompt) break;
+          continue;
+        }
         if (input === "/extensions") {
           notice(
             JSON.stringify(
@@ -546,7 +585,7 @@ program
         }
         if (input === "/help") {
           notice(
-            "/plan <task>  Read-only plan\n/review <task>  Read-only code review\n/mode chat|build|plan|review  Set the default mode\n/model [id]  List or select models\n/permissions [read-only|default|full-access]  Session tool permissions\n/theme auto|dark|light  Save the terminal palette\n/update  Check/install instructions (exit session first)\n/usage  Hosted allowance and reset time\n/status  Current workspace and provider\n/new  Start a new saved task\n/resume [number or id]  List or reopen saved tasks\n/clear  Clear the visible transcript\n/exit  Exit Freecoda\n\nEnter sends. Ctrl+J adds a newline. Paste never submits automatically. Up/Down recalls input. PageUp/PageDown scrolls. Escape or Ctrl+C cancels a running request. Approval: y once, s category for this session, n decline.",
+            "/plan <task>  Read-only plan\n/review <task>  Read-only code review\n/mode chat|build|plan|review  Set the default mode\n/model [id]  List or select models\n/mcp [enable|disable|discover <id>]  Manage connections\n/tools [enable|disable <name>]  Select next-turn tools\n/extensions  List installed tools and skills\n/queue [resume|remove <id>]  Review paused or queued turns\n/permissions [read-only|default|full-access]  Session tool permissions\n/theme auto|dark|light  Save the terminal palette\n/update  Check/install instructions (exit session first)\n/usage  Hosted allowance and reset time\n/status  Current workspace and provider\n/new  Start a new saved task\n/resume [number or id]  List or reopen saved tasks\n/clear  Clear the visible transcript\n/exit  Exit Freecoda\n\nEnter sends. Ctrl+J adds a newline. Paste never submits automatically. Up/Down recalls input. PageUp/PageDown scrolls. Escape or Ctrl+C cancels a running request. Approval: y once, s category for this session, n decline.",
           );
           if (opts.prompt) break;
           continue;
@@ -673,6 +712,7 @@ program
               );
             else {
               const catalog = await api("models");
+      catalog.models = approvedFreeModels(catalog.models ?? []);
               notice(
                 catalog.models
                   .map(
@@ -712,11 +752,13 @@ program
           if (opts.prompt) break;
           continue;
         }
+        const captured = screen?.dequeuedTurn?.context as ReturnType<typeof captureTurn> | undefined;
+        const activeTurn = screen?.dequeuedTurn;
         const mode = /^\/plan(?:\s|$)/.test(input)
           ? "plan"
           : /^\/review(?:\s|$)/.test(input)
             ? "review"
-            : defaultMode;
+            : captured?.mode ?? defaultMode;
         if (conversationScope(root, mode) !== scope) {
           try {
             await switchMode(mode);
@@ -766,11 +808,13 @@ program
         screen && (screen.onCancel = abort);
         closeReader();
         process.on("SIGINT", abort);
+        let responseCompleted = false;
         try {
           const result = await runAgent({
             root,
+            disabledTools: [...new Set([...(captured?.disabledTools ?? []), ...sessionTools.disabled])],
             extensions: await loadExtensionRegistry(extensionFile()),
-            model: model!,
+            model: captured?.model ?? model!,
             messages: next,
             mode: permissions.effectiveMode(mode),
             approve: permissions.approve,
@@ -787,6 +831,8 @@ program
               } else console.log(c.dim("\n  " + label + "…"));
             },
           });
+          controller.signal.throwIfAborted();
+          responseCompleted = true;
           messages = result.messages;
           conversation = await persistConversation({
             ...conversation,
@@ -801,6 +847,13 @@ program
             screen ? (ad) => screen.showSponsor(ad) : undefined,
           );
         } catch (e) {
+          if (screen) {
+            screen.queue.paused = true;
+            if (!responseCompleted) screen.queue.items.unshift(activeTurn ?? { id: crypto.randomUUID(), input, context: captureTurn() });
+            notice(responseCompleted
+              ? "Response completed but saving failed. Queue paused; the completed request will not be sent again. Use /queue to review following turns."
+              : "Queue paused; the interrupted turn is retained. Use /queue to review, /queue resume to retry, or /queue remove <id> to discard.");
+          }
           error(
             controller.signal.aborted
               ? "Request cancelled."

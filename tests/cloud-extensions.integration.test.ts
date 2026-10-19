@@ -47,6 +47,8 @@ test("cloud extension changes are blocked during queued and running tasks and re
   const action = { action: "skill-text" as const, name: "During task", instructions: "Do not install while a task is active." };
   try {
     await expect(configureProjectExtensions(owner, projectId, action)).rejects.toThrow("in progress");
+    await expect(configureProjectExtensions(owner, projectId, { action: "discover", id: "mcp_missing" })).rejects.toThrow("in progress");
+    await expect(configureProjectExtensions(owner, projectId, { action: "tool-toggle", name: "shell", enabled: false })).rejects.toThrow("in progress");
     await store.runState(run.id, "running");
     await expect(configureProjectExtensions(owner, projectId, action)).rejects.toThrow("in progress");
     expect((await projectExtensions(owner, projectId)).skills).toEqual([]);
@@ -55,4 +57,13 @@ test("cloud extension changes are blocked during queued and running tasks and re
   expect(installed.skills).toHaveLength(1);
   expect((await store.project(owner, projectId)).payload.extensions?.skills[0]?.instructions).toContain("Do not install");
   await configureProjectExtensions(owner, projectId, { action: "remove", id: installed.skills[0]!.id });
+});
+
+test("tool selection persists without execution and refuses unconfigured tools", async () => {
+  const result = await configureProjectExtensions(owner, projectId, { action: "tool-toggle", name: "shell", enabled: false });
+  expect(result.disabledTools).toContain("shell");
+  expect((await store.project(owner, projectId)).payload.disabledTools).toContain("shell");
+  await expect(configureProjectExtensions(owner, projectId, { action: "tool-toggle", name: "mcp_unknown", enabled: true })).rejects.toThrow("Discover the tool");
+  expect((await configureProjectExtensions(owner, projectId, { action: "tool-toggle", name: "shell", enabled: true })).disabledTools).not.toContain("shell");
+  expect((await projectExtensions(owner, projectId)).builtins.map(tool => tool.name)).not.toContain("skill_file");
 });

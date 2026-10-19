@@ -159,6 +159,7 @@ export async function repositories(userId: string) {
               owner: { login: string };
               default_branch: string;
               private: boolean;
+              created_at: string;
             }[];
           }>(
             token.token,
@@ -190,6 +191,7 @@ export async function repositories(userId: string) {
               name: repo.name,
               defaultBranch: repo.default_branch,
               private: repo.private,
+              createdAt: repo.created_at,
             });
           }
           if (result.repositories.length < 100) break;
@@ -211,7 +213,18 @@ export async function repositories(userId: string) {
     if (installations.length < 100) break;
   }
   return {
-    repos,
+    repos: repos.sort((a, b) => {
+      const aTime = Date.parse(a.createdAt || "");
+      const bTime = Date.parse(b.createdAt || "");
+      const aValid = Number.isFinite(aTime);
+      const bValid = Number.isFinite(bTime);
+      if (aValid !== bValid) return bValid ? 1 : -1;
+      const newest = aValid && bValid ? bTime - aTime : 0;
+      return newest ||
+        a.owner.localeCompare(b.owner) ||
+        a.name.localeCompare(b.name) ||
+        a.repositoryId - b.repositoryId;
+    }),
     ...(unavailable
       ? {
           warning:

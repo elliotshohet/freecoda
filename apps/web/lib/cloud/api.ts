@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PREFERRED_FREE_MODEL } from "../free-model-selector";
 import { start, getRun } from "workflow/api";
 import { getPool } from "../db";
 import { handle, json, jsonBody, ApiError, sameOrigin } from "../http";
@@ -15,6 +16,9 @@ import { configuredGithubRepositories } from "../github-repositories";
 const idSchema = z.uuid();
 const identifier = z.string().regex(/^[A-Za-z0-9_.-]{1,100}$/);
 const consent = z.literal(true);
+// Bump this when cloud-storage consent terms or data scope materially change.
+const cloudStorageConsentVersion = "cloud-storage-2026-10-v1";
+const consentSchema = z.object({ version: z.string().min(1).max(80) }).strict();
 const createSchema = z
   .object({
     name: z.string().trim().min(1).max(80),
@@ -43,6 +47,8 @@ const filesSchema = z
   .strict();
 const runSchema = z
   .object({
+    requestId: z.uuid().optional(),
+    model: z.string().min(1).max(150).default(PREFERRED_FREE_MODEL),
     extensionConsent: z.boolean().default(false),
     prompt: z.string().trim().min(1).max(20000),
     mode: z.enum(["build", "plan", "review"]).default("build"),
@@ -160,6 +166,10 @@ export async function cloudRoute(req: Request) {
       const ready = !!user && !user.device && invited && service.cloudReady();
       return json({
         enabled,
+        userId: user && !user.device ? user.id : undefined,
+        userName: user && !user.device ? user.name : undefined,
+        userImage: user && !user.device ? user.image : undefined,
+        models: ready ? (await service.configuredCloudModels()).map(config => ({ id: config.id, name: config.id })) : [],
         authenticated: !!user && !user.device,
         invited,
         ready,
@@ -193,6 +203,32 @@ export async function cloudRoute(req: Request) {
       sameOrigin(req);
       await rateLimit(`cloud:${user.id}`, 30, 60);
     }
+    if (path.join("/") === "consent") {
+      if (method === "GET")
+        return json({
+          version: cloudStorageConsentVersion,
+          accepted: await store.hasCloudConsent(
+            user.id,
+            "cloud-storage",
+            cloudStorageConsentVersion,
+          ),
+        });
+      if (method === "POST") {
+        const body = await jsonBody(req, consentSchema);
+        if (body.version !== cloudStorageConsentVersion)
+          throw new ApiError(409, "Cloud storage terms changed. Review them and try again.");
+        await store.acknowledgeCloudConsent(
+          user.id,
+          "cloud-storage",
+          cloudStorageConsentVersion,
+        );
+        return json({ version: cloudStorageConsentVersion, accepted: true });
+      }
+    }
+    const controlAction = method === "DELETE" ||
+      (method === "POST" && (path[0] === "runs" && path[2] === "cancel" || path[0] === "projects" && path[2] === "suspend"));
+    if (method !== "GET" && !controlAction && !await store.hasCloudConsent(user.id, "cloud-storage", cloudStorageConsentVersion))
+      throw new ApiError(403, "Review and accept the current cloud storage terms before continuing.");
     if (path.join("/") === "github/repos" && method === "GET")
       return json(await repositories(user.id));
     if (path[0] === "projects" && path.length === 1) {
@@ -300,6 +336,13 @@ export async function cloudRoute(req: Request) {
       throw new ApiError(404, "Cloud route not found.");
     const id = path[1];
     const record = await store.project(user.id, id);
+    if (path[2] === "sync") {
+      if (method === "GET") return json(await service.repositorySyncStatus(user.id, id));
+      if (method === "POST") {
+        const body = await jsonBody(req, z.object({ expectedBaseSha: z.string().regex(/^[a-f0-9]{40}$/) }).strict());
+        return json({ project: await service.pullRepository(user.id, id, body.expectedBaseSha) });
+      }
+    }
     if (path[2] === "extensions") {
       if (method === "GET") return json(await projectExtensions(user.id, id));
       if (method === "POST") return json(await configureProjectExtensions(user.id, id, await jsonBody(req, extensionActionSchema, 100_000)));
@@ -365,28 +408,33 @@ export async function cloudRoute(req: Request) {
         throw new ApiError(409, "Cancel the active run before suspending.");
       return json({ project: await service.suspend(user.id, id) });
     }
+    if (path[2] === "preview-session" && method === "GET")
+      return json(await service.previewSession(user.id, id));
     if (path[2] === "preview-session" && method === "POST") {
-      const project = await service.activate(user.id, id);
+      const preview = await service.startPreviewSession(user.id, id);
       await lifecycle(id);
-      const preview = await vm.startProjectPreview(project);
-      return json({
-        url: preview.previewUrl,
-        expiresAt: new Date(Date.now() + 300000).toISOString(),
-      });
+      return json(preview);
     }
     if (path[2] === "runs" && method === "POST") {
       const body = await jsonBody(req, runSchema);
+      await service.requireCloudModel(body.model);
+      if (body.requestId) {
+        const existing = await store.findRunRequest(user.id, id, body.requestId, body);
+        if (existing) return json({ run: existing }, 202);
+      }
       if (body.mode === "build" && record.payload.extensions?.servers.some(server => server.enabled) && !body.extensionConsent)
         throw new ApiError(403, "Allow installed external tools for this run before starting.");
       await service.activate(user.id, id);
       await lifecycle(id);
-      const run = await store.createRun(user.id, id, {
+      const { run, created } = await store.createRunRequest(user.id, id, {
         extensionConsent: body.extensionConsent,
+        model: body.model,
         prompt: body.prompt,
         mode: body.mode,
         consentAt: new Date().toISOString(),
-      });
-      await store.event(run.id, "user", { text: body.prompt });
+      }, body.requestId);
+      if (!created) return json({ run }, 202);
+      await store.event(run.id, "user", { text: body.prompt, messageId: run.id });
       try {
         const workflow = await start(cloudAgentWorkflow, [run.id]);
         await store.runState(run.id, "queued", workflow.runId);

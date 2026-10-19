@@ -144,6 +144,15 @@ test("read-only preset and explicit plan/review omit mutation tools even with fu
     expect(catalogs).toHaveLength(3);
     for (const tools of catalogs)
       expect(tools).toEqual(["list_files", "read_file", "search"]);
+    await runAgent({
+      root,
+      model: directModel(`http://127.0.0.1:${server.port}/v1`, "fixture", ""),
+      messages: [{ role: "user", content: "Fixture task" }],
+      mode: "plan",
+      disabledTools: ["read_file", "shell"],
+      approve: policy.approve,
+    });
+    expect(catalogs.at(-1)).toEqual(["list_files", "search"]);
   } finally {
     await server.stop(true);
     await rm(root, { recursive: true, force: true });

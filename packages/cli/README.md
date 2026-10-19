@@ -63,6 +63,10 @@ Bracketed paste is inserted as text, including embedded newlines and slash comma
 - `/mode chat|build|plan|review`: choose the default mode for following turns. Chat is the default and has no project access or tools.
 - `/model`: list approved hosted models, or show the direct provider model.
 - `/model <id>`: select a model for this session.
+- `/mcp`: list installed connections. `/mcp enable|disable <server-id>` changes the next turn’s connections; `/mcp discover <server-id>` explicitly connects to one enabled server, lists its actual tools, then closes without executing tools.
+- `/tools`: show session tool selections. `/tools enable|disable <name>` selects native or discovered MCP tools for following turns. Mode and permission restrictions still apply; selecting a tool never grants approval.
+- `/extensions`: list installed MCP connections and skills.
+- `/queue`: inspect queued turns. While a response streams, Enter queues a message with its current model, mode, and tool restrictions. `/queue remove <id>` removes a queued turn; `/queue resume` retries after cancellation or failure. The queue pauses with the failed turn retained and never silently sends following turns. Up to 20 turns queue in the full-screen interface; plain mode remains sequential.
 - `/theme auto|dark|light`: save the terminal palette; `/theme` shows the current preference.
 - `/update`: show instructions to check and install an update after leaving the session.
 - `/usage`: show hosted allowance and reset information.

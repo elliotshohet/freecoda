@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   ArrowUp,
   Check,
-  ChevronDown,
   Code2,
   Copy,
   Menu,
@@ -17,10 +16,15 @@ import {
 } from "lucide-react";
 import { createAuthClient } from "better-auth/react";
 import { Mark } from "@/components/chrome";
+import { UserAvatar } from "@/components/user-avatar";
+import { MarkdownMessage } from "@/components/markdown-message";
+import { ModelPicker, modelDisplayName } from "@/components/model-picker";
+import { useModelSelection } from "@/components/use-model-selection";
 import { ThemeControl } from "@/components/theme-control";
 import { SponsorPlacement } from "@/components/sponsor-placement";
 import s from "./chat.module.css";
 import {
+  boundedChatContext,
   chatContext,
   type Message,
 } from "./history";
@@ -28,10 +32,13 @@ import { useCloudHistory } from "./use-cloud-history";
 type Status = {
   signedIn: boolean;
   userId?: string;
+  userName?: string | null;
+  userImage?: string | null;
   available: boolean;
   reason?: string;
   models: { id: string; name: string }[];
 };
+const noModels: Status["models"] = [];
 const suggestions = [
   "Explain a tricky idea",
   "Help me write something",
@@ -65,89 +72,41 @@ function CopyButton({
     </button>
   );
 }
-function Inline({ text }: { text: string }) {
-  return (
-    <>
-      {text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) =>
-        part.startsWith("**") && part.endsWith("**") ? (
-          <strong key={i}>{part.slice(2, -2)}</strong>
-        ) : part.startsWith("`") && part.endsWith("`") ? (
-          <code className={s.inlineCode} key={i}>
-            {part.slice(1, -1)}
-          </code>
-        ) : (
-          part
-        ),
-      )}
-    </>
-  );
-}
-function MessageContent({ text }: { text: string }) {
-  const parts = text.split(/(```[\s\S]*?```)/g);
-  return (
-    <>
-      {parts.map((part, i) => {
-        if (part.startsWith("```") && part.endsWith("```")) {
-          const body = part.slice(3, -3),
-            newline = body.indexOf("\n"),
-            language = newline >= 0 ? body.slice(0, newline).trim() : "",
-            code = newline >= 0 ? body.slice(newline + 1) : body;
-          return (
-            <div className={s.code} key={i}>
-              <div>
-                <span>{language || "Code"}</span>
-                <CopyButton text={code} label="Copy code" />
-              </div>
-              <pre>
-                <code>{code}</code>
-              </pre>
-            </div>
-          );
-        }
-        return (
-          <div className={s.prose} key={i}>
-            {part.split("\n").map((line, j) =>
-              /^#{1,3} /.test(line) ? (
-                <h3 key={j}>
-                  <Inline text={line.replace(/^#{1,3} /, "")} />
-                </h3>
-              ) : /^\s*(?:[-*]|\d+\.) /.test(line) ? (
-                <div className={s.listLine} key={j}>
-                  <span>{line.match(/^\s*(\d+\.) /)?.[1] || "•"}</span>
-                  <span>
-                    <Inline text={line.replace(/^\s*(?:[-*]|\d+\.) /, "")} />
-                  </span>
-                </div>
-              ) : (
-                <p key={j}>
-                  <Inline text={line || "\u00a0"} />
-                </p>
-              ),
-            )}
-          </div>
-        );
-      })}
-    </>
-  );
-}
-export default function Chat() {
+type ChatProps = {
+  embedded?: boolean;
+  initialThreadId?: string;
+  onOpenWorkspace?: () => void;
+};
+
+export default function Chat({ embedded = false, initialThreadId, onOpenWorkspace }: ChatProps) {
   const [status, setStatus] = useState<Status | null>(null),
-    [active, setActive] = useState<string | null>(null),
+    [active, setActive] = useState<string | null>(initialThreadId || null),
     [draft, setDraft] = useState(""),
+    [queue, setQueue] = useState<{ id: string; text: string; sent?: boolean; status: "queued" | "sending" | "accepted" | "failed"; messageIndex?: number; model?: string }[]>([]),
+    [pendingSend, setPendingSend] = useState<{ id: string; text: string; status: "sending" | "accepted" | "failed"; inHistory?: boolean; messageIndex?: number; model?: string } | null>(null),
     [query, setQuery] = useState(""),
-    [model, setModel] = useState(""),
+    [modelPickerOpen, setModelPickerOpen] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [sidebar, setSidebar] = useState(false),
-    [signingIn, setSigningIn] = useState(false);
+    [signingIn, setSigningIn] = useState(false),
+    [commandNotice, setCommandNotice] = useState("");
+  const { model, setModel } = useModelSelection(status?.userId, status?.models ?? noModels);
   const { chats, setChats, historyReady, storageError, syncError, removeConversation, openConversation, opening } = useCloudHistory(status?.userId, busy);
   const abort = useRef<AbortController | null>(null),
     sending = useRef(false),
+    drainingQueue = useRef(false),
+    autoDrainQueue = useRef(false),
+    queueRef = useRef(queue),
+    sendTextRef = useRef<(retry?: boolean, textOverride?: string, queueId?: string, pendingId?: string, modelOverride?: string) => Promise<boolean>>(() => Promise.resolve(false)),
+    owner = useRef<string | undefined>(undefined),
+    initialThreadApplied = useRef(false),
     end = useRef<HTMLDivElement>(null),
     input = useRef<HTMLTextAreaElement>(null),
     search = useRef<HTMLInputElement>(null);
   const selected = chats.find((c) => c.id === active),
     messages = selected?.messages || [];
+  queueRef.current = queue;
   useEffect(() => { if (selected?.cloudLoaded === false) void openConversation(selected.id); }, [selected?.id, selected?.cloudLoaded, openConversation]);
   useEffect(() => {
     let alive = true;
@@ -160,7 +119,6 @@ export default function Chat() {
       .then((d: Status) => {
         if (!alive) return;
         setStatus(d);
-        setModel(d.models?.[0]?.id || "");
       })
       .catch((e) => {
         if (alive) setError(e.message);
@@ -183,11 +141,6 @@ export default function Chat() {
           setChats([]);
         }
         setStatus(fresh);
-        setModel((current) =>
-          fresh.models.some((m) => m.id === current)
-            ? current
-            : fresh.models[0]?.id || "",
-        );
       } catch {
         /* Keep the last known state; pre-send verification still applies. */
       }
@@ -195,7 +148,32 @@ export default function Chat() {
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
   }, [status?.userId]);
-  useEffect(() => { setActive(null); }, [status?.userId]);
+  useEffect(() => {
+    const showModel = (event: Event) => {
+      const detail = (event as CustomEvent<{ view?: string }>).detail;
+      if (detail?.view === "chat") setModelPickerOpen(true);
+    };
+    const showHistory = () => setSidebar(true);
+    window.addEventListener("freecoda:show-model", showModel);
+    window.addEventListener("freecoda:chat-sidebar", showHistory);
+    return () => {
+      window.removeEventListener("freecoda:show-model", showModel);
+      window.removeEventListener("freecoda:chat-sidebar", showHistory);
+    };
+  }, []);
+  useEffect(() => {
+    if (owner.current !== undefined && owner.current !== status?.userId) {
+      setActive(null);
+      setDraft("");
+      setQueue([]);
+    }
+    owner.current = status?.userId;
+  }, [status?.userId]);
+  useEffect(() => {
+    if (!historyReady || !initialThreadId || initialThreadApplied.current) return;
+    initialThreadApplied.current = true;
+    if (chats.some((chat) => chat.id === initialThreadId)) setActive(initialThreadId);
+  }, [historyReady, chats, initialThreadId]);
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: "instant", block: "end" });
   }, [messages, busy]);
@@ -204,15 +182,77 @@ export default function Chat() {
     setActive(null);
     setDraft("");
     setError("");
+    setCommandNotice("");
     setSidebar(false);
     input.current?.focus();
   };
+  async function runCommand(value: string) {
+    const [command, ...args] = value.trim().split(/\s+/);
+    const argument = args.join(" ");
+    switch (command.toLowerCase()) {
+      case "/help":
+        setCommandNotice("Chat commands: /help, /new, /clear, /model [id], /mode chat|build|plan|review, /status, /usage, /extensions, /mcp, /tools, /permissions. Build, files, tools, permissions, and repository actions are available in Workspace.");
+        break;
+      case "/new":
+        newChat();
+        break;
+      case "/clear":
+        setActive(null);
+        setDraft("");
+        setCommandNotice("Cleared this view. The saved conversation remains in your history.");
+        break;
+      case "/model":
+        if (!argument) {
+          setModelPickerOpen(true);
+          setCommandNotice(`Current model: ${status?.models.find((item) => item.id === model) ? modelDisplayName(status.models.find((item) => item.id === model)!) : model || "Loading"}.`);
+        } else if (!status?.models.some((item) => item.id === argument)) {
+          setCommandNotice(`Unknown model “${argument}”. Available: ${status?.models.map((item) => item.id).join(", ") || "none"}.`);
+        } else {
+          setModel(argument);
+          setCommandNotice(`Model set to ${argument}.`);
+        }
+        break;
+      case "/mode":
+        if (!argument || argument === "chat") setCommandNotice("Mode: Chat. Use Workspace for build, plan, and review modes.");
+        else if (["build", "plan", "review"].includes(argument)) {
+          setCommandNotice(`Switching to Workspace. Choose ${argument} mode from its mode menu.`);
+          onOpenWorkspace?.();
+        } else setCommandNotice("Use /mode chat, build, plan, or review. Coding modes run in Workspace.");
+        break;
+      case "/status":
+        setCommandNotice(`${status?.signedIn ? "Signed in" : "Not signed in"} · ${selected?.title || "New chat"} · ${model || "No model selected"} · ${status?.available ? "Chat available" : status?.reason || "Chat unavailable"}`);
+        break;
+      case "/usage":
+        try {
+          const response = await fetch("/api/v1/usage", { cache: "no-store" });
+          const usage = await response.json();
+          if (!response.ok) throw new Error(usage.error || "Usage is unavailable.");
+          setCommandNotice(`Free allowance remaining today: $${(usage.freeRemainingMicros / 1_000_000).toFixed(4)} · resets ${new Date(usage.resetAt).toLocaleString()}.`);
+        } catch (error) {
+          setCommandNotice(error instanceof Error ? error.message : "Usage is unavailable.");
+        }
+        break;
+      case "/extensions":
+      case "/permissions":
+        setCommandNotice(`${command} are configured per coding project in Workspace. Chat has no repository, filesystem, or external tool access.`);
+        onOpenWorkspace?.();
+        break;
+      case "/mcp":
+      case "/tools":
+        setCommandNotice(`Opening ${command.slice(1)} tools in Workspace.`);
+        onOpenWorkspace?.();
+        window.dispatchEvent(new CustomEvent("freecoda:extensions", { detail: { view: command.toLowerCase() === "/mcp" ? "mcp" : "tools" } }));
+        break;
+      default:
+        setCommandNotice(`Unknown command “${command}”. Use /help to see commands.`);
+    }
+  }
   async function signIn() {
     setSigningIn(true);
     try {
       const result = await createAuthClient().signIn.social({
         provider: "github",
-        callbackURL: "/chat",
+        callbackURL: "/app?view=chat",
       });
       if (result.error) throw Error(result.error.message || "Sign-in failed.");
     } catch (e) {
@@ -227,27 +267,28 @@ export default function Chat() {
       ),
     );
   }
-  async function send(retry = false) {
-    if (busy || sending.current || !status?.available || !historyReady || selected?.mode === "coding" || selected?.cloudDeleted || selected?.cloudLoaded === false) return;
-    const text = draft.trim();
-    if (!retry && !text) return;
+  async function send(retry = false, textOverride?: string, queueId?: string, pendingId?: string, modelOverride?: string): Promise<boolean> {
+    if (busy || sending.current || !status?.available || !historyReady || selected?.mode === "coding" || selected?.cloudDeleted || selected?.cloudLoaded === false) return false;
+    const text = (textOverride ?? draft).trim();
+    if (!retry && !text) return false;
     const current = selected?.messages || [],
       displayedContext = retry
         ? current.at(-1)?.role === "assistant"
           ? current.slice(0, -1)
           : current
         : [...current, { role: "user" as const, content: text }],
-      context = chatContext(displayedContext);
-    if (!context.length || context.at(-1)?.role !== "user") return;
-    if (context.length > 40) {
+      rawContext = chatContext(displayedContext),
+      context = boundedChatContext(rawContext);
+    if (!context) {
       setError(
-        "This conversation has reached its context limit. Start a new chat to continue.",
+        "This current message is too large to send. Shorten it or reduce attached context; your draft and conversation history have been kept.",
       );
-      return;
+      return false;
     }
+    if (!context.length || context.at(-1)?.role !== "user") return false;
     const requestBody = JSON.stringify({
       messages: context,
-      ...(model ? { model } : {}),
+      ...(modelOverride || model ? { model: modelOverride || model } : {}),
       expectedUserId: status.userId,
       consent: true,
     });
@@ -255,7 +296,7 @@ export default function Chat() {
       setError(
         "This conversation is too long to send. Start a new chat; your draft and history have been kept.",
       );
-      return;
+      return false;
     }
     if (
       context.some((m) => m.content.length > (m.role === "user" ? 8000 : 64000))
@@ -263,9 +304,10 @@ export default function Chat() {
       setError(
         "User messages can contain up to 8,000 characters. Start a new chat if a response exceeds the context limit.",
       );
-      return;
+      return false;
     }
     sending.current = true;
+    if (textOverride === undefined) setDraft("");
     setBusy(true);
     const controller = new AbortController();
     abort.current = controller;
@@ -293,13 +335,16 @@ export default function Chat() {
         throw Error(fresh.reason || "Chat is currently unavailable.");
       }
     } catch (e) {
+      if (textOverride === undefined) setDraft((current) => current || text);
+      if (pendingId) setPendingSend((current) => current?.id === pendingId ? { ...current, status: "failed" } : current);
+      if (queueId) setQueue((current) => current.map((item) => item.id === queueId ? { ...item, status: "failed" } : item));
       setError(
         e instanceof Error ? e.message : "Could not verify your account.",
       );
       setBusy(false);
       sending.current = false;
       abort.current = null;
-      return;
+      return false;
     }
     const id = selected?.id || crypto.randomUUID();
     if (!selected)
@@ -317,12 +362,14 @@ export default function Chat() {
       );
     else updateMessages(id, displayedContext);
     setActive(id);
-    setDraft("");
+    if (pendingId) setPendingSend((current) => current?.id === pendingId ? { ...current, status: "sending", inHistory: true, messageIndex: displayedContext.length - 1 } : current);
+    if (queueId) setQueue((current) => current.map((item) => item.id === queueId ? { ...item, sent: true, status: "sending", messageIndex: displayedContext.length - 1 } : item));
     setError("");
     setBusy(true);
     setSidebar(false);
     let answer = "",
-      finished = false;
+      finished = false,
+      successful = false;
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -334,6 +381,8 @@ export default function Chat() {
         const data = await response.json().catch(() => ({}));
         throw Error(data.error || `Chat request failed (${response.status}).`);
       }
+      if (pendingId) setPendingSend((current) => current?.id === pendingId ? { ...current, status: "accepted" } : current);
+      if (queueId) setQueue((current) => current.map((item) => item.id === queueId ? { ...item, status: "accepted" } : item));
       if (!response.body) throw Error("No response stream was returned.");
       const reader = response.body.getReader(),
         decoder = new TextDecoder();
@@ -375,7 +424,11 @@ export default function Chat() {
         ...displayedContext,
         { role: "assistant", content: answer, status: "complete" },
       ]);
+      if (pendingId) setPendingSend((current) => current?.id === pendingId ? null : current);
+      successful = true;
     } catch (e) {
+      if (pendingId) setPendingSend((current) => current?.id === pendingId ? { ...current, status: "failed" } : current);
+      if (queueId) setQueue((current) => current.map((item) => item.id === queueId ? { ...item, status: "failed" } : item));
       if (answer)
         updateMessages(id, [
           ...displayedContext,
@@ -399,12 +452,73 @@ export default function Chat() {
       setBusy(false);
       input.current?.focus();
     }
+    if (successful && queueRef.current.length) autoDrainQueue.current = true;
+    return successful;
+  }
+  sendTextRef.current = send;
+  useEffect(() => {
+    if (!autoDrainQueue.current || busy || !historyReady || !queue.length || drainingQueue.current) return;
+    const next = queue[0];
+    const requestModel = next.model || model;
+    drainingQueue.current = true;
+    autoDrainQueue.current = false;
+    let succeeded = false;
+    setQueue((current) => current.map((item) => item.id === next.id ? { ...item, status: "sending", model: requestModel } : item));
+    void sendTextRef.current(next.sent === true, next.text, next.id, undefined, requestModel).then((success) => {
+      if (success) {
+        succeeded = true;
+        drainingQueue.current = false;
+        autoDrainQueue.current = true;
+        setQueue((current) => current.filter((item) => item.id !== next.id));
+      } else {
+        setCommandNotice("A queued message was kept because the last send failed. Retry it when chat is available.");
+      }
+    }).finally(() => {
+      if (!succeeded) drainingQueue.current = false;
+    });
+  }, [busy, historyReady, queue, model]);
+  function submitMessage() {
+    const text = draft.trim();
+    if (!text) return;
+    if (/^\/[a-z]+(?:\s|$)/i.test(text)) {
+      setDraft("");
+      setCommandNotice("");
+      void runCommand(text);
+      return;
+    }
+    if (busy || sending.current || queue.length > 0) {
+      setQueue((current) => [...current, { id: crypto.randomUUID(), text, status: "queued" }]);
+      setDraft("");
+      setCommandNotice(`${queue.length + 1} message${queue.length ? "s" : ""} queued. Messages run one at a time.`);
+      if (!busy) autoDrainQueue.current = true;
+      return;
+    }
+    if (!status?.available || !historyReady) {
+      setError(status?.reason || "Chat is not ready yet. Your draft is still here.");
+      return;
+    }
+    setCommandNotice("");
+    const id = crypto.randomUUID();
+    setPendingSend({ id, text, status: "sending", model });
+    void send(false, undefined, undefined, id, model);
+  }
+  function retryQueue() {
+    autoDrainQueue.current = true;
+    setQueue((current) => [...current]);
+  }
+  function retryPendingSend() {
+    if (!pendingSend || busy || sending.current) return;
+    const retrying = pendingSend;
+    setPendingSend({ ...retrying, status: "sending" });
+    if (!retrying.inHistory)
+      setDraft((current) => current.trim() === retrying.text ? "" : current);
+    void send(retrying.inHistory === true, retrying.text, undefined, retrying.id, retrying.model);
   }
   const visibleChats = chats.filter((c) =>
     c.title.toLowerCase().includes(query.toLowerCase()),
   );
   return (
-    <main id="main" className={s.shell}>
+    <main id="main" className={`${s.shell} ${embedded ? s.embedded : ""}`}>
       {sidebar && (
         <button
           className={s.scrim}
@@ -412,8 +526,8 @@ export default function Chat() {
           onClick={() => setSidebar(false)}
         />
       )}
-      <aside id="chat-sidebar" className={`${s.sidebar} ${sidebar ? s.open : ""}`}>
-        <div className={s.brand}>
+      <aside id="chat-sidebar" data-open={sidebar} className={`${s.sidebar} ${sidebar ? s.open : ""}`}>
+        {!embedded && <div className={s.brand}>
           <Link href="/" aria-label="Freecoda home">
             <Mark />
             <span>freecoda</span>
@@ -425,7 +539,7 @@ export default function Chat() {
           >
             <X size={19} />
           </button>
-        </div>
+        </div>}
         <button className={s.newChat} onClick={newChat} disabled={busy}>
           <Plus size={18} />
           New chat
@@ -483,17 +597,24 @@ export default function Chat() {
             </p>
           )}
         </div>
-        <Link className={s.workspace} href="/app">
-          <Code2 size={18} />
-          <span>Coding workspace</span>
-        </Link>
-        <div className={s.account}>
+        {onOpenWorkspace ? (
+          <button className={s.workspace} type="button" onClick={onOpenWorkspace}>
+            <Code2 size={18} />
+            <span>Coding workspace</span>
+          </button>
+        ) : (
+          <Link className={s.workspace} href="/app">
+            <Code2 size={18} />
+            <span>Coding workspace</span>
+          </Link>
+        )}
+        {!embedded && <div className={s.account}>
           <Link href="/settings">Your account & settings</Link>
           <ThemeControl />
-        </div>
+        </div>}
       </aside>
       <section className={s.conversation}>
-        <header className={s.topbar}>
+        {!embedded && <header className={s.topbar}>
           <button
             className={s.menu}
             aria-label="Open sidebar"
@@ -508,21 +629,9 @@ export default function Chat() {
           </div>
           <div className={s.headerRight}>
             {status?.models?.length ? (
-              <label className={s.model}>
-                <select
-                  aria-label="Chat model"
-                  value={model}
-                  disabled={busy}
-                  onChange={(e) => setModel(e.target.value)}
-                >
-                  {status.models.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={13} />
-              </label>
+              <button type="button" className={s.modelPickerTrigger} aria-haspopup="dialog" onClick={() => setModelPickerOpen(true)}>
+                {status.models.find((candidate) => candidate.id === model) ? modelDisplayName(status.models.find((candidate) => candidate.id === model)!) : "Choose model"} ▾
+              </button>
             ) : (
               <span className={s.modelState}>
                 {status ? "Chat" : "Connecting…"}
@@ -538,27 +647,31 @@ export default function Chat() {
               </button>
             )}
           </div>
-        </header>
+        </header>}
         <div className={s.scroll}>
-          {messages.length ? (
+          {messages.length || pendingSend || queue.some((item) => !item.sent) ? (
             <div className={s.messages} aria-label="Conversation">
               {messages.map((m, i) => (
-                <article
-                  key={i}
-                  className={
-                    m.role === "user" ? s.userMessage : s.assistantMessage
-                  }
-                  aria-label={
-                    m.role === "user" ? "Your message" : "Freecoda response"
-                  }
+                <div key={i} className={`${s.messageRow} ${m.role === "user" ? s.userRow : s.assistantRow}`}>
+                  {m.role === "user" ? <UserAvatar image={status?.userImage} name={status?.userName} className={`${s.avatar} ${s.userAvatar}`} /> : <span className={`${s.avatar} ${s.assistantAvatar}`} role="img" aria-label="Coda"><Mark /></span>}
+                  <article
+                  className={m.role === "user" ? s.userMessage : s.assistantMessage}
+                  aria-label={m.role === "user" ? "Your message" : "Coda response"}
                 >
-                  {m.role === "assistant" && (
-                    <div className={s.assistantLabel}>
-                      <Mark />
-                      <span>Freecoda</span>
-                    </div>
-                  )}
-                  <MessageContent text={m.content} />
+                  {m.role === "assistant" && <div className={s.assistantLabel}>Coda</div>}
+                  <MarkdownMessage text={m.content} />
+                  {m.role === "user" && queue.find((item) => item.sent && item.messageIndex === i && item.text === m.content) && (() => {
+                    const delivery = queue.find((item) => item.sent && item.messageIndex === i && item.text === m.content)!;
+                    return <div className={s.deliveryState} role="status">
+                      {delivery.status === "failed" ? "Failed" : delivery.status === "accepted" ? "Accepted" : "Sending"}
+                      {delivery.status === "failed" && <button type="button" onClick={retryQueue}>Retry</button>}
+                      <button type="button" onClick={() => setQueue((current) => current.filter((item) => item.id !== delivery.id))}>Remove</button>
+                    </div>;
+                  })()}
+                  {m.role === "user" && pendingSend?.inHistory && pendingSend.messageIndex === i && pendingSend.text === m.content && <div className={s.deliveryState} role="status">
+                    {pendingSend.status === "failed" ? "Failed" : pendingSend.status === "accepted" ? "Accepted" : "Sending"}
+                    {pendingSend.status === "failed" && <button type="button" onClick={retryPendingSend}>Retry</button>}
+                  </div>}
                   {m.role === "assistant" &&
                     m.status &&
                     m.status !== "complete" && (
@@ -571,8 +684,24 @@ export default function Chat() {
                   {m.role === "assistant" && !busy && (
                     <CopyButton text={m.content} label="Copy response" />
                   )}
-                </article>
+                  </article>
+                </div>
               ))}
+              {pendingSend && !pendingSend.inHistory && <div className={`${s.messageRow} ${s.userRow}`}><UserAvatar image={status?.userImage} name={status?.userName} className={`${s.avatar} ${s.userAvatar}`} /><article className={s.userMessage} aria-label="Pending message">
+                <MarkdownMessage text={pendingSend.text} />
+                <div className={s.deliveryState} role="status">
+                  {pendingSend.status === "failed" ? "Failed before send" : "Sending"}
+                  {pendingSend.status === "failed" && <button type="button" onClick={retryPendingSend}>Retry</button>}
+                </div>
+              </article></div>}
+              {queue.filter((item) => !item.sent).map((item) => <div key={item.id} className={`${s.messageRow} ${s.userRow}`}><UserAvatar image={status?.userImage} name={status?.userName} className={`${s.avatar} ${s.userAvatar}`} /><article className={s.userMessage} aria-label="Queued message">
+                <MarkdownMessage text={item.text} />
+                <div className={s.deliveryState} role="status">
+                  {item.status === "failed" ? "Failed" : item.status === "sending" ? "Sending" : "Queued"}
+                  {item.status === "failed" && <button type="button" onClick={retryQueue}>Retry</button>}
+                  <button type="button" onClick={() => setQueue((current) => current.filter((entry) => entry.id !== item.id))}>Remove</button>
+                </div>
+              </article></div>)}
               {busy && messages.at(-1)?.role !== "assistant" && (
                 <div role="status" className={s.thinking}>
                   <Mark />
@@ -606,10 +735,11 @@ export default function Chat() {
           )}
         </div>
         <div className={s.composerArea}>
+          {commandNotice && <div className={s.availability} role="status">{commandNotice}</div>}
           {error && (
             <div className={s.error} role="alert">
               {error}
-              {!busy && messages.length > 0 && (
+              {!busy && messages.length > 0 && !pendingSend && queue.length === 0 && (
                 <button
                   onClick={() => void send(true)}
                   disabled={!status?.available}
@@ -643,7 +773,7 @@ export default function Chat() {
             className={s.composer}
             onSubmit={(e) => {
               e.preventDefault();
-              void send();
+              submitMessage();
             }}
           >
             <textarea
@@ -658,25 +788,28 @@ export default function Chat() {
                   !e.nativeEvent.isComposing
                 ) {
                   e.preventDefault();
-                  void send();
+                  submitMessage();
                 }
               }}
-              placeholder="Message Freecoda"
+              placeholder={busy ? "Write a message to queue…" : "Message Freecoda"}
               aria-label="Message Freecoda"
               rows={2}
-              disabled={busy || selected?.mode === "coding" || selected?.cloudDeleted || selected?.cloudLoaded === false}
+              disabled={selected?.mode === "coding" || selected?.cloudDeleted || selected?.cloudLoaded === false}
             />
             <div className={s.composerActions}>
-              <span>Ask anything. Make something.</span>
+              <span>{busy ? "Enter queues the next message. Messages run one at a time." : "Ask anything. Make something."}</span>
               {busy ? (
-                <button
-                  type="button"
-                  className={s.send}
-                  aria-label="Stop response"
-                  onClick={() => abort.current?.abort()}
-                >
-                  <Square size={16} fill="currentColor" />
-                </button>
+                <>
+                  {draft.trim() && <button type="submit" className={s.queueButton}>Queue</button>}
+                  <button
+                    type="button"
+                    className={s.send}
+                    aria-label="Stop response"
+                    onClick={() => abort.current?.abort()}
+                  >
+                    <Square size={16} fill="currentColor" />
+                  </button>
+                </>
               ) : (
                 <button
                   type="submit"
@@ -691,6 +824,7 @@ export default function Chat() {
               )}
             </div>
           </form>
+          {queue.length > 0 && <button type="button" className={s.retryQueue} disabled={!status?.available || busy || drainingQueue.current} onClick={retryQueue}>Retry queued messages ({queue.length})</button>}
           <p className={s.disclaimer}>
             Freecoda can make mistakes. Check important information.{" "}
             <Link href="/privacy">
@@ -702,6 +836,7 @@ export default function Chat() {
       <div className={s.adDock}>
         <SponsorPlacement />
       </div>
+      <ModelPicker open={modelPickerOpen} models={status?.models ?? noModels} selected={model} onSelect={setModel} onClose={() => setModelPickerOpen(false)} />
     </main>
   );
 }

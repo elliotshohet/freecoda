@@ -21,6 +21,7 @@ import { selectAd, recordAd, verifyAd } from "../apps/web/lib/ads";
 import { route } from "../apps/web/lib/api";
 import { utcDay, utcMonth } from "../packages/contracts/src";
 import * as cloud from "../apps/web/lib/cloud/store";
+import * as cloudService from "../apps/web/lib/cloud/service";
 import { randomBytes } from "node:crypto";
 const pool = getPool();
 let userId: string;
@@ -99,6 +100,42 @@ test("workflow ID registration cannot move an executing run back to queued", asy
   await cloud.runState(r.id, "completed");
   await cloud.runState(r.id, "queued", "wf_fixture");
   expect((await cloud.run(userId, r.id)).run.status).toBe("completed");
+});
+
+test("repeated cloud message IDs create exactly one run and reject changed intent", async () => {
+  const project = await cloud.createProject(userId, "Idempotent messages", { files: [], consentAt: new Date().toISOString() });
+  const requestId = randomUUID();
+  const payload = { prompt: "Only once", mode: "plan" as const, extensionConsent: false, consentAt: new Date().toISOString() };
+  const results = await Promise.all([
+    cloud.createRunRequest(userId, project.id, payload, requestId),
+    cloud.createRunRequest(userId, project.id, payload, requestId),
+  ]);
+  expect(results.filter(result => result.created)).toHaveLength(1);
+  expect(results.every(result => result.run.id === requestId)).toBe(true);
+  expect((await cloud.createRunRequest(userId, project.id, { ...payload, model: "reflection/beam-free" }, requestId)).created).toBe(false);
+  await expect(cloud.createRunRequest(userId, project.id, { ...payload, model: "unavailable-model" }, requestId)).rejects.toThrow("different request");
+  expect(await cloud.runs(project.id)).toHaveLength(1);
+  await expect(cloud.createRunRequest(userId, project.id, { ...payload, prompt: "Different intent" }, requestId)).rejects.toThrow("different request");
+  await cloud.runState(requestId, "cancelled");
+  const retry = await cloud.createRunRequest(userId, project.id, payload, requestId);
+  expect(retry.created).toBe(false);
+  expect(retry.run.status).toBe("cancelled");
+  await expect(cloud.findRunRequest("stranger", project.id, requestId, payload)).resolves.toBeNull();
+});
+
+test("cloud upstream sync refuses stale, dirty, active and unowned workspaces before network access", async () => {
+  const baseSha = "a".repeat(40);
+  const files = [{ path: "index.ts", content: "committed" }];
+  const project = await cloud.createProject(userId, "Safe pull", { files, consentAt: new Date().toISOString(), repository: { owner: "fixture", name: "repo", installationId: 1, repositoryId: 1, defaultBranch: "main", baseSha, baseFiles: files } });
+  await expect(cloudService.pullRepository(userId, project.id, "b".repeat(40))).rejects.toThrow("base changed");
+  const record = await cloud.project(userId, project.id);
+  await cloud.saveProject(userId, project.id, record.version, { ...record.payload, files: [{ path: "index.ts", content: "unpublished" }] });
+  await expect(cloudService.pullRepository(userId, project.id, baseSha)).rejects.toThrow("unpublished changes");
+  const dirty = await cloud.project(userId, project.id);
+  await cloud.saveProject(userId, project.id, dirty.version, dirty.payload, { sandboxId: "fixture-vm" });
+  await expect(cloudService.pullRepository(userId, project.id, baseSha)).rejects.toThrow("Suspend");
+  await expect(cloudService.pullRepository("stranger", project.id, baseSha)).rejects.toThrow();
+  expect((await cloud.project(userId, project.id)).payload.files[0]!.content).toBe("unpublished");
 });
 
 test("reviewed publication lock excludes new runs and competing edits", async () => {
@@ -187,6 +224,71 @@ beforeEach(async () => {
   await requireInvite(userId);
 });
 afterAll(async () => pool.end());
+test("device account profiles are private and model discovery excludes paid models", async () => {
+  const anonymous = await route(new Request("http://localhost/api/v1/account"));
+  expect(anonymous.status).toBe(401);
+  const token = randomBytes(32).toString("hex");
+  await pool.query(
+    "INSERT INTO devices(id,user_id,token_hash,name,expires_at) VALUES($1,$2,$3,'Profile fixture',now()+interval '1 hour')",
+    [randomUUID(), userId, hash(token)],
+  );
+  await pool.query('UPDATE "user" SET image=$1 WHERE id=$2', ["https://avatars.githubusercontent.com/u/1", userId]);
+  const headers = { Authorization: `Bearer ${token}` };
+  const profile = await route(new Request("http://localhost/api/v1/account", { headers }));
+  expect(profile.status).toBe(200);
+  expect(await profile.json()).toEqual({ name: "Integration fixture", image: "https://avatars.githubusercontent.com/u/1" });
+  const paidId = "fixture/paid-discovery";
+  await pool.query("INSERT INTO model_catalog(id,config) VALUES($1,$2)", [paidId, JSON.stringify({ id: paidId, provider: "fixture", approved: true, inputMicrosPerToken: 1, outputMicrosPerToken: 1, maxContextTokens: 10000 })]);
+  try {
+    const response = await route(new Request("http://localhost/api/v1/models", { headers }));
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.models.some((model: { id: string }) => model.id === paidId)).toBe(false);
+    expect(data.models.every((model: { inputMicrosPerToken: number; outputMicrosPerToken: number }) => model.inputMicrosPerToken === 0 && model.outputMicrosPerToken === 0)).toBe(true);
+  } finally {
+    await pool.query("DELETE FROM model_catalog WHERE id=$1", [paidId]);
+  }
+});
+test("cloud storage consent is account scoped and versioned", async () => {
+  expect(await cloud.hasCloudConsent(userId, "cloud-storage", "v1")).toBe(false);
+  await cloud.acknowledgeCloudConsent(userId, "cloud-storage", "v1");
+  expect(await cloud.hasCloudConsent(userId, "cloud-storage", "v1")).toBe(true);
+  expect(await cloud.hasCloudConsent(userId, "cloud-storage", "v2")).toBe(false);
+  expect(await cloud.hasCloudConsent(randomUUID(), "cloud-storage", "v1")).toBe(false);
+});
+test("saved private preview sessions survive project reload and expire without allocating compute", async () => {
+  const project = await cloud.createProject(userId, "Preview fixture", {
+    files: [],
+    consentAt: new Date().toISOString(),
+  });
+  const current = await cloud.project(userId, project.id);
+  const expiresAt = new Date(Date.now() + 60_000).toISOString();
+  await cloud.saveProject(userId, project.id, current.version, {
+    ...current.payload,
+    preview: {
+      sandboxId: "sandbox-fixture",
+      url: "https://preview-fixture.vercel.run/?ticket=signed-fixture",
+      token: "signed-fixture",
+      expiresAt,
+    },
+  }, { status: "ready", sandboxId: "sandbox-fixture" });
+  expect(await cloudService.previewSession(userId, project.id)).toEqual({
+    url: "https://preview-fixture.vercel.run/?ticket=signed-fixture",
+    expiresAt,
+  });
+  const saved = await cloud.project(userId, project.id);
+  await cloud.saveProject(userId, project.id, saved.version, {
+    ...saved.payload,
+    preview: {
+      ...saved.payload.preview!,
+      expiresAt: new Date(Date.now() - 1000).toISOString(),
+    },
+  });
+  expect(await cloudService.previewSession(userId, project.id)).toEqual({
+    url: null,
+    expiresAt: null,
+  });
+});
 test("only one parallel request can reserve a user allowance", async () => {
   const results = await Promise.allSettled(
     Array.from({ length: 8 }, () => reserve(userId, "fixture", 60_000)),
@@ -234,7 +336,7 @@ test("uncertain requests keep their reservation until reconciled", async () => {
 test("stale zero-cost Beam reservations release atomically before retry", async () => {
   const before = await usageSnapshot(userId);
   const old = await reserve(userId, "reflection/beam-free", 0);
-  await uncertain(old);
+  await uncertain(old, "interrupted-free-generation");
   await pool.query(
     "UPDATE reservations SET created_at=now()-interval '6 minutes' WHERE id=$1",
     [old],
@@ -250,6 +352,17 @@ test("stale zero-cost Beam reservations release atomically before retry", async 
     before.freeRemainingMicros,
   );
   await settle(retry, 0);
+});
+test("legacy orphaned Beam reservations settle at their full bound before another request", async () => {
+  const old = await reserve(userId, "reflection/beam-free", 1);
+  await uncertain(old);
+  await pool.query("UPDATE reservations SET created_at=now()-interval '6 minutes' WHERE id=$1", [old]);
+  const before = await usageSnapshot(userId);
+  const next = await reserve(userId, "reflection/beam-free", 0);
+  expect((await pool.query("SELECT status,actual_cost_micros FROM reservations WHERE id=$1", [old])).rows[0]).toEqual({ status: "settled", actual_cost_micros: "1" });
+  expect((await usageSnapshot(userId)).freeRemainingMicros).toBe(before.freeRemainingMicros);
+  await settle(next, 0);
+  expect(await settle(old, 0, undefined, true)).toBe(false);
 });
 test("UTC reset ignores old daily buckets but retains monthly spend", async () => {
   await pool.query(

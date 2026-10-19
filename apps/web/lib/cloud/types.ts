@@ -28,12 +28,19 @@ export type CloudProject = {
   repo?: Omit<RepositorySource, "baseFiles">;
 };
 export type ProjectPayload = {
+  disabledTools?: string[];
+  mcpToolCatalog?: Record<string, { checkedAt: string; tools: { name: string; description?: string }[] }>;
   extensions?: import("../../../../packages/core/src/extensions").ExtensionRegistry;
   error?: string;
   files: SourceFile[];
   repository?: RepositorySource;
   consentAt: string;
-  preview?: { url: string; token: string; expiresAt: string };
+  preview?: {
+    sandboxId: string;
+    url: string;
+    token: string;
+    expiresAt: string;
+  };
 };
 export type CloudRun = {
   id: string;
@@ -45,6 +52,7 @@ export type CloudRun = {
   updatedAt: string;
 };
 export type RunPayload = {
+  model?: string;
   conversationId?: string;
   conversationVersion?: number;
   extensionConsent?: boolean;

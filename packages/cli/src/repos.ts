@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { validateBaseURL } from "@freecoda/core";
+import { validateBaseURL, repositorySyncStatus, pullRepository } from "@freecoda/core";
 import { loadConfig } from "./config";
 import { safeTerminalText } from "./ui";
 
@@ -20,6 +20,12 @@ async function request(path: string, body?: unknown) {
 }
 export function registerRepoCommands(program: Command) {
   const repos = program.command("repos").description("Manage account GitHub repository settings shared by web, desktop, and CLI; does not clone or trust local code");
+  repos.command("status").description("Show local GitHub identity, branch, local changes, and last fetched upstream status")
+    .option("--root <path>", "Local checkout", ".")
+    .action(async (options: { root: string }) => console.log(JSON.stringify(await repositorySyncStatus(options.root), null, 2)));
+  repos.command("pull").description("Explicitly fetch origin and fast-forward a clean checkout; never uploads or overwrites local changes")
+    .option("--root <path>", "Trusted local checkout", ".")
+    .action(async (options: { root: string }) => console.log(JSON.stringify(await pullRepository(options.root), null, 2)));
   repos.command("list").description("List accessible installed GitHub repositories and installation link").action(async () => console.log(JSON.stringify(await request("repos"), null, 2)));
   repos.command("configured").description("Show account repository settings").action(async () => console.log(JSON.stringify(await request("repositories"), null, 2)));
   repos.command("configure <repository>").description("Save OWNER/NAME settings for your connected account")

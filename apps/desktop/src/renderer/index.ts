@@ -1,3 +1,5 @@
+import { canDeliverQueuedPrompt, settleQueuedPrompt, type QueuedPrompt } from "./prompt-queue";
+import { parseMarkdownBlocks, safeMarkdownLink } from "./markdown";
 import type {
   AgentMode,
   DesktopPermissionPreset,
@@ -38,6 +40,8 @@ const editor = area("editor");
 const prompt = area("prompt");
 const mode = el<HTMLSelectElement>("mode");
 let state: DesktopState | null = null;
+let accountProfile: { name?: string; avatar?: string } = {};
+let profileSignedIn: boolean | undefined;
 let file: DesktopFile | null = null;
 let pendingFolder: DesktopWorkspace | null = null;
 let filesRequest = 0;
@@ -55,6 +59,9 @@ let currentApproval: string | null = null;
 let loginInProgress = false;
 let commandInFlight = false;
 let conversationRoot: string | null = null;
+const promptQueue: QueuedPrompt[] = [];
+let drainingPromptQueue = false;
+let promptQueuePaused = false;
 const abort = new AbortController();
 const signal = abort.signal;
 const modifier = /Mac/i.test(navigator.platform) ? "⌘" : "Ctrl";
@@ -65,7 +72,7 @@ document
     node.textContent = `${modifier}${index === 0 ? "O" : "S"}`;
   });
 document.querySelector<HTMLElement>(".composer-hint")!.textContent =
-  `${modifier} Enter to send`;
+  "Enter to send · Ctrl+Enter to queue · Shift+Enter for a new line";
 
 function message(error: unknown) {
   return error instanceof Error
@@ -120,14 +127,14 @@ function updateControls() {
   button("save-file").disabled =
     !safe || readOnly || !file || file.readOnly || !dirty();
   editor.disabled = !safe || readOnly || !file || file.readOnly;
-  prompt.disabled = running || actionBusy;
+  prompt.disabled = actionBusy;
   mode.disabled = running || actionBusy;
   button("send").disabled =
-    running ||
     actionBusy ||
     !prompt.value.trim() ||
     (!localCommand && (!ready || !state?.auth.signedIn || (!chat && dirty())));
   hide("send", running);
+  renderPromptQueue();
   hide("stop", !running);
   button("stop").disabled = actionBusy;
   button("new-chat").disabled = !ready;
@@ -499,6 +506,8 @@ async function saveFile() {
       await refreshFiles();
     }
   } catch (error) {
+    promptQueuePaused = true;
+    renderPromptQueue();
     showError(error);
   } finally {
     actionBusy = false;
@@ -543,48 +552,48 @@ function copyControl(value: () => string, label: string) {
   return node;
 }
 function inlineContent(parent: HTMLElement, value: string) {
-  for (const part of value.split(/(\*\*[^*]+\*\*|`[^`]+`)/g)) {
-    if (part.startsWith("**") && part.endsWith("**")) {
-      const node = document.createElement("strong");
-      node.textContent = part.slice(2, -2);
-      parent.append(node);
+  for (const part of value.split(/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^\s)]+\))/g)) {
+    const link = /^\[([^\]]+)\]\(([^\s)]+)\)$/.exec(part);
+    if (link && safeMarkdownLink(link[2])) {
+      const label = document.createElement("span");
+      label.textContent = `${link[1]} (${link[2]})`;
+      parent.append(label, copyControl(() => link[2], "Copy link"));
+    } else if (part.startsWith("**") && part.endsWith("**")) {
+      const node = document.createElement("strong"); node.textContent = part.slice(2, -2); parent.append(node);
     } else if (part.startsWith("`") && part.endsWith("`")) {
-      const node = document.createElement("code");
-      node.textContent = part.slice(1, -1);
-      parent.append(node);
+      const node = document.createElement("code"); node.textContent = part.slice(1, -1); parent.append(node);
     } else parent.append(document.createTextNode(part));
   }
 }
 function renderRichContent(parent: HTMLElement, content: string) {
-  parent.replaceChildren();
-  parent.dataset.raw = content;
-  for (const part of content.split(/(```[\s\S]*?```)/g)) {
-    if (part.startsWith("```") && part.endsWith("```")) {
-      const body = part.slice(3, -3),
-        newline = body.indexOf("\n");
-      const code = newline >= 0 ? body.slice(newline + 1) : body;
-      const block = document.createElement("div");
-      block.className = "chat-code";
-      const head = document.createElement("div");
-      const label = document.createElement("span");
-      label.textContent =
-        newline >= 0 ? body.slice(0, newline).trim() || "Code" : "Code";
-      head.append(
-        label,
-        copyControl(() => code, "Copy code"),
-      );
-      const pre = document.createElement("pre"),
-        codeNode = document.createElement("code");
-      codeNode.textContent = code;
-      pre.append(codeNode);
-      block.append(head, pre);
-      parent.append(block);
-    } else
-      for (const line of part.split("\n")) {
-        const node = document.createElement(/^#{1,3} /.test(line) ? "h3" : "p");
-        inlineContent(node, line.replace(/^#{1,3} /, "") || "\u00a0");
-        parent.append(node);
-      }
+  parent.classList.remove("streaming-response");
+  parent.replaceChildren(); parent.dataset.raw = content;
+  for (const part of parseMarkdownBlocks(content)) {
+    if (part.kind === "code") {
+      const block = document.createElement("div"); block.className = "chat-code";
+      const head = document.createElement("div"), label = document.createElement("span");
+      label.textContent = part.language;
+      head.append(label, copyControl(() => part.text, "Copy code"));
+      const pre = document.createElement("pre"), code = document.createElement("code");
+      code.textContent = part.text; pre.append(code); block.append(head, pre); parent.append(block);
+    } else if (part.kind === "list") {
+      const list = document.createElement(part.ordered ? "ol" : "ul");
+      if (list instanceof HTMLOListElement) list.start = part.start;
+      for (const item of part.items) { const node = document.createElement("li"); inlineContent(node, item); list.append(node); }
+      parent.append(list);
+    } else if (part.kind === "table") {
+      const scroll = document.createElement("div"); scroll.className = "chat-table-scroll"; scroll.tabIndex = 0;
+      scroll.setAttribute("role", "region"); scroll.setAttribute("aria-label", "Response table");
+      const table = document.createElement("table"), head = document.createElement("thead"), body = document.createElement("tbody");
+      const header = document.createElement("tr");
+      for (const cell of part.headers) { const node = document.createElement("th"); node.scope = "col"; inlineContent(node, cell); header.append(node); }
+      head.append(header);
+      for (const row of part.rows) { const node = document.createElement("tr"); for (const cell of row) { const td = document.createElement("td"); inlineContent(td, cell); node.append(td); } body.append(node); }
+      table.append(head, body); scroll.append(table); parent.append(scroll);
+    } else {
+      const node = document.createElement(part.kind === "heading" ? `h${Math.max(2, part.level)}` : part.kind === "quote" ? "blockquote" : "p");
+      inlineContent(node, part.text); parent.append(node);
+    }
   }
 }
 function appendMessage(role: "user" | "assistant" | "system", content: string) {
@@ -594,13 +603,30 @@ function appendMessage(role: "user" | "assistant" | "system", content: string) {
   const label = document.createElement("span");
   label.className = "message-label";
   label.textContent =
-    role === "user" ? "You" : role === "assistant" ? "Freecoda" : "Workspace";
+    role === "user" ? "You" : role === "assistant" ? "Coda" : "Workspace";
+  const speaker = document.createElement("div");
+  speaker.className = "message-speaker";
+  if (role !== "system") {
+    const avatar = document.createElement("span");
+    avatar.className = `message-avatar ${role}`;
+    avatar.setAttribute("aria-hidden", "true");
+    if (role === "assistant") {
+      const logo = document.createElement("img");
+      logo.src = "./logo.svg"; logo.alt = ""; logo.width = 22; logo.height = 22;
+      avatar.append(logo);
+    } else if (accountProfile.avatar) {
+      const image = document.createElement("img"); image.src = accountProfile.avatar;
+      image.alt = ""; image.width = 22; image.height = 22; avatar.append(image);
+    } else avatar.textContent = accountProfile.name?.slice(0, 1).toUpperCase() || "U";
+    speaker.append(avatar);
+  }
+  speaker.append(label);
   const paragraph = document.createElement("div");
   paragraph.className = "chat-message-content";
   paragraph.dataset.raw = content;
   if (role === "assistant") renderRichContent(paragraph, content);
   else paragraph.textContent = content;
-  node.append(label, paragraph);
+  node.append(speaker, paragraph);
   if (role === "assistant")
     node.append(
       copyControl(() => paragraph.dataset.raw || "", "Copy response"),
@@ -615,6 +641,7 @@ function scrollChat() {
 }
 function appendText(value: string) {
   if (!assistantParagraph) assistantParagraph = appendMessage("assistant", "");
+  assistantParagraph.classList.add("streaming-response");
   assistantParagraph.dataset.raw =
     (assistantParagraph.dataset.raw || "") + value;
   assistantParagraph.textContent = assistantParagraph.dataset.raw;
@@ -660,7 +687,16 @@ async function newConversation() {
 }
 async function sendPrompt(event?: Event) {
   event?.preventDefault();
-  if (running || actionBusy || !prompt.value.trim()) return;
+  if (actionBusy || !prompt.value.trim()) return;
+  if (running) {
+    notify("A task is running. Press Ctrl+Enter to add this message to the queue.");
+    return;
+  }
+  if (await runSlashCommand(prompt.value.trim())) {
+    prompt.value = "";
+    updateControls();
+    return true;
+  }
   if (/^\/permissions(?:\s|$)/i.test(prompt.value.trim())) {
     if (prompt.value.trim().toLowerCase() !== "/permissions") {
       showError(new Error("Use /permissions to choose a permission preset."));
@@ -703,14 +739,138 @@ async function sendPrompt(event?: Event) {
         ? "Conversation started."
         : `${chosen === "build" ? "Build" : chosen === "plan" ? "Plan" : "Review"} started in ${workspaceName()}.`,
     );
+    return true;
   } catch (error) {
     running = false;
     activeRun = null;
+    promptQueuePaused = true;
+    renderPromptQueue();
     showError(error);
   } finally {
     actionBusy = false;
     updateControls();
     renderFiles();
+    if (!running) void drainPromptQueue();
+  }
+}
+function renderPromptQueue() {
+  const list = el("prompt-queue");
+  list.replaceChildren();
+  hide("prompt-queue", promptQueue.length === 0);
+  if (promptQueuePaused && promptQueue.length) {
+    const resume = document.createElement("button");
+    resume.type = "button";
+    resume.textContent = "Resume queued messages";
+    resume.addEventListener("click", () => {
+      if (running || actionBusy) return;
+      promptQueuePaused = false;
+      void drainPromptQueue();
+    }, { signal });
+    list.append(resume);
+  }
+  promptQueue.forEach((value, index) => {
+    const row = document.createElement("div");
+    row.className = "queued-prompt";
+    const label = document.createElement("span");
+    label.textContent = `${index + 1}. ${value.text}`;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "Remove";
+    remove.setAttribute("aria-label", `Remove queued message ${index + 1}`);
+    remove.addEventListener("click", () => {
+      promptQueue.splice(index, 1);
+      renderPromptQueue();
+    }, { signal });
+    row.append(label, remove);
+    list.append(row);
+  });
+}
+function enqueuePrompt() {
+  const value = prompt.value.trim();
+  if (!value) return;
+  promptQueue.push({ text: value, mode: mode.value, threadId: state?.activeThreadId, root: state?.workspace?.root });
+  prompt.value = "";
+  renderPromptQueue();
+  updateControls();
+  notify(`Queued message ${promptQueue.length}. It will run after the current task settles.`);
+}
+async function drainPromptQueue() {
+  if (promptQueuePaused || drainingPromptQueue || running || actionBusy || !promptQueue.length) return;
+  drainingPromptQueue = true;
+  try {
+    while (!running && !actionBusy && promptQueue.length) {
+      // Never overwrite a draft typed while the previous task was running.
+      if (prompt.value.trim()) { promptQueuePaused = true; renderPromptQueue(); break; }
+      const next = promptQueue[0];
+      if (!canDeliverQueuedPrompt(next, { mode: mode.value, threadId: state?.activeThreadId, root: state?.workspace?.root }, prompt.value)) {
+        promptQueuePaused = true; renderPromptQueue();
+        notify("Return to the queued message’s conversation and mode before resuming."); break;
+      }
+      prompt.value = next.text;
+      const accepted = await sendPrompt();
+      const settled = settleQueuedPrompt(promptQueue, accepted === true);
+      if (settled.paused) { promptQueuePaused = true; prompt.value = ""; }
+      renderPromptQueue();
+      if (running || promptQueuePaused) break;
+    }
+  } finally {
+    drainingPromptQueue = false;
+  }
+}
+async function runSlashCommand(value: string): Promise<boolean> {
+  if (!value.startsWith("/")) return false;
+  const [command, ...args] = value.trim().split(/\s+/);
+  switch (command.toLowerCase()) {
+    case "/help":
+      appendMessage("assistant", "Desktop commands: /help, /new, /clear, /mode chat|build|plan|review, /model, /permissions, /usage, /status, /sync status|pull, /mcp, /tools, /extensions. Tool access still follows the selected mode, trusted folder, and permission approvals.");
+      return true;
+    case "/new":
+      await newConversation();
+      return true;
+    case "/clear":
+      clearConversation(false);
+      notify("Visible conversation cleared. Saved conversation history is unchanged.");
+      return true;
+    case "/mode": {
+      const selected = args[0] as AgentMode | undefined;
+      if (!selected || !["chat", "build", "plan", "review"].includes(selected)) {
+        notify("Use /mode chat, build, plan, or review.");
+        return true;
+      }
+      await switchAgentMode(selected);
+      return true;
+    }
+    case "/model":
+      await openModels();
+      return true;
+    case "/permissions":
+      if (args.length) notify("Use /permissions to choose a permission preset.");
+      else openPermissions();
+      return true;
+    case "/usage":
+      openAccount();
+      return true;
+    case "/status":
+      notify(`${isChat() ? "Chat" : `${mode.value} workspace · ${workspaceName()}`} · ${trusted() ? "folder trusted" : "no trusted folder"} · ${state?.permissionPreset || "default"} permissions · ${state?.auth.model || "Beam Free"}`);
+      return true;
+    case "/sync": {
+      const action = args[0] || "status";
+      if (action !== "status" && action !== "pull") {
+        notify("Use /sync status or /sync pull.");
+        return true;
+      }
+      const result = await bridge.syncRepository(action);
+      appendMessage("assistant", `${result.repository || "Repository"} · ${result.branch || "detached HEAD"} → ${result.upstream || "no upstream"}\n${result.ahead} ahead · ${result.behind} behind · ${result.dirty ? "local changes present" : "clean"} · ${result.conflicts ? "conflicts present" : "no conflicts"}${result.operationInProgress ? " · Git operation in progress" : ""}${action === "status" ? "\nCounts reflect the last fetch. /sync pull explicitly fetches and fast-forwards a clean checkout." : "\nSync finished. Nothing was uploaded."}`);
+      return true;
+    }
+    case "/mcp":
+    case "/tools":
+    case "/extensions":
+      button("extensions-open").click();
+      return true;
+    default:
+      notify(`Unknown command: ${command}. Use /help to see desktop commands.`);
+      return true;
   }
 }
 async function stopRun() {
@@ -897,6 +1057,7 @@ button("github-repos-open").addEventListener("click", async () => {
 button("github-repos-close").addEventListener("click", () => el<HTMLDialogElement>("github-repos-dialog").close(), { signal });
 button("github-repos-refresh").addEventListener("click", () => { void refreshGitHubRepositories().catch(error => text("github-repos-status", error instanceof Error ? error.message : "Could not refresh repositories.")); }, { signal });
 button("github-connect").addEventListener("click", () => { void bridge.connectGitHub().catch(error => text("github-repos-status", error instanceof Error ? error.message : "Could not open GitHub.")); }, { signal });
+button("github-reconnect").addEventListener("click", () => { void bridge.reconnectGitHub().catch(error => text("github-repos-status", error instanceof Error ? error.message : "Could not open Freecoda settings.")); }, { signal });
 el("github-repos-form").addEventListener("submit", async event => {
   event.preventDefault(); button("github-repos-save").disabled = true;
   try {
@@ -927,20 +1088,33 @@ function renderExtensions(items: import("../shared").DesktopExtension[]) {
     for (const [control, operation] of [[toggle, () => bridge.setExtensionEnabled({ id: item.id, enabled: !item.enabled })], [remove, () => bridge.removeExtension(item.id)]] as const) {
       control.addEventListener("click", async () => {
         toggle.disabled = remove.disabled = true;
-        try { renderExtensions(await operation()); } catch (error) { showError(error); toggle.disabled = remove.disabled = false; }
+        try { if (running || promptQueue.length) throw Error("Finish or remove queued messages before changing tools or skills."); renderExtensions(await operation()); } catch (error) { showError(error); toggle.disabled = remove.disabled = false; }
       }, { signal });
+    }
+    if (item.kind === "mcp") {
+      const discover = document.createElement("button"); discover.textContent = "Check & list tools";
+      discover.disabled = !item.enabled || running;
+      discover.addEventListener("click", async () => {
+        discover.disabled = true;
+        try { const names = await bridge.discoverTools(item.id); detail.textContent = `Available at last check · ${names.join(", ") || "No tools returned"}`; await renderToolChoices(); }
+        catch (error) { detail.textContent = `Check failed: ${message(error)}`; }
+        finally { discover.disabled = !item.enabled; }
+      }, { signal });
+      actions.append(discover);
     }
     actions.append(toggle, remove); row.append(info, actions); list.append(row);
   }
 }
 button("extensions-open").addEventListener("click", async () => {
-  try { renderExtensions(await bridge.listExtensions()); el<HTMLDialogElement>("extensions-dialog").showModal(); }
+  if (running || promptQueue.length) { notify("Finish or remove queued messages before changing tools or skills."); return; }
+  try { renderExtensions(await bridge.listExtensions()); await renderToolChoices(); el<HTMLDialogElement>("extensions-dialog").showModal(); }
   catch (error) { showError(error); }
 }, { signal });
 button("extensions-close").addEventListener("click", () => el<HTMLDialogElement>("extensions-dialog").close(), { signal });
 el("extensions-form").addEventListener("submit", async event => {
   event.preventDefault(); button("extension-install").disabled = true;
   try {
+    if (running || promptQueue.length) throw Error("Finish or remove queued messages before changing tools or skills.");
     const kind = el<HTMLSelectElement>("extension-kind").value;
     if (kind !== "skill" && kind !== "mcp") throw Error("Choose an extension type.");
     renderExtensions(await bridge.installExtension({ kind, name: input("extension-name").value, url: input("extension-url").value }));
@@ -951,6 +1125,19 @@ el("extensions-form").addEventListener("submit", async event => {
 }, { signal });
 function renderAccount() {
   if (!state) return;
+  if (profileSignedIn !== state.auth.signedIn) {
+    profileSignedIn = state.auth.signedIn;
+    accountProfile = {};
+    if (state.auth.signedIn) void bridge.accountProfile().then(profile => {
+      if (!state?.auth.signedIn) return;
+      accountProfile = profile;
+      for (const avatar of document.querySelectorAll<HTMLElement>(".message-avatar.user")) {
+        avatar.replaceChildren();
+        if (profile.avatar) { const image = document.createElement("img"); image.src = profile.avatar; image.alt = ""; image.width = 22; image.height = 22; avatar.append(image); }
+        else avatar.textContent = profile.name?.slice(0, 1).toUpperCase() || "U";
+      }
+    }).catch(() => {});
+  }
   text(
     "account-state",
     state.auth.signedIn
@@ -1149,6 +1336,7 @@ async function handleEvent(event: DesktopEvent) {
         running = false;
         activeRun = null;
         assistantParagraph = null;
+        if (event.cancelled) { promptQueuePaused = true; renderPromptQueue(); }
         activity(event.cancelled ? "Task stopped." : "Task completed.");
         text("working-text", "Working in your project…");
         approvalQueue = approvalQueue.filter((a) => a.runId !== event.runId);
@@ -1173,9 +1361,12 @@ async function handleEvent(event: DesktopEvent) {
           el<HTMLDialogElement>("account-dialog").open
         )
           void refreshUsage();
+        void drainPromptQueue();
       }
       break;
     case "error":
+      promptQueuePaused = true;
+      renderPromptQueue();
       showError(new Error(event.text));
       if (assistantParagraph) {
         const note = document.createElement("p");
@@ -1190,6 +1381,7 @@ async function handleEvent(event: DesktopEvent) {
         assistantParagraph = null;
         updateControls();
         renderFiles();
+        void drainPromptQueue();
       }
       activity("The action stopped. Review the error before trying again.");
       break;
@@ -1293,13 +1485,18 @@ el("permissions-form").addEventListener(
 prompt.addEventListener(
   "keydown",
   (event) => {
-    if (
-      event.key === "Enter" &&
-      !event.shiftKey &&
-      !event.metaKey &&
-      !event.ctrlKey &&
-      /^\/permissions(?:\s|$)/i.test(prompt.value.trim())
-    ) {
+    if (event.key === "Enter" && event.shiftKey) return;
+    if (event.key === "Enter" && event.ctrlKey) {
+      event.preventDefault();
+      if (running) enqueuePrompt();
+      else void sendPrompt();
+      return;
+    }
+    if (event.key === "Enter" && event.metaKey) {
+      event.preventDefault();
+      return;
+    }
+    if (event.key === "Enter" && !event.metaKey) {
       event.preventDefault();
       void sendPrompt();
     }
@@ -1677,4 +1874,42 @@ if (!bridge) {
 } else {
   void bridge.getState().then(renderState).catch(showError);
   void loadSponsor();
+}
+
+async function openModels() {
+  if (running || actionBusy || promptQueue.length) { notify("Finish or remove queued messages before changing models."); return; }
+  const models = await bridge.listModels();
+  const list = el("model-options"); list.replaceChildren();
+  if (!models.length) list.textContent = "No configured free models are available. Check your account connection.";
+  for (const model of models) {
+    const option = document.createElement("button"); option.type = "button";
+    option.className = "button secondary";
+    option.textContent = `${model.name}${state?.auth.model === model.id ? " · Selected" : ""}`;
+    option.addEventListener("click", async () => {
+      option.disabled = true;
+      try { if (running || promptQueue.length) throw Error("Finish or remove queued messages before changing models."); renderState(await bridge.selectModel(model.id)); el<HTMLDialogElement>("model-dialog").close(); }
+      catch (error) { showError(error); option.disabled = false; }
+    }, { signal });
+    list.append(option);
+  }
+  el<HTMLDialogElement>("model-dialog").showModal();
+}
+button("model-close").addEventListener("click", () => el<HTMLDialogElement>("model-dialog").close(), { signal });
+
+async function renderToolChoices() {
+  let list = document.getElementById("tool-choices");
+  if (!list) { list = document.createElement("div"); list.id = "tool-choices"; el("extensions-list").after(list); }
+  list.replaceChildren();
+  const title = document.createElement("p"); title.textContent = "Tools for the next task · session only. Mode and approval restrictions still apply. MCP tools appear after an explicit check."; list.append(title);
+  for (const tool of await bridge.toolChoices()) {
+    const label = document.createElement("label"); const box = document.createElement("input");
+    box.type = "checkbox"; box.checked = tool.enabled; box.disabled = running;
+    box.addEventListener("change", async () => {
+      box.disabled = true;
+      try { if (running || promptQueue.length) throw Error("Finish or remove queued messages before changing tools."); await bridge.setToolEnabled({ name: tool.name, enabled: box.checked }); }
+      catch (error) { box.checked = !box.checked; showError(error); }
+      finally { box.disabled = running; }
+    }, { signal });
+    label.append(box, tool.name); list.append(label);
+  }
 }

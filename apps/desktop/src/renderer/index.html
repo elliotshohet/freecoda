@@ -362,7 +362,7 @@ Command output will appear here. Your permission preset controls local command e
             >
               Default permissions</button
             ><span id="model-label" class="model-label">Freecoda model</span
-            ><span class="composer-hint">⌘ Enter to send</span
+            ><span class="composer-hint">Enter to send · Ctrl+Enter to queue · Shift+Enter for a new line</span
             ><button id="send" type="submit" class="send" disabled>
               Send <span aria-hidden="true">↑</span></button
             ><button id="stop" type="button" class="stop" hidden>
@@ -370,6 +370,7 @@ Command output will appear here. Your permission preset controls local command e
             </button>
           </div>
         </form>
+        <div id="prompt-queue" class="prompt-queue" aria-label="Queued messages" hidden></div>
         <p class="permission-note" id="permission-note">
           <span aria-hidden="true">◇</span> You approve every file change and
           shell command.
@@ -525,7 +526,8 @@ Command output will appear here. Your permission preset controls local command e
       <button id="github-repos-close" class="dialog-close" aria-label="Close repositories">×</button>
       <h2 id="github-repos-title">Connected repositories</h2>
       <p>Choose the GitHub repositories available to your hosted account. Branch and app folder preferences sync across your devices. Local folders still require explicit trust; saving does not clone a repository.</p>
-      <div class="dialog-actions"><button id="github-connect" class="button secondary">Connect GitHub repositories</button><button id="github-repos-refresh" class="button secondary">Refresh access</button></div>
+      <p>If account authorization expires, reconnect your GitHub account in Freecoda settings. App installation access is managed separately.</p>
+      <div class="dialog-actions"><button id="github-reconnect" class="button secondary">Reconnect GitHub account</button><button id="github-connect" class="button secondary">Manage GitHub App access</button><button id="github-repos-refresh" class="button secondary">Refresh access</button></div>
       <form id="github-repos-form"><div id="github-repos-list"></div><div class="dialog-actions"><button id="github-repos-save" type="submit" class="button secondary">Save preferences</button></div></form>
       <p id="github-repos-status" role="status"></p>
     </dialog>
@@ -585,6 +587,12 @@ Command output will appear here. Your permission preset controls local command e
         Signed-in conversations sync to your account, with a local offline copy; AI requests send the context
         needed for your task.
       </p>
+    </dialog>
+    <dialog id="model-dialog" aria-labelledby="model-title">
+      <h2 id="model-title">Free model</h2>
+      <p>Changes apply to your next request. Only configured free models are available.</p>
+      <div id="model-options"></div>
+      <button id="model-close" class="button secondary">Close</button>
     </dialog>
     <script type="module" src="./renderer.js"></script>
   </body>

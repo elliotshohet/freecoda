@@ -14,6 +14,8 @@ import { connectExtensionTools, type ExtensionRegistry } from "./extensions";
 export async function runAgent(options: {
   root: string;
   extensions?: ExtensionRegistry;
+  /** Restricts the final mode-allowed tool set; never grants additional access. */
+  disabledTools?: string[];
   model: LanguageModel;
   messages: ModelMessage[];
   approve: Approval;
@@ -125,6 +127,7 @@ export async function runAgent(options: {
         })
       : { tools: {}, instructions: "", close: async () => {} };
   tools = { ...tools, ...extensions.tools };
+  for (const name of options.disabledTools ?? []) delete tools[name];
   try {
     const agent = new ToolLoopAgent({
       model: options.model,

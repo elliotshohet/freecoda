@@ -2,10 +2,18 @@ import { contextBridge, ipcRenderer } from "electron";
 import type { DesktopBridge, DesktopEvent } from "./shared";
 // Expose individual operations, never raw IPC or Node APIs.
 const api: DesktopBridge = {
+  discoverTools: (id) => ipcRenderer.invoke("desktop:discoverTools", id),
+  toolChoices: () => ipcRenderer.invoke("desktop:toolChoices"),
+  setToolEnabled: (input) => ipcRenderer.invoke("desktop:setToolEnabled", input),
+  accountProfile: () => ipcRenderer.invoke("desktop:accountProfile"),
+  listModels: () => ipcRenderer.invoke("desktop:listModels"),
+  selectModel: (id) => ipcRenderer.invoke("desktop:selectModel", id),
+  syncRepository: (action) => ipcRenderer.invoke("desktop:syncRepository", action),
   refreshConversations: () => ipcRenderer.invoke("desktop:refreshConversations"),
   githubRepositories: () => ipcRenderer.invoke("desktop:githubRepositories"),
   saveGitHubRepositories: (repositories) => ipcRenderer.invoke("desktop:saveGitHubRepositories", repositories),
   connectGitHub: () => ipcRenderer.invoke("desktop:connectGitHub"),
+  reconnectGitHub: () => ipcRenderer.invoke("desktop:reconnectGitHub"),
   listExtensions: () => ipcRenderer.invoke("desktop:listExtensions"),
   installExtension: (input) => ipcRenderer.invoke("desktop:installExtension", input),
   setExtensionEnabled: (input) => ipcRenderer.invoke("desktop:setExtensionEnabled", input),

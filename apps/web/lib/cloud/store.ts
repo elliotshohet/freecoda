@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { getPool, transaction } from "../db";
 import { ApiError } from "../http";
+import { PREFERRED_FREE_MODEL } from "../free-model-selector";
 import { encrypt, decrypt } from "./crypto";
 import type {
   CloudProject,
@@ -11,6 +12,19 @@ import type {
   CloudEvent,
 } from "./types";
 export const CLOUD_STORAGE_CAP_BYTES = 350_000_000;
+export async function hasCloudConsent(userId: string, purpose: string, version: string) {
+  const result = await getPool().query(
+    "SELECT 1 FROM cloud_user_consents WHERE user_id=$1 AND purpose=$2 AND version=$3",
+    [userId, purpose, version],
+  );
+  return !!result.rowCount;
+}
+export async function acknowledgeCloudConsent(userId: string, purpose: string, version: string) {
+  await getPool().query(
+    "INSERT INTO cloud_user_consents(user_id,purpose,version) VALUES($1,$2,$3) ON CONFLICT DO NOTHING",
+    [userId, purpose, version],
+  );
+}
 async function storageLock(db: PoolClient) {
   await db.query("SELECT pg_advisory_xact_lock(hashtext('cloud-storage'))");
 }
@@ -167,7 +181,19 @@ export async function createRun(
   projectId: string,
   payload: RunPayload,
 ) {
-  const id = randomUUID();
+  return (await createRunRequest(userId, projectId, payload)).run;
+}
+export async function findRunRequest(userId: string, projectId: string, id: string, payload: Pick<RunPayload, "prompt" | "mode" | "extensionConsent" | "model">) {
+  const row = (await getPool().query("SELECT project_id,payload FROM cloud_runs WHERE id=$1 AND user_id=$2", [id, userId])).rows[0];
+  if (!row) return null;
+  const saved = decrypt<RunPayload>(row.payload, `run:${id}`);
+  if (row.project_id !== projectId || saved.prompt !== payload.prompt || saved.mode !== payload.mode || (saved.model || PREFERRED_FREE_MODEL) !== (payload.model || PREFERRED_FREE_MODEL) || !!saved.extensionConsent !== !!payload.extensionConsent)
+    throw new ApiError(409, "This message ID was already used for a different request.");
+  return (await run(userId, id)).run;
+}
+export async function createRunRequest(userId: string, projectId: string, payload: RunPayload, requestId?: string) {
+  const id = requestId || randomUUID();
+  let created = true;
   try {
     await transaction(async (db) => {
       await storageLock(db);
@@ -178,6 +204,16 @@ export async function createRun(
         )
       ).rows[0];
       if (!projectRow) throw new ApiError(404, "Project not found.");
+      if (requestId) {
+        const existing = (await db.query("SELECT project_id,payload FROM cloud_runs WHERE id=$1 AND user_id=$2", [id, userId])).rows[0];
+        if (existing) {
+          const saved = decrypt<RunPayload>(existing.payload, `run:${id}`);
+          if (existing.project_id !== projectId || saved.prompt !== payload.prompt || saved.mode !== payload.mode || (saved.model || PREFERRED_FREE_MODEL) !== (payload.model || PREFERRED_FREE_MODEL) || !!saved.extensionConsent !== !!payload.extensionConsent)
+            throw new ApiError(409, "This message ID was already used for a different request.");
+          created = false;
+          return;
+        }
+      }
       if (
         projectRow.operation_token &&
         new Date(projectRow.operation_expires_at).getTime() > Date.now()
@@ -218,7 +254,7 @@ export async function createRun(
       throw new ApiError(409, "Another agent run is active.");
     throw e;
   }
-  return (await run(userId, id)).run;
+  return { run: (await run(userId, id)).run, created };
 }
 export async function runState(
   id: string,

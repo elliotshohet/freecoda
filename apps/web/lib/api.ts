@@ -24,6 +24,7 @@ import { inference } from "./inference";
 import { publicModelConfig } from "./public-model";
 import { githubRepositoryRoute } from "./github-repositories";
 import { conversationRoute } from "./conversations";
+import { eligibleChatModels } from "./browser-chat";
 export async function route(req: Request) {
   return handle(async () => {
     const url = new URL(req.url);
@@ -137,13 +138,22 @@ export async function route(req: Request) {
       const user = await identity(req);
       return json(await usageSnapshot(user.id));
     }
+    if (path === "account" && method === "GET") {
+      const user = await identity(req);
+      const { rows } = await getPool().query(
+        'SELECT name,image FROM "user" WHERE id=$1',
+        [user.id],
+      );
+      if (!rows.length) throw new ApiError(401, "Account is unavailable.");
+      return json({ name: rows[0].name, image: rows[0].image });
+    }
     if (path === "models" && method === "GET") {
       const user = await identity(req);
       const { rows } = await getPool().query(
         "SELECT config FROM model_catalog WHERE config->>'approved'='true' ORDER BY id",
       );
       return json({
-        models: rows.map((r) => publicModelConfig(r.config)),
+        models: eligibleChatModels(rows.map((r) => r.config)).map(publicModelConfig),
         hostedEnabled: publicConfig().hostedEnabled,
       });
     }

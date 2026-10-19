@@ -7,6 +7,8 @@ import {
   Check,
   ChevronRight,
   Code2,
+  Copy,
+  ExternalLink,
   FileCode2,
   FolderGit2,
   GitBranch,
@@ -26,12 +28,20 @@ import {
 } from "lucide-react";
 import styles from "./workspace.module.css";
 import { Mark } from "@/components/chrome";
+import { UserAvatar } from "@/components/user-avatar";
+import { MarkdownMessage } from "@/components/markdown-message";
+import { ModelPicker, modelDisplayName } from "@/components/model-picker";
+import { useModelSelection } from "@/components/use-model-selection";
 import { ThemeControl } from "@/components/theme-control";
 import { SponsorPlacement } from "@/components/sponsor-placement";
 import { ProjectExtensions } from "./extensions";
 
 type Status = {
   enabled: boolean;
+  userId?: string;
+  userName?: string | null;
+  userImage?: string | null;
+  models?: { id: string; name: string }[];
   authenticated?: boolean;
   invited?: boolean;
   ready?: boolean;
@@ -49,10 +59,12 @@ type Status = {
     concurrentGlobal?: number;
   };
 };
+const noWorkspaceModels: NonNullable<Status["models"]> = [];
 type Project = {
   id: string;
   name: string;
   status: string;
+  sandboxId?: string | null;
   updatedAt?: string;
   appDirectory?: string;
   repository?: string;
@@ -71,12 +83,14 @@ type Repo = {
   installationId: string | number;
   owner: string;
   name: string;
+  createdAt?: string;
   defaultBranch?: string;
   private?: boolean;
 };
 type RunEvent = {
   data?: {
     text?: string;
+    messageId?: string;
     delta?: string;
     message?: string;
     command?: string;
@@ -105,7 +119,16 @@ type Changes = {
   files?: { path: string }[];
   reviewHash?: string;
 };
-type Message = { role: "user" | "assistant" | "system"; text: string };
+type Message = { id?: string; runId?: string; status?: "accepted"; role: "user" | "assistant" | "system"; text: string };
+
+function allowedPreview(url: string) {
+  const candidate = new URL(url);
+  return candidate.protocol === "https:" &&
+    candidate.origin !== window.location.origin &&
+    [".vercel.run", ".sandbox.vercel.dev"].some((suffix) =>
+      candidate.hostname.endsWith(suffix),
+    );
+}
 
 async function api<T>(
   path: string,
@@ -131,13 +154,19 @@ async function api<T>(
   return data as T;
 }
 
-export function CloudWorkspace() {
+export function CloudWorkspace({ conversationMode = "project" }: { conversationMode?: "ask" | "project" }) {
   const [status, setStatus] = useState<Status | null>(null);
+  const { model, setModel } = useModelSelection(status?.userId, status?.models ?? noWorkspaceModels);
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [project, setProject] = useState<Project | null>(null);
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [fileFilter, setFileFilter] = useState("");
   const [projectsOpen, setProjectsOpen] = useState(false);
+  const [mobilePane, setMobilePane] = useState<"chat" | "inspect">("chat");
+  const [controlsOpen, setControlsOpen] = useState(false);
+  const [extensionsView, setExtensionsView] = useState<"all" | "mcp" | "tools">("all");
+  const [extensionsOpenSignal, setExtensionsOpenSignal] = useState(0);
   const [file, setFile] = useState<{
     path: string;
     content: string;
@@ -146,8 +175,27 @@ export function CloudWorkspace() {
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [prompt, setPrompt] = useState("");
+  const promptInputRef = useRef("");
+  type QueuedPrompt = { id: string; text: string; mode: string; model?: string; extensionConsent?: boolean; failed?: boolean };
+  const [queuedPrompts, setQueuedPrompts] = useState<QueuedPrompt[]>([]);
+  const queuedRef = useRef<QueuedPrompt[]>([]);
+  const submittingRef = useRef(false);
+  const activeRunRef = useRef<string | null>(null);
+  const [queuePaused, setQueuePaused] = useState(false);
+  const queuePausedRef = useRef(false);
+  function updateQueue(next: QueuedPrompt[]) {
+    queuedRef.current = next;
+    setQueuedPrompts(next);
+  }
+  function pauseQueue(paused: boolean) {
+    queuePausedRef.current = paused;
+    setQueuePaused(paused);
+  }
   const [mode, setMode] = useState("build");
   const [consent, setConsent] = useState(false);
+  const [consentVersion, setConsentVersion] = useState("");
+  const [consentLoaded, setConsentLoaded] = useState(false);
+  const [consentSaving, setConsentSaving] = useState(false);
   const [hasExternalTools, setHasExternalTools] = useState(false);
   const [extensionConsent, setExtensionConsent] = useState(false);
   const extensionsChanged = useCallback((enabled: boolean) => { setHasExternalTools(enabled); setExtensionConsent(false); }, []);
@@ -170,6 +218,7 @@ export function CloudWorkspace() {
     "create" | "import" | "publish" | "delete" | null
   >(null);
   const [repos, setRepos] = useState<Repo[]>([]);
+  const [selectedRepo, setSelectedRepo] = useState<Repo | null>(null);
   const [installUrl, setInstallUrl] = useState<string | null>(null);
   const [repoPreferences, setRepoPreferences] = useState<{ repositoryId: number; owner: string; name: string; enabled: boolean }[]>([]);
   const [repoLoadError, setRepoLoadError] = useState("");
@@ -187,6 +236,17 @@ export function CloudWorkspace() {
     status.authenticated !== false &&
     status.invited !== false;
   const running = runId !== null;
+  useEffect(() => {
+    const open = (event: Event) => {
+      if (!project) { setNotice("Select or import a project to manage its MCP connections and tools."); return; }
+      const view = (event as CustomEvent).detail?.view;
+      setControlsOpen(true);
+      setExtensionsView(view === "mcp" || view === "tools" ? view : "all");
+      setExtensionsOpenSignal(value => value + 1);
+    };
+    window.addEventListener("freecoda:extensions", open);
+    return () => window.removeEventListener("freecoda:extensions", open);
+  }, [project?.id]);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -200,6 +260,14 @@ export function CloudWorkspace() {
         next.authenticated !== false &&
         next.invited !== false
       ) {
+        const cloudConsent = await api<{
+          version: string;
+          accepted: boolean;
+        }>("consent", "GET", undefined, signal);
+        if (signal?.aborted) return;
+        setConsentVersion(cloudConsent.version);
+        setConsent(cloudConsent.accepted);
+        setConsentLoaded(true);
         const data = await api<{ projects: Project[] }>(
           "projects",
           "GET",
@@ -223,6 +291,14 @@ export function CloudWorkspace() {
     void load(abort.signal);
     return () => abort.abort();
   }, [load]);
+  useEffect(() => {
+    const showModel = (event: Event) => {
+      const detail = (event as CustomEvent<{ view?: string }>).detail;
+      if (detail?.view === "workspace") setModelPickerOpen(true);
+    };
+    window.addEventListener("freecoda:show-model", showModel);
+    return () => window.removeEventListener("freecoda:show-model", showModel);
+  }, []);
   useEffect(() => {
     if (!dialog) return;
     const previous = document.activeElement as HTMLElement | null;
@@ -280,7 +356,13 @@ export function CloudWorkspace() {
       block: "nearest",
       behavior: "instant",
     });
-  }, [messages]);
+  }, [messages, queuedPrompts]);
+  useEffect(() => {
+    const next = queuedRef.current[0];
+    if (!next || runId || activeRunRef.current || busy || submittingRef.current || queuePausedRef.current) return;
+    if (!project || !consent || dirty || (hasExternalTools && next.mode === "build" && next.extensionConsent === undefined && !extensionConsent)) return;
+    void startPrompt(next);
+  }, [busy, queuedPrompts, runId, queuePaused, consent, dirty, hasExternalTools, extensionConsent, project?.id]);
 
   async function refreshFiles(id: string) {
     const data = await api<{ files: FileEntry[] }>(`projects/${id}/files`);
@@ -296,10 +378,11 @@ export function CloudWorkspace() {
   }
   async function selectProject(next: Project, signal?: AbortSignal) {
     if (dirty && !window.confirm("Discard your unsaved file changes?")) return;
-    if (running) {
+    if (running || activeRunRef.current || submittingRef.current) {
       setError("Stop the current run before switching projects.");
       return;
     }
+    if (queuedRef.current.length && !window.confirm("Discard queued messages before switching projects?")) return;
     projectRef.current = next.id;
     setProject(next);
     setFile(null);
@@ -307,6 +390,9 @@ export function CloudWorkspace() {
     setFileFilter("");
     setChanges(null);
     setMessages([]);
+    updateQueue([]);
+    pauseQueue(false);
+    activeRunRef.current = null;
     setOutput("");
     setPreview(null);
     setPrUrl(null);
@@ -322,13 +408,25 @@ export function CloudWorkspace() {
       if (projectRef.current !== next.id || signal?.aborted) return;
       setProject(detail.project);
       setFiles(detail.files);
+      if (detail.project.status === "ready" && detail.project.sandboxId) {
+        const savedPreview = await api<{
+          url: string | null;
+          expiresAt: string | null;
+        }>(`projects/${next.id}/preview-session`, "GET", undefined, signal);
+        if (projectRef.current !== next.id || signal?.aborted) return;
+        if (savedPreview.url && savedPreview.expiresAt) {
+          if (!allowedPreview(savedPreview.url))
+            throw new Error("This preview URL is not a supported private sandbox.");
+          setPreview({ url: savedPreview.url, expiresAt: savedPreview.expiresAt });
+        }
+      }
       const url = new URL(window.location.href);
       url.searchParams.set("project", next.id);
       window.history.replaceState(null, "", url);
       const latest = detail.runs[0];
       if (latest) {
         eventCursor.current = 0;
-        if (["queued", "running"].includes(latest.status)) setRunId(latest.id);
+        if (["queued", "running"].includes(latest.status)) { activeRunRef.current = latest.id; setRunId(latest.id); }
         else {
           let after: string | number = 0;
           for (let batch = 0; batch < 50; batch++) {
@@ -427,6 +525,12 @@ export function CloudWorkspace() {
             event.output ??
             "");
       if (event.type === "user" && text) {
+        const messageId = event.data?.messageId;
+        setMessages((current) => {
+          const index = messageId ? current.findIndex((message) => message.id === messageId || message.runId === messageId) : -1;
+          if (index < 0) return [...current, { id: messageId, role: "user", text }];
+          return current.map((message, position) => position === index ? { ...message, text, status: undefined } : message);
+        });
       } else if (
         [
           "message",
@@ -499,26 +603,36 @@ export function CloudWorkspace() {
             )) &&
           (data.events?.length || 0) < 100
         ) {
+          setBusy(true);
+          const terminalStatus = data.run?.status || data.status || "";
+          if (["failed", "cancelled"].includes(terminalStatus)) pauseQueue(true);
+          // Keep the active run until the terminal state is confirmed, then
+          // prevent queue draining while refreshing its final files.
+          activeRunRef.current = null;
           setRunId(null);
-          const detail = await api<{ project: Project; files: FileEntry[] }>(
-            `projects/${id}`,
-          );
-          if (projectRef.current === id) {
-            setProject(detail.project);
-            setFiles(detail.files);
-            setProjects((current) =>
-              current.map((p) => (p.id === id ? detail.project : p)),
+          try {
+            const detail = await api<{ project: Project; files: FileEntry[] }>(
+              `projects/${id}`,
             );
-          }
-          await refreshChanges(id);
-          if (file && projectRef.current === id) {
-            const fresh = await api<{
-              path: string;
-              content: string;
-              hash: string;
-            }>(`projects/${id}/files?path=${encodeURIComponent(file.path)}`);
-            setFile(fresh);
-            setDraft(fresh.content);
+            if (projectRef.current === id) {
+              setProject(detail.project);
+              setFiles(detail.files);
+              setProjects((current) =>
+                current.map((p) => (p.id === id ? detail.project : p)),
+              );
+            }
+            await refreshChanges(id);
+            if (file && projectRef.current === id) {
+              const fresh = await api<{
+                path: string;
+                content: string;
+                hash: string;
+              }>(`projects/${id}/files?path=${encodeURIComponent(file.path)}`);
+              setFile(fresh);
+              setDraft(fresh.content);
+            }
+          } finally {
+            if (projectRef.current === id) setBusy(false);
           }
           return;
         }
@@ -526,9 +640,9 @@ export function CloudWorkspace() {
       } catch (e) {
         if (!abort.signal.aborted) {
           setError(
-            `${errorMessage(e)} Reopen the project to inspect saved changes.`,
+            `${errorMessage(e)} Reconnecting to the current run; queued messages are retained.`,
           );
-          setRunId(null);
+          timer = setTimeout(poll, 2500);
         }
       }
     }
@@ -541,29 +655,164 @@ export function CloudWorkspace() {
 
   async function sendPrompt(e: React.FormEvent) {
     e.preventDefault();
-    if (!project || !prompt.trim() || !consent || dirty || running || (hasExternalTools && mode === "build" && !extensionConsent)) return;
-    const text = prompt.trim();
+    if (!promptInputRef.current.trim()) return;
+    const text = promptInputRef.current.trim();
+    if (text.startsWith("/")) {
+      promptInputRef.current = "";
+      setPrompt("");
+      await slashCommand(text);
+      return;
+    }
+    enqueuePrompt();
+  }
+
+  async function slashCommand(input: string) {
+    const [command, ...args] = input.trim().split(/\s+/);
+    const rawArgument = args.join(" ").trim();
+    const argument = args.join(" ").toLowerCase();
+    setError("");
+    switch (command.toLowerCase()) {
+      case "/help":
+        setNotice("Commands: /new, /clear, /mode build|plan|review, /model, /permissions, /status, /usage, /extensions, /mcp, /tools, /sync status|pull, /resume, /suspend.");
+        break;
+      case "/new":
+        setDialog("create");
+        break;
+      case "/clear":
+        setMessages([]);
+        setOutput("");
+        setNotice("Cleared the visible chat and terminal output. Saved cloud history remains available.");
+        break;
+      case "/mode":
+        if (["build", "plan", "review"].includes(argument)) {
+          setMode(argument);
+          setNotice(`Mode set to ${argument}.`);
+        } else setNotice("Usage: /mode build|plan|review");
+        break;
+      case "/model":
+        if (!rawArgument) {
+          const currentModel = status?.models?.find((entry) => entry.id === model);
+          setNotice(`Current model: ${currentModel ? modelDisplayName(currentModel) : model || "Loading"}.`);
+          setModelPickerOpen(true);
+        } else if (!status?.models?.some((entry) => entry.id === rawArgument)) {
+          setError(`Unknown model “${rawArgument}”. Available: ${status?.models?.map((entry) => entry.id).join(", ") || "none"}.`);
+        } else if (setModel(rawArgument)) {
+          const chosenModel = status?.models?.find((entry) => entry.id === rawArgument);
+          setNotice(`Model set to ${chosenModel ? modelDisplayName(chosenModel) : rawArgument}.`);
+        }
+        break;
+      case "/permissions":
+        setNotice(`Cloud storage consent: ${consent ? "saved for this account" : "not yet accepted"}. External MCP tools: ${hasExternalTools ? extensionConsent ? "allowed for the next run" : "require per-run approval" : "not enabled"}.`);
+        break;
+      case "/status":
+        setNotice(`Project: ${project?.name || "none"} (${project?.status || "not selected"}). Run: ${running ? "active" : "idle"}. Queued: ${queuedPrompts.length}.`);
+        break;
+      case "/usage": {
+        try {
+          const response = await fetch("/api/v1/usage", { cache: "no-store" });
+          const usage = await response.json();
+          if (!response.ok) throw new Error(usage.error || "Usage is unavailable.");
+          setNotice(`AI free allowance remaining today: $${(usage.freeRemainingMicros / 1_000_000).toFixed(4)}. Beam Free inference has $0 model cost.`);
+        } catch (error) { setError(errorMessage(error)); }
+        break;
+      }
+      case "/extensions":
+      case "/mcp":
+      case "/tools":
+        window.dispatchEvent(new CustomEvent("freecoda:extensions", { detail: { view: command === "/mcp" ? "mcp" : command === "/tools" ? "tools" : "all" } }));
+        setNotice(project ? "Manage the selection for the next run in Cloud settings. Active runs keep their existing tools." : "Select or import a project to manage its MCP connections and tools.");
+        break;
+      case "/sync":
+        if (!argument || argument === "status") await syncRepository("status");
+        else if (argument === "pull") await syncRepository("pull");
+        else setNotice("Usage: /sync status|pull. Publish and merge cloud edits before pulling.");
+        break;
+      case "/resume":
+        if (project?.status === "suspended") await lifecycle("resume");
+        else setNotice("The selected project is already active.");
+        break;
+      case "/suspend":
+        if (project?.status === "ready" && !running) await lifecycle("suspend");
+        else setNotice("Stop the active run before suspending this project.");
+        break;
+      default:
+        setError(`Unknown command: ${command}. Try /help.`);
+    }
+  }
+  function enqueuePrompt() {
+    const text = promptInputRef.current.trim();
+    if (!text || !project || !consent || dirty || inactive) return;
+    if (text.startsWith("/")) {
+      promptInputRef.current = "";
+      setPrompt("");
+      void slashCommand(text);
+      return;
+    }
+    updateQueue([...queuedRef.current, { id: crypto.randomUUID(), text, mode }]);
+    // Clear only the submitted draft now; a later response must never erase
+    // a new message typed while this request is in flight.
+    promptInputRef.current = "";
+    setPrompt("");
+  }
+  async function startPrompt(item: QueuedPrompt) {
+    if (!project || !consent || dirty || submittingRef.current || activeRunRef.current || queuePausedRef.current) return;
+    if (hasExternalTools && item.mode === "build" && item.extensionConsent === undefined && !extensionConsent) return;
+    const id = project.id;
+    if (projectRef.current !== id || queuedRef.current[0]?.id !== item.id) return;
+    // Bind approval to this request identity, including an uncertain POST retry.
+    const approvedItem = { ...item, model: item.model || model, extensionConsent: item.extensionConsent ?? extensionConsent, failed: false };
+    if (!approvedItem.model) {
+      pauseQueue(true);
+      setError("No approved free model is available for this account. Your message is retained in the queue.");
+      return;
+    }
+    updateQueue(queuedRef.current.map((entry) => entry.id === item.id ? approvedItem : entry));
+    submittingRef.current = true;
     setBusy(true);
     setError("");
     setNotice("");
     setReviewed(false);
     try {
       const data = await api<{ run: { id: string; status: string } }>(
-        `projects/${project.id}/runs`,
+        `projects/${id}/runs`,
         "POST",
-        { prompt: text, mode, consent: true, extensionConsent },
+        { requestId: item.id, prompt: item.text, mode: item.mode, model: approvedItem.model, consent: true, extensionConsent: approvedItem.extensionConsent },
       );
-      setPrompt("");
+      if (projectRef.current !== id) return;
+      activeRunRef.current = data.run.id;
+      setMessages((current) => current.some((message) => message.id === item.id || message.runId === data.run.id)
+        ? current
+        : [...current, { id: item.id, runId: data.run.id, role: "user", text: item.text, status: "accepted" }]);
+      updateQueue(queuedRef.current.filter((entry) => entry.id !== item.id));
       setExtensionConsent(false);
       eventCursor.current = 0;
       setRunId(data.run.id);
     } catch (e) {
-      setError(errorMessage(e));
+      updateQueue(queuedRef.current.map((entry) => entry.id === item.id ? { ...entry, failed: true } : entry));
+      pauseQueue(true);
+      setError(`${errorMessage(e)} Your message is retained. Retry the queue to reconnect or submit it safely.`);
     } finally {
+      submittingRef.current = false;
       setBusy(false);
     }
   }
+  async function acceptCloudConsent(checked: boolean) {
+    if (!checked || consent || !consentVersion || consentSaving) return;
+    setConsentSaving(true);
+    setError("");
+    try {
+      const result = await api<{ accepted: boolean }>("consent", "POST", {
+        version: consentVersion,
+      });
+      setConsent(result.accepted);
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setConsentSaving(false);
+    }
+  }
   async function stopRun() {
+    pauseQueue(true);
     if (!runId) return;
     setBusy(true);
     try {
@@ -625,6 +874,32 @@ export function CloudWorkspace() {
       setBusy(false);
     }
   }
+  async function syncRepository(action: "status" | "pull") {
+    if (!project?.repo) { setError("Import a GitHub repository first."); return; }
+    if (busy || running || dirty) { setError("Finish the active task and save your file before syncing."); return; }
+    if (action === "pull" && !consent) { setError("Accept cloud storage terms before pulling source."); return; }
+    const id = project.id;
+    setBusy(true);
+    setError("");
+    try {
+      if (action === "status") {
+        const state = await api<{ identity: string; branch: string; baseSha: string; headSha: string; status: string; aheadBy: number; behindBy: number; dirty: boolean }>(`projects/${id}/sync`);
+        setNotice(`${state.identity} · ${state.branch} · ${state.baseSha.slice(0, 7)} → ${state.headSha.slice(0, 7)} · ${state.dirty ? "unpublished cloud edits" : "clean"} · upstream ${state.status} (${state.aheadBy} commits ahead, ${state.behindBy} behind). Pull requires a clean suspended workspace.`);
+      } else {
+        if (!window.confirm(`Pull committed source from ${project.repo.owner}/${project.repo.name} (${project.repo.defaultBranch})? Unpublished cloud edits and divergent branches will be refused.`)) return;
+        const result = await api<{ project: Project }>(`projects/${id}/sync`, "POST", { expectedBaseSha: project.repo.baseSha });
+        if (projectRef.current !== id) return;
+        setProject(result.project);
+        setProjects(current => current.map(item => item.id === id ? result.project : item));
+        setFile(null);
+        setPreview(null);
+        await refreshFiles(id);
+        await refreshChanges(id);
+        setNotice("Pulled committed source from GitHub. Resume when you want to run this workspace.");
+      }
+    } catch (error) { setError(errorMessage(error)); }
+    finally { setBusy(false); }
+  }
   async function changeAppDirectory(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!project || running || dirty || !consent) return;
@@ -655,6 +930,7 @@ export function CloudWorkspace() {
     setError("");
     setRepoLoadError("");
     setRepos([]);
+    setSelectedRepo(null);
     setRepoPreferences([]);
     setInstallUrl(null);
     try {
@@ -729,20 +1005,22 @@ export function CloudWorkspace() {
         "POST",
         {},
       );
-      const candidate = new URL(data.url);
-      if (
-        candidate.protocol !== "https:" ||
-        candidate.origin === window.location.origin ||
-        ![".vercel.run", ".sandbox.vercel.dev"].some((suffix) =>
-          candidate.hostname.endsWith(suffix),
-        )
-      )
+      if (!allowedPreview(data.url))
         throw new Error("This preview URL is not a supported private sandbox.");
       setPreview(data);
     } catch (e) {
       setError(errorMessage(e));
     } finally {
       setBusy(false);
+    }
+  }
+  async function copyPreviewUrl() {
+    if (!preview) return;
+    try {
+      await navigator.clipboard.writeText(preview.url);
+      setNotice("Private preview URL copied. It expires automatically.");
+    } catch {
+      setError("Could not copy the preview URL. Open it in a new tab instead.");
     }
   }
   async function reviewChanges() {
@@ -794,6 +1072,9 @@ export function CloudWorkspace() {
   );
   const visibleFiles = matchingFiles.slice(0, 250);
   const paused = ["suspended", "stopped"].includes(project?.status || "");
+  const activeWorkspace = projects.find(
+    (candidate) => candidate.id !== project?.id && candidate.status === "ready" && candidate.sandboxId,
+  );
   const inactive = ["creating", "failed", "expired", "deleted"].includes(
     project?.status || "",
   );
@@ -804,6 +1085,8 @@ export function CloudWorkspace() {
           `${Math.floor(status.limits.dailyComputeSeconds / 60)} compute minutes/day`,
         status.limits.sessionSeconds &&
           `${Math.floor(status.limits.sessionSeconds / 60)} minutes/session`,
+        status.limits.concurrentPerUser &&
+          `${status.limits.concurrentPerUser} active project at a time`,
         status.limits.monthlyGlobalComputeSeconds &&
           `${Math.floor(status.limits.monthlyGlobalComputeSeconds / 60)} compute minutes/month shared by everyone`,
         status.limits.idleMinutes &&
@@ -813,26 +1096,16 @@ export function CloudWorkspace() {
         .join(" · ")
     : "Free capacity is limited. Projects may pause when the daily capacity is used.";
   return (
-    <div className={styles.shell}>
+    <div className={styles.shell} data-conversation-mode={conversationMode}>
       <h1 className="sr-only">Freecoda coding workspace</h1>
-      <header className={styles.heading}>
-        <Link href="/" className={styles.wordmark} aria-label="Freecoda home">
-          <Mark /> freecoda
-        </Link>
-        <div className={styles.appTitle}>
-          <span>Workspace</span>
-          <span className={styles.free}>Free forever</span>
-        </div>
-        <div className={styles.topActions}>
-          <ThemeControl />
-          <Link href="/dashboard">
-            Account & allowance <ArrowUpRight size={13} />
-          </Link>
-        </div>
-      </header>
       {error && (
         <div className={styles.error} role="alert">
-          {error}
+          <span>{error}</span>
+          {error.includes("Cloud compute is busy") && activeWorkspace && (
+            <button className={styles.errorAction} type="button" onClick={() => void selectProject(activeWorkspace)}>
+              Open active workspace: {activeWorkspace.name}
+            </button>
+          )}
           <button aria-label="Dismiss error" onClick={() => setError("")}>
             <X size={16} />
           </button>
@@ -876,7 +1149,7 @@ export function CloudWorkspace() {
               <SponsorPlacement placement="web" />
             </div>
           </aside>
-          <section className={styles.setup}>
+          <section className={styles.setup} data-conversation-slot>
             <div className={styles.setupIcon}>
               <Code2 size={34} />
             </div>
@@ -921,6 +1194,11 @@ export function CloudWorkspace() {
         </div>
       ) : (
         <>
+          <div className={styles.workspaceSettings} data-open={controlsOpen || !consent}>
+            <button type="button" className={styles.settingsToggle} aria-expanded={controlsOpen || !consent} onClick={() => setControlsOpen(open => !open)}>
+              <ShieldCheck size={14} /> Cloud settings · {consent ? "consent saved" : "consent required"}
+            </button>
+            <div className={styles.settingsBody}>
           <div className={styles.capacity}>
             <ShieldCheck size={16} />
             <span>{limitText}</span>
@@ -930,20 +1208,22 @@ export function CloudWorkspace() {
             <input
               type="checkbox"
               checked={consent}
-              onChange={(e) => setConsent(e.target.checked)}
+              disabled={!consentLoaded || consentSaving || consent}
+              onChange={(e) => void acceptCloudConsent(e.target.checked)}
             />
             <span>
-              I agree to store this project’s files, chat, diffs, and command
-              output in Freecoda’s cloud for up to seven days after last
-              activity. Delete the project at any time. Avoid secrets and
-              private customer data.
+              {consent
+                ? "Cloud storage consent is saved for this account. Files, chat, diffs, and command output are retained for up to seven days after activity; material changes to these terms will ask again."
+                : "I agree to store this project’s files, chat, diffs, and command output in Freecoda’s cloud for up to seven days after last activity. Delete the project at any time. Avoid secrets and private customer data."}
             </span>
           </label>
-          {project && <ProjectExtensions key={project.id} projectId={project.id} disabled={busy || running} onToolsChanged={extensionsChanged} />}
+          {project && <div id="cloud-project-extensions"><ProjectExtensions key={project.id} projectId={project.id} disabled={busy || running || !consent} onToolsChanged={extensionsChanged} requestedView={extensionsView} openSignal={extensionsOpenSignal} mode={mode} /></div>}
           {project && hasExternalTools && mode === "build" && <label className={styles.consent}>
             <input type="checkbox" checked={extensionConsent} disabled={running} onChange={event => setExtensionConsent(event.target.checked)} />
             <span>Allow enabled MCP tools for this run. They may send project context to external servers and perform actions outside this workspace.</span>
           </label>}
+            </div>
+          </div>
           <div className={styles.workbench}>
             <aside className={styles.projects} data-mobile-open={projectsOpen}>
               <button
@@ -976,7 +1256,11 @@ export function CloudWorkspace() {
                     <FolderGit2 size={16} />
                     <span>
                       {p.name}
-                      <small>{p.status}</small>
+                      <small>
+                        {p.status === "ready" && p.sandboxId
+                          ? "Active · uses your compute slot"
+                          : p.status}
+                      </small>
                     </span>
                     <ChevronRight size={13} />
                   </button>
@@ -1033,7 +1317,7 @@ export function CloudWorkspace() {
               </p>
             </aside>
             {!project ? (
-              <section className={styles.start}>
+              <section className={styles.start} data-conversation-slot>
                 <div className={styles.startGlyph}>
                   <Code2 size={46} strokeWidth={1.3} />
                 </div>
@@ -1065,11 +1349,16 @@ export function CloudWorkspace() {
                 <div className={styles.projectTop}>
                   <div>
                     <strong>{project.name}</strong>
+                    {project.repo && <span className={styles.projectStatus}>{project.repo.owner}/{project.repo.name} · {project.repo.defaultBranch} · {project.repo.baseSha.slice(0, 7)}</span>}
                     <span className={styles.projectStatus}>
                       {project.status}
                     </span>
                   </div>
                   <div className={styles.projectTools}>
+                    {project.repo && <>
+                      <button disabled={busy || running || dirty} onClick={() => syncRepository("status")}><GitBranch size={14} /> Check GitHub</button>
+                      <button disabled={busy || running || dirty || !consent} onClick={() => syncRepository("pull")}><RefreshCw size={14} /> Pull from GitHub</button>
+                    </>}
                     {paused ? (
                       <button
                         disabled={busy || running || !consent || inactive}
@@ -1094,9 +1383,14 @@ export function CloudWorkspace() {
                     </button>
                   </div>
                 </div>
-                <div className={styles.taskLayout}>
+                <div className={styles.mobilePaneToggle} role="group" aria-label="Workspace view">
+                  <button type="button" aria-pressed={mobilePane === "chat"} onClick={() => setMobilePane("chat")}>Conversation</button>
+                  <button type="button" aria-pressed={mobilePane === "inspect"} onClick={() => setMobilePane("inspect")}>Files & output</button>
+                </div>
+                <div className={styles.taskLayout} data-mobile-pane={mobilePane}>
                   <section
                     className={styles.chatColumn}
+                    data-conversation-slot
                     aria-label="Agent conversation"
                   >
                     <div
@@ -1123,6 +1417,7 @@ export function CloudWorkspace() {
                                 key={suggestion}
                                 type="button"
                                 onClick={() => {
+                                  promptInputRef.current = suggestion;
                                   setPrompt(suggestion);
                                   document
                                     .getElementById("cloud-prompt")
@@ -1136,22 +1431,13 @@ export function CloudWorkspace() {
                         </div>
                       )}
                       {messages.map((m, i) => (
-                        <div
-                          key={i}
-                          className={
-                            m.role === "user"
-                              ? styles.userMessage
-                              : styles.agentMessage
-                          }
-                        >
-                          <span>
-                            {m.role === "user"
-                              ? "You"
-                              : m.role === "assistant"
-                                ? "Freecoda"
-                                : "Workspace"}
-                          </span>
-                          <p>{m.text}</p>
+                        <div key={m.id || i} className={`${styles.messageRow} ${m.role === "user" ? styles.userRow : styles.agentRow}`}>
+                          {m.role === "user" ? <UserAvatar image={status?.userImage} name={status?.userName} className={`${styles.messageAvatar} ${styles.userAvatar}`} /> : <span className={`${styles.messageAvatar} ${styles.agentAvatar}`} role="img" aria-label="Coda"><Mark /></span>}
+                          <div className={m.role === "user" ? styles.userMessage : styles.agentMessage} aria-label={m.role === "user" ? "Your message" : "Coda response"}>
+                          <span>{m.role === "user" ? "You" : m.role === "assistant" ? "Coda" : "Workspace"}</span>
+                          {m.role === "assistant" ? <MarkdownMessage text={m.text} /> : <p>{m.text}</p>}
+                          {m.status === "accepted" && <small>Sent · waiting for the agent</small>}
+                          </div>
                         </div>
                       ))}
                       {running && (
@@ -1159,6 +1445,29 @@ export function CloudWorkspace() {
                           <Loader2 size={14} className={styles.spin} /> Working
                           in your project…
                         </p>
+                      )}
+                      {queuedPrompts.length > 0 && (
+                        <div className={styles.queuedPrompts} aria-label="Queued messages">
+                          <strong>{queuedPrompts.length} queued{queuePaused ? " · paused" : ""}</strong>
+                          {queuePaused && <button type="button" disabled={busy || running} onClick={() => { setError(""); pauseQueue(false); }}>Retry queue</button>}
+                          {hasExternalTools && queuedPrompts[0]?.mode === "build" && queuedPrompts[0]?.extensionConsent === undefined && !extensionConsent && <p>Approve external tools for the next run before this queue continues.</p>}
+                          {queuedPrompts.map((queued, index) => (
+                            <div key={queued.id} className={styles.userMessage}>
+                              <UserAvatar image={status?.userImage} name={status?.userName} />
+                              <span>You · {submittingRef.current && index === 0 ? "Sending…" : queued.failed ? "Failed · retry available" : queuePaused ? "Paused" : "Queued"}</span>
+                              <p>{queued.text}</p>
+                              <small>{queued.mode}</small>
+                              <button
+                                type="button"
+                                aria-label={`Remove queued message ${index + 1}`}
+                                disabled={submittingRef.current && index === 0}
+                                onClick={() => updateQueue(queuedRef.current.filter((entry) => entry.id !== queued.id))}
+                              >
+                                <X size={13} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       )}
                       <div ref={endOfChat} />
                     </div>
@@ -1169,20 +1478,17 @@ export function CloudWorkspace() {
                       <textarea
                         id="cloud-prompt"
                         value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
+                        onChange={(e) => { promptInputRef.current = e.target.value; setPrompt(e.target.value); }}
                         onKeyDown={(event) => {
-                          if (
-                            (event.metaKey || event.ctrlKey) &&
-                            event.key === "Enter"
-                          ) {
-                            event.preventDefault();
-                            event.currentTarget.form?.requestSubmit();
-                          }
+                          if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+                          event.preventDefault();
+                          if (event.ctrlKey) enqueuePrompt();
+                          else event.currentTarget.form?.requestSubmit();
                         }}
                         rows={2}
                         maxLength={12000}
                         placeholder="What would you like to build?"
-                        disabled={!consent || running || inactive || busy}
+                        disabled={!consent || inactive}
                       />
                       <div>
                         <label>
@@ -1197,10 +1503,11 @@ export function CloudWorkspace() {
                             <option value="review">Review · read only</option>
                           </select>
                         </label>
+                        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("freecoda:extensions", { detail: { view: "tools" } }))}>Tools</button>
                         <span>
                           {dirty
                             ? "Save your file before starting a run."
-                            : "Expires after seven days without activity."}
+                            : "Enter sends · Ctrl+Enter queues · Shift+Enter adds a line."}
                         </span>
                         {running ? (
                           <button
@@ -1288,6 +1595,7 @@ export function CloudWorkspace() {
                     <section
                       className={styles.panel}
                       role="tabpanel"
+                      tabIndex={0}
                       id={`panel-${tab}`}
                       aria-labelledby={`tab-${tab}`}
                     >
@@ -1329,7 +1637,7 @@ export function CloudWorkspace() {
                             </span>
                           </form>
                           <div className={styles.editorRow}>
-                            <div className={styles.files}>
+                            <div className={styles.files} role="region" aria-label="Project files" tabIndex={0}>
                               <div className={styles.sectionHead}>
                                 <strong>Files</strong>
                                 <button
@@ -1524,6 +1832,12 @@ export function CloudWorkspace() {
                                     ? ` · expires ${new Date(preview.expiresAt).toLocaleTimeString()}`
                                     : ""}
                                 </span>
+                                <a href={preview.url} target="_blank" rel="noopener noreferrer">
+                                  <ExternalLink size={13} /> Open link
+                                </a>
+                                <button onClick={() => void copyPreviewUrl()}>
+                                  <Copy size={13} /> Copy link
+                                </button>
                                 <button disabled={busy} onClick={openPreview}>
                                   <RefreshCw size={14} /> Refresh access
                                 </button>
@@ -1675,8 +1989,11 @@ export function CloudWorkspace() {
                     {repos.map((repo) => (
                       <button
                         key={`${repo.installationId}/${repo.owner}/${repo.name}`}
-                        disabled={busy || !consent}
-                        onClick={() => importRepo(repo)}
+                        type="button"
+                        disabled={busy}
+                        aria-pressed={selectedRepo?.repositoryId === repo.repositoryId}
+                        data-selected={selectedRepo?.repositoryId === repo.repositoryId}
+                        onClick={() => setSelectedRepo(repo)}
                       >
                         <FolderGit2 size={18} />
                         <span>
@@ -1701,6 +2018,22 @@ export function CloudWorkspace() {
                       : "No repositories are available. Select repositories in the GitHub App installation, then refresh."}
                   </p>
                 )}
+                {repos.length > 0 && (
+                  <p className={styles.footnote}>Sorted by repository creation date, newest first.</p>
+                )}
+                {selectedRepo && (
+                  <p className={styles.selectedRepo}>
+                    Selected: <strong>{selectedRepo.owner}/{selectedRepo.name}</strong>
+                  </p>
+                )}
+                <button
+                  type="button"
+                  className="button purple"
+                  disabled={!selectedRepo || busy || !consent}
+                  onClick={() => selectedRepo && void importRepo(selectedRepo)}
+                >
+                  {busy ? "Importing…" : "Import selected repository"}
+                </button>
                 {repoPreferences.some(preference => !repos.some(repo => repo.repositoryId === preference.repositoryId)) && !busy && <div className={styles.unavailableRepos}>
                   <h3 className={styles.repoSectionTitle}>Saved selections without current access</h3>
                   <p>These repositories cannot be imported until GitHub access is restored. Manage GitHub App access or remove their saved configuration in Freecoda settings.</p>
@@ -1785,6 +2118,7 @@ export function CloudWorkspace() {
           </section>
         </div>
       )}
+      <ModelPicker open={modelPickerOpen} models={status?.models ?? noWorkspaceModels} selected={model} onSelect={setModel} onClose={() => setModelPickerOpen(false)} />
     </div>
   );
 }

@@ -8,6 +8,14 @@ Freecoda starts in Chat: a general conversation with no repository access or too
 
 Choose Build, Plan, or Review to work with a repository. Coding still requires selecting and trusting the folder. Returning to Chat restores the separate general conversations, hides repository tools, and resets session permission grants. Search, deletion, response copying, and clearly labeled sponsor placements remain part of the conversation interface.
 
+## Models, messages, and avatars
+
+Use `/model` to open the configured free-model picker. The selected model is saved locally, shared across desktop conversation modes, and checked against the approved zero-price Beam Free catalog before every request. An unavailable selection fails visibly instead of falling back to a paid model. Finish the active task before changing models.
+
+Enter sends a message; Ctrl+Enter queues one while a task is running. Queued messages keep their original conversation, mode, and folder. Failed launches retain the queued message; errors and cancellation pause the queue until **Resume queued messages**. Return to its original conversation before resuming, and keep the composer empty so an existing draft is preserved. Replies stream and support Markdown, code copying, lists, and tables.
+
+Signed-in message bubbles use the account's public GitHub avatar when available. Desktop retrieves a bounded image in its main process without forwarding account credentials. Older servers without the account endpoint and unavailable images use an initial instead.
+
 ## Conversation sync
 
 When signed in, Freecoda uploads completed conversations and existing local history for the selected mode to your account. Conversation records include structured messages and tool results, but no local workspace path. Server storage is encrypted; model-provider training and retention still follow the hosted privacy policy. Coding conversations can be opened in a trusted local folder; a cloud conversation never grants folder access or command permissions.
@@ -27,6 +35,8 @@ Saving preferences does not clone a repository, read a local folder, or grant lo
 ## Tools and skills
 
 Open **Tools & skills** in the title bar. Choose **Skill · SKILL.md**, enter a name and an absolute local SKILL.md path or HTTPS source URL, then install. Choose **MCP tool server · HTTP** to register a trusted HTTPS MCP endpoint. Installations save configuration; they do not run a command or call an MCP server. Explicit installations start enabled; use **Disable** or **Remove** to control future tasks.
+
+Use `/mcp`, `/tools`, or `/extensions` to open these controls. **Check & list tools** explicitly connects to an enabled MCP server, discovers its actual tool names, and closes the connection without executing a tool. A failed check displays an error; a successful check describes availability at that check, not a permanent connection. Individual tool checkboxes apply to the next task for this desktop session only. Disabling a tool can narrow access but cannot override mode restrictions or approvals.
 
 Enabled skills supply instructions to coding modes. MCP tools are available in Build mode and each external tool call follows command approval (including its session grants and Full access preset); Plan and Review do not gain external tools. General Chat remains tool-free. External servers receive tool arguments and may return untrusted content. Only install instructions and endpoints you trust. Never put credentials in a URL; this UI does not accept authentication headers. Local configuration is stored in the desktop application's private `extensions.json` under Electron's user-data directory. It is separate from CLI and cloud-project registries. Changes apply to the next task and are blocked while a task is running.
 

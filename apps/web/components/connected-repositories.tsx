@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw, GitBranch, Trash2 } from "lucide-react";
+import { GitHubSignIn } from "./github-sign-in";
 import styles from "./connected-repositories.module.css";
 type Repository = { repositoryId: number; installationId: number; owner: string; name: string; defaultBranch: string };
 type Setting = Omit<Repository, "defaultBranch"> & { branch: string; appDirectory: string; enabled: boolean };
@@ -16,12 +17,13 @@ export function ConnectedRepositories() {
   const [installUrl, setInstallUrl] = useState("");
   const [error, setError] = useState("");
   const [accessWarning, setAccessWarning] = useState("");
+  const [reconnectGitHub, setReconnectGitHub] = useState(false);
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const load = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true); setError(""); setAccessWarning(""); setLoaded(false);
+    setLoading(true); setError(""); setAccessWarning(""); setReconnectGitHub(false); setLoaded(false);
     try {
       const [accessResult, configuredResult] = await Promise.allSettled([
         request("repos", undefined, signal),
@@ -34,7 +36,12 @@ export function ConnectedRepositories() {
       setLoaded(true);
       if (accessResult.status === "rejected") {
         setRepos([]);
-        setAccessWarning("GitHub repository access could not be refreshed. You can still remove saved configurations below; reconnect the Freecoda GitHub App and refresh access to edit repository details.");
+        const reason = accessResult.reason;
+        const authorizationExpired = reason instanceof Error && /authorization expired or was revoked/i.test(reason.message);
+        setReconnectGitHub(authorizationExpired);
+        setAccessWarning(authorizationExpired
+          ? "GitHub account authorization expired or was revoked. Reconnect your GitHub account, then refresh access. This leaves your desktop sign-in and saved repository settings intact."
+          : "GitHub App repository access could not be refreshed. You can still remove saved configurations below; check the App installation and repository permissions to edit them.");
         return;
       }
       const access = accessResult.value;
@@ -64,6 +71,7 @@ export function ConnectedRepositories() {
     <p>Choose your repositories, working branch, and app folder. These account settings are shared by the web, desktop app, and CLI. They do not clone code or grant local folder trust.</p>
     {installUrl && <p><a className="text-link" href={installUrl} target="_blank" rel="noopener noreferrer">Manage GitHub App repository access</a></p>}
     {error && <p role="alert">{error}</p>}{accessWarning && <p role="status">{accessWarning}</p>}{notice && <p role="status">{notice}</p>}
+    {reconnectGitHub && <GitHubSignIn callbackURL="/settings#connections" label="Reconnect GitHub account" />}
     {loading ? <p role="status">Loading repositories…</p> : <form onSubmit={save}>
       {!repos.length && <p>No repositories available. Connect the Freecoda GitHub App, then refresh access.</p>}
       {repos.map(repo => { const setting = settings.find(item => item.repositoryId === repo.repositoryId); return <fieldset key={`${repo.installationId}:${repo.repositoryId}`} className={styles.repository} disabled={busy}>

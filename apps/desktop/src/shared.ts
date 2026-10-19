@@ -72,10 +72,18 @@ export type DesktopGitHubPreference = { repositoryId: number; installationId: nu
 export type DesktopGitHubState = { repos: DesktopGitHubRepo[]; repositories: DesktopGitHubPreference[]; canInstall: boolean };
 export type DesktopExtension = { id: string; name: string; kind: "skill" | "mcp"; enabled: boolean };
 export interface DesktopBridge {
+  discoverTools(id: string): Promise<string[]>;
+  toolChoices(): Promise<{ name: string; enabled: boolean }[]>;
+  setToolEnabled(input: { name: string; enabled: boolean }): Promise<{ name: string; enabled: boolean }[]>;
+  accountProfile(): Promise<{ name?: string; avatar?: string }>;
+  listModels(): Promise<{ id: string; name: string }[]>;
+  selectModel(id: string): Promise<DesktopState>;
+  syncRepository(action: "status" | "pull"): Promise<import("../../../packages/core/src/git-sync").RepositorySyncStatus>;
   refreshConversations(): Promise<DesktopState>;
   githubRepositories(): Promise<DesktopGitHubState>;
   saveGitHubRepositories(repositories: DesktopGitHubPreference[]): Promise<DesktopGitHubState>;
   connectGitHub(): Promise<void>;
+  reconnectGitHub(): Promise<void>;
   listExtensions(): Promise<DesktopExtension[]>;
   installExtension(input: { kind: "skill" | "mcp"; name: string; url: string }): Promise<DesktopExtension[]>;
   setExtensionEnabled(input: { id: string; enabled: boolean }): Promise<DesktopExtension[]>;

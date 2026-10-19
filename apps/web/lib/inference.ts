@@ -199,7 +199,7 @@ export async function executeInference(
   const { rows } = await getPool().query(
     "SELECT config FROM model_catalog WHERE config->>'approved'='true'",
   );
-  const approved = rows.map(r => r.config as ModelConfig);
+  const approved = rows.map(r => r.config as ModelConfig).filter(isVerifiedZeroCostFreeModel);
   if (!approved.some(c => c.id === body.model))
     throw new ApiError(503, "This model has not passed launch checks.");
   let config: ModelConfig;
@@ -209,7 +209,7 @@ export async function executeInference(
       kind: body.options.tools?.length ? "coding" : "chat",
       contextTokens: Buffer.byteLength(JSON.stringify(body.options)) + 8192 + (body.options.maxOutputTokens || 4096),
       outputTokens: body.options.maxOutputTokens || 4096,
-    }, approved)).config;
+    }, approved, fetch, body.model)).config;
   } catch {
     throw new ApiError(503, "No evaluated free model is currently available for this request. Try again later.");
   }

@@ -16,8 +16,10 @@ import path from "node:path";
 import { platform, arch } from "node:os";
 import {
   loadExtensionRegistry, saveExtensionRegistry, installSkill, installMcpServer,
-  setExtensionEnabled, removeExtension,
+  setExtensionEnabled, removeExtension, connectExtensionTools,
   Workspace,
+  repositorySyncStatus,
+  pullRepository,
   runShell,
   runAgent as executeAgent,
   hostedModel,
@@ -55,8 +57,13 @@ const text = (value: unknown, name: string, maximum: number) => {
     throw new Error(`${name} is invalid.`);
   return value;
 };
+type DesktopModel = { id: string; name?: string; provider?: string; byok?: boolean; approved?: boolean; inputMicrosPerToken?: number; outputMicrosPerToken?: number; allowPromptTraining?: boolean };
+function verifiedFreeModel(model: DesktopModel) {
+  return model.id === "reflection/beam-free" && model.provider === "reflection" && model.approved === true && model.byok === false && model.inputMicrosPerToken === 0 && model.outputMicrosPerToken === 0;
+}
 type Config = {
   accountId?: string;
+  model?: string;
   server: string;
   token?: string;
   trustedRoots: string[];
@@ -182,6 +189,7 @@ export class LocalAgentService {
         throw new Error("Invalid saved connection.");
       this.config = {
         server: this.server,
+        ...(typeof stored.model === "string" ? { model: stored.model } : {}),
         trustedRoots: roots(stored.trustedRoots, 50),
         recentRoots: roots(stored.recentRoots, 12),
         ...(stored.token ? { token: stored.token } : {}),
@@ -192,6 +200,7 @@ export class LocalAgentService {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
+    this.selectedModel = this.config.model;
     this.cloudAccountId = this.config.accountId;
     await this.restoreHistory();
   }
@@ -309,6 +318,34 @@ export class LocalAgentService {
       throw Error("The service returned an invalid GitHub installation link.");
     return url.toString();
   }
+  private disabledTools = new Set<string>();
+  private discoveredTools = new Map<string, string[]>();
+  async toolChoices() {
+    return [...new Set(["list_files", "read_file", "search", "write_file", "replace_text", "shell", ...[...this.discoveredTools.values()].flat()])]
+      .map(name => ({ name, enabled: !this.disabledTools.has(name) }));
+  }
+  async setToolEnabled(input: { name: string; enabled: boolean }) {
+    this.check();
+    if (this.activeController || this.extensionMutation) throw Error("Finish the current task before changing tools.");
+    if (!input || typeof input.enabled !== "boolean" || !(await this.toolChoices()).some(tool => tool.name === input.name)) throw Error("Unknown tool.");
+    if (input.enabled) this.disabledTools.delete(input.name); else this.disabledTools.add(input.name);
+    return this.toolChoices();
+  }
+  async discoverTools(id: string) {
+    await this.initialize(); this.check();
+    if (this.activeController || this.extensionMutation) throw Error("Finish the current task before checking tools.");
+    this.extensionMutation = true;
+    try {
+      const registry = await loadExtensionRegistry(this.extensionFile());
+      const selected = registry.servers.find(server => server.id === id && server.enabled);
+      if (!selected) throw Error("Enable this MCP server before checking its tools.");
+      const runtime = await connectExtensionTools({ version: 1, skills: [], servers: [selected] }, {
+        approve: async () => false, allowLocal: true, signal: AbortSignal.timeout(20_000),
+      });
+      try { const names = Object.keys(runtime.tools); this.discoveredTools.set(id, names); return names; }
+      finally { await runtime.close(); }
+    } finally { this.extensionMutation = false; }
+  }
   private extensionMutation = false;
   private extensionFile() { return path.join(this.directory, "extensions.json"); }
   async listExtensions(): Promise<DesktopExtension[]> {
@@ -351,6 +388,50 @@ export class LocalAgentService {
   async removeExtension(value: string) {
     const id = text(value, "Extension ID", 100);
     return this.changeExtensions(registry => removeExtension(registry, id));
+  }
+  async accountProfile(): Promise<{ name?: string; avatar?: string }> {
+    await this.initialize();
+    if (!this.config.token) return {};
+    try {
+      const profile = await this.api("account") as { name?: string; image?: string };
+      const result: { name?: string; avatar?: string } = { name: typeof profile.name === "string" ? profile.name.slice(0, 200) : undefined };
+      if (typeof profile.image !== "string") return result;
+      const url = new URL(profile.image);
+      // Fetch public GitHub avatars without forwarding account credentials.
+      if (url.protocol !== "https:" || url.hostname !== "avatars.githubusercontent.com" || url.username || url.password) return result;
+      const response = await this.transport(url, { credentials: "omit", redirect: "error", signal: AbortSignal.timeout(5000) });
+      const type = response.headers.get("content-type")?.split(";")[0];
+      if (!response.ok || !["image/png", "image/jpeg", "image/webp"].includes(type || "")) return result;
+      const reader = response.body?.getReader();
+      if (!reader) return result;
+      const chunks: Uint8Array[] = []; let size = 0;
+      try {
+        while (true) {
+          const part = await reader.read(); if (part.done) break;
+          size += part.value.length;
+          if (size > 256_000) { await reader.cancel(); return result; }
+          chunks.push(part.value);
+        }
+      } finally { reader.releaseLock(); }
+      result.avatar = `data:${type};base64,${Buffer.concat(chunks).toString("base64")}`;
+      return result;
+    } catch { return {}; }
+  }
+  async listModels(): Promise<{ id: string; name: string }[]> {
+    await this.initialize();
+    const catalog = await this.api("models") as { hostedEnabled?: boolean; models?: DesktopModel[] };
+    if (!catalog.hostedEnabled) return [];
+    return (catalog.models || []).filter(verifiedFreeModel)
+      .map(model => ({ id: model.id, name: model.name || model.id }));
+  }
+  async selectModel(value: string): Promise<DesktopState> {
+    if (this.activeController) throw Error("Finish the current task before changing models.");
+    const models = await this.listModels();
+    if (this.activeController) throw Error("Finish the current task before changing models.");
+    if (!models.some(model => model.id === value)) throw Error("Choose an available free model.");
+    this.selectedModel = this.config.model = value;
+    await this.saveConfig();
+    return this.getState();
   }
   async getState(): Promise<DesktopState> {
     await this.initialize();
@@ -554,6 +635,22 @@ export class LocalAgentService {
     await this.emitState();
     return this.getState();
   }
+  async syncRepository(action: "status" | "pull") {
+    if (action !== "status" && action !== "pull") throw new Error("Invalid sync action.");
+    const root = this.trustedRoot();
+    if (this.activeController || this.workspaceChanging || this.authChanging) throw new Error("Wait for the current action before syncing.");
+    this.workspaceChanging = true;
+    try {
+      if (action === "status") return await repositorySyncStatus(root);
+      if (!await this.approval(new AbortController())("shell", "Fetch origin and fast-forward this clean local checkout. This downloads committed changes and never uploads files.")) throw new Error("Repository pull was not approved.");
+      if (this.root !== root) throw new Error("The selected repository changed.");
+      const result = await pullRepository(root);
+      await this.emitState();
+      return result;
+    } finally {
+      this.workspaceChanging = false;
+    }
+  }
   private approval(controller: AbortController, runId?: string): Approval {
     return async (kind, description) => {
       controller.signal.throwIfAborted();
@@ -736,8 +833,11 @@ export class LocalAgentService {
           "models",
           undefined,
           controller.signal,
-        )) as { models?: { id: string; allowPromptTraining?: boolean }[]; hostedEnabled?: boolean };
-        const chosen = catalog.models?.[0];
+        )) as { models?: DesktopModel[]; hostedEnabled?: boolean };
+        const available = catalog.models?.filter(verifiedFreeModel);
+        const chosen = this.selectedModel
+          ? available?.find(model => model.id === this.selectedModel)
+          : available?.[0];
         if (
           !catalog.hostedEnabled ||
           !chosen ||
@@ -755,6 +855,7 @@ export class LocalAgentService {
         ];
         const result = await executeAgent({
           root,
+          disabledTools: [...this.disabledTools],
           extensions: await loadExtensionRegistry(this.extensionFile()),
           model: hostedModel(this.server, chosen.id, this.config.token!),
           messages: next,
@@ -1376,6 +1477,7 @@ export class LocalAgentService {
     }
     delete this.config.token;
     this.selectedModel = undefined;
+    delete this.config.model;
     this.allowPromptTraining = undefined;
     await this.saveConfig();
     this.emit({

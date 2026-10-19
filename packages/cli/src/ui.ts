@@ -3,6 +3,7 @@ import { emitKeypressEvents, type Key } from "node:readline";
 import { PassThrough } from "node:stream";
 import { StringDecoder } from "node:string_decoder";
 import c from "picocolors";
+import { TurnQueue, type QueuedTurn } from "./turn-queue";
 import { CLI_VERSION } from "./version";
 import {
   SessionPermissions,
@@ -49,6 +50,26 @@ export function safeTerminalText(value: string) {
     .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
     .replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/g, "")
     .replace(/\t/g, "    ");
+}
+export function terminalMarkdownLines(value: string): { text: string; kind: "text" | "heading" | "code" }[] {
+  let fence: string | null = null;
+  return safeTerminalText(value).split("\n").map(line => {
+    const marker = /^\s*(`{3,}|~{3,})(.*)$/.exec(line);
+    if (marker && !fence) {
+      fence = marker[1];
+      return { text: `── ${marker[2].trim() || "Code"} ──`, kind: "heading" };
+    }
+    if (fence) {
+      if (line.trim().startsWith(fence) && /^\s*[`~]+\s*$/.test(line)) { fence = null; return { text: "── End code ──", kind: "heading" }; }
+      return { text: line, kind: "code" };
+    }
+    const heading = /^\s{0,3}#{1,6}\s+(.+)$/.exec(line);
+    const text = (heading?.[1] || line)
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g, "$1 ($2)")
+      .replace(/^(\s*)[-+*]\s+/, "$1• ");
+    return { text, kind: heading ? "heading" : "text" };
+  });
 }
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 function width(value: string) {
@@ -104,6 +125,10 @@ export const TERMINAL_COMMANDS = [
   { command: "/new", description: "Start a new task in this project" },
   { command: "/resume", description: "Open a saved task" },
   { command: "/model", description: "List or choose the active model" },
+  { command: "/mcp", description: "List, discover, or enable MCP connections" },
+  { command: "/tools", description: "Select tools for following turns" },
+  { command: "/extensions", description: "List installed tools and skills" },
+  { command: "/queue", description: "List, resume, or remove queued turns" },
   {
     command: "/mode",
     description: "Choose chat, build, plan, or review",
@@ -150,6 +175,10 @@ export type SponsorBanner = {
   href: string;
 };
 export class TerminalScreen {
+  readonly queue = new TurnQueue();
+  dequeuedTurn?: QueuedTurn;
+  captureTurn?: () => unknown;
+  private composerDraft = "";
   private entries: Entry[] = [];
   private question?: Question;
   private value = "";
@@ -305,8 +334,14 @@ export class TerminalScreen {
   prompt(label = "Message Freecoda", kind: Question["kind"] = "composer") {
     if (this.question)
       throw new Error("A terminal question is already active.");
-    this.value = "";
-    this.cursor = 0;
+    if (kind !== "composer") this.composerDraft = this.value;
+    else {
+      this.dequeuedTurn = this.queue.next();
+      if (this.dequeuedTurn) return Promise.resolve(this.dequeuedTurn.input);
+    }
+    this.value = kind === "composer" ? this.composerDraft || this.value : "";
+    if (kind === "composer") this.composerDraft = "";
+    this.cursor = Array.from(this.value).length;
     this.historyIndex = -1;
     return new Promise<string>((resolve, reject) => {
       this.question = {
@@ -333,7 +368,7 @@ export class TerminalScreen {
     process.exit(143);
   };
   private insert(text: string) {
-    if (!this.question) return;
+    if (!this.question && !this.busy) return;
     const chars = Array.from(this.value);
     const inserted = Array.from(safeTerminalText(text)).slice(
       0,
@@ -518,7 +553,7 @@ export class TerminalScreen {
       this.render();
       return;
     }
-    if (!this.question) return;
+    if (!this.question && !this.busy) return;
     const chars = Array.from(this.value);
     const commands = this.commandMatches();
     this.commandIndex = Math.min(
@@ -613,7 +648,7 @@ export class TerminalScreen {
     }
     if (
       (key.name === "up" || key.name === "down") &&
-      this.question.kind === "composer"
+      this.question?.kind === "composer"
     ) {
       if (key.name === "up" && this.history.length) {
         if (this.historyIndex < 0) {
@@ -638,7 +673,20 @@ export class TerminalScreen {
   };
   private submit(answer: string) {
     const q = this.question;
-    if (!q) return;
+    if (!q) {
+      if (!this.busy || !answer.trim()) return;
+      if (answer.trim().startsWith("/")) {
+        this.append("notice", "Commands are available after the current turn. Escape cancels and pauses the queue.");
+        return;
+      }
+      try {
+        const item = this.queue.add(answer.trim(), this.captureTurn?.());
+        this.append("notice", `Queued ${item.id.slice(0, 8)} · ${answer.trim().slice(0, 160)}`);
+        this.value = "";
+        this.cursor = 0;
+      } catch (error) { this.append("notice", error instanceof Error ? error.message : "Could not queue turn."); }
+      return;
+    }
     this.question = undefined;
     this.value = "";
     this.cursor = 0;
@@ -647,6 +695,11 @@ export class TerminalScreen {
       if (this.history.length > 100) this.history.shift();
     }
     q.resolve(answer.trim());
+    if (q.kind !== "composer") {
+      this.value = this.composerDraft;
+      this.composerDraft = "";
+      this.cursor = Array.from(this.value).length;
+    }
     this.schedule();
   }
   render() {
@@ -706,7 +759,8 @@ export class TerminalScreen {
                   ? palette.error(label)
                   : c.bold(label)),
         );
-      for (const line of wrapTerminalText(entry.text, inner)) {
+      const formatted = entry.role === "freecoda" ? terminalMarkdownLines(entry.text) : entry.text.split("\n").map(text => ({ text, kind: "text" }));
+      for (const part of formatted) for (const line of wrapTerminalText(part.text, inner)) {
         const styled =
           entry.role === "error"
             ? palette.error(line)
@@ -716,7 +770,11 @@ export class TerminalScreen {
                 ? palette.success(line)
                 : entry.role === "approval" && line.startsWith("-")
                   ? palette.error(line)
-                  : line;
+                  : part.kind === "heading"
+                    ? c.bold(line)
+                    : part.kind === "code"
+                      ? palette.info(line)
+                      : line;
         transcript.push("  " + styled);
       }
       transcript.push("");
@@ -808,7 +866,7 @@ export class TerminalScreen {
               this.question?.kind === "permissions"
               ? this.question.label
               : this.busy
-                ? `${this.status} · Esc to interrupt`
+                ? `${this.status} · ${this.queue.items.length} queued${this.queue.paused ? " (paused)" : ""} · Esc to interrupt`
                 : `${this.mode === "chat" ? "Chat · no project access or tools" : (this.mode === "build" ? "Agent" : this.mode === "plan" ? "Plan" : "Review") + " · " + (this.mode === "build" ? this.permissions : "read-only turn · " + this.permissions)}`,
             inner,
           ),

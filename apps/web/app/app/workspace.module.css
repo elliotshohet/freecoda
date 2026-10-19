@@ -190,7 +190,8 @@
 }
 .projectList > button:hover,
 .projectList > button.selected,
-.repoList > button:hover {
+.repoList > button:hover,
+.repoList > button[data-selected="true"] {
   background: light-dark(#e8e4f9, #241e32);
   color: light-dark(#5844b7, #baa6df);
 }
@@ -474,6 +475,38 @@
   font-size: 11px;
   color: var(--purple);
 }
+.queuedPrompts {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: light-dark(#f8f7fb, #211e2c);
+}
+.queuedPrompts > strong {
+  color: var(--muted);
+  font: 10px/1.4 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.queuedPrompts > div {
+  display: flex;
+  align-items: start;
+  gap: 8px;
+  color: var(--text);
+  font-size: 12px;
+}
+.queuedPrompts > div span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.queuedPrompts button {
+  border: 0;
+  padding: 2px;
+  background: transparent;
+  color: var(--muted);
+}
 .composer {
   margin: 0 17px 16px;
   border: 1px solid light-dark(#dcd7ef, #393143);
@@ -631,7 +664,8 @@
   color: var(--muted);
   border-bottom: 1px solid var(--line);
 }
-.previewBar button {
+.previewBar button,
+.previewBar a {
   margin-left: auto;
   border: 0;
   background: transparent;
@@ -639,6 +673,10 @@
   gap: 4px;
   align-items: center;
   font-size: 10px;
+}
+.previewBar button + button,
+.previewBar a + button {
+  margin-left: 4px;
 }
 .preview iframe {
   width: 100%;
@@ -665,6 +703,12 @@
   border: 0;
   color: inherit;
   background: transparent;
+}
+.error button.errorAction {
+  flex-shrink: 1;
+  color: inherit;
+  text-decoration: underline;
+  white-space: nowrap;
 }
 .notice {
   display: flex;
@@ -731,6 +775,13 @@
   margin: 20px 0;
   max-height: 300px;
   overflow: auto;
+}
+.selectedRepo {
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 12px;
 }
 .linkButton {
   border: 0;
@@ -1718,3 +1769,161 @@
 .repoAccessError { border: 1px solid var(--line); padding: 12px; border-radius: 8px; }
 .unavailableRepos { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 4px; }
 .unavailableRepos p, .unavailableRepos li { font-size: 12px; line-height: 1.6; color: var(--muted); overflow-wrap: anywhere; }
+
+/* File count must never determine the size of the workspace. */
+.panel:has(.editorRow) {
+  display: flex;
+  flex-direction: column;
+  height: clamp(300px, 58dvh, 640px);
+  min-height: 0;
+  overflow: hidden;
+}
+.panel > .appFolder {
+  flex-shrink: 0;
+}
+.editorRow {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
+}
+.files {
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.files:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: -2px;
+}
+.editor {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.messageRow { display: flex; align-items: flex-start; gap: 9px; min-width: 0; margin: 0 auto 22px; max-width: 680px; }
+.userRow { justify-content: flex-end; }
+.agentRow { justify-content: flex-start; }
+.messageAvatar { display: grid; place-items: center; width: 27px; height: 27px; flex: 0 0 27px; border-radius: 50%; font-size: 10px; font-weight: 650; }
+.userAvatar { order: 2; background: light-dark(#f3f3f3, #303030); }
+.agentAvatar { color: var(--purple); background: color-mix(in srgb, var(--purple) 14%, transparent); }
+.messageAvatar :global(.brand-symbol) { width: 14px; height: 16px; }
+.messageRow .userMessage, .messageRow .agentMessage { min-width: 0; max-width: calc(100% - 36px); margin: 0; overflow-wrap: anywhere; }
+.messageRow .agentMessage > span { display: block; margin: 2px 0 6px; }
+.messageRow .agentMessage { padding: 10px 14px; border: 1px solid var(--line); border-radius: 15px; background: light-dark(#fafafa, #252525); }
+.messageRow .userMessage > span { display: block; margin-bottom: 5px; }
+.messageRow .userMessage p { margin: 0; white-space: pre-wrap; }
+.mobilePaneToggle { display: none; }
+.settingsToggle { display: none; }
+.workspaceSettings { flex: 0 0 auto; min-height: 0; }
+.settingsBody { min-height: 0; max-height: 32dvh; overflow: auto; overscroll-behavior: contain; }
+
+/* The unified app owns the viewport; every work surface scrolls inside its pane. */
+:global(#workspace-panel) .shell {
+  flex: 1 1 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+:global(#workspace-panel) .heading { flex: 0 0 60px; min-height: 0; }
+:global(#workspace-panel) .workbench {
+  flex: 1 1 0;
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+:global(#workspace-panel) .projects { min-height: 0; overflow: auto; overscroll-behavior: contain; }
+:global(#workspace-panel) .projectArea { min-height: 0; overflow: hidden; }
+:global(#workspace-panel) .projectTop { flex: 0 0 48px; }
+:global(#workspace-panel) .taskLayout { flex: 1 1 0; min-height: 0; overflow: hidden; }
+:global(#workspace-panel) .chatColumn { min-height: 0; overflow: hidden; }
+:global(#workspace-panel) .conversation {
+  flex: 1 1 0;
+  height: 0;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+:global(#workspace-panel) .chatEmpty { height: auto; min-height: 0; }
+:global(#workspace-panel) .composer { flex: 0 0 auto; max-width: 100%; }
+:global(#workspace-panel) .bottom { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+:global(#workspace-panel) .tabs { flex: 0 0 44px; min-width: 0; overflow-x: auto; overflow-y: hidden; }
+:global(#workspace-panel) .panel {
+  flex: 1 1 0;
+  height: 0;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+:global(#workspace-panel) .panel:has(.editorRow) { display: flex; flex-direction: column; }
+:global(#workspace-panel) .editorRow { flex: 1 1 0; height: 0; min-height: 0; overflow: hidden; }
+:global(#workspace-panel) .files { min-height: 0; overflow: auto; overscroll-behavior: contain; }
+:global(#workspace-panel) .editor { min-height: 0; overflow: auto; }
+:global(#workspace-panel) .codeEditor { min-height: 0; overflow: auto; }
+:global(#workspace-panel) .changePanel,
+:global(#workspace-panel) .output,
+:global(#workspace-panel) .preview { min-height: 0; overflow: auto; overscroll-behavior: contain; }
+:global(#workspace-panel) .output pre { max-height: none; }
+:global(#workspace-panel) .preview iframe { height: 100%; min-height: 220px; }
+:global(#workspace-panel) .empty,
+:global(#workspace-panel) .setup { flex: 1 1 0; min-height: 0; overflow: auto; }
+
+@media (max-width: 900px) {
+  :global(#workspace-panel) .workbench { grid-template-columns: 160px minmax(0, 1fr); }
+  :global(#workspace-panel) .taskLayout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .mobilePaneToggle { display: flex; flex: 0 0 auto; gap: 5px; padding: 5px 9px; border-bottom: 1px solid var(--line); }
+  .mobilePaneToggle button { padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--ink); }
+  .mobilePaneToggle button[aria-pressed="true"] { background: var(--pale); color: var(--purple); }
+  :global(#workspace-panel) .chatColumn { display: contents; }
+  :global(#workspace-panel) .conversation { grid-row: 1; height: auto; }
+  :global(#workspace-panel) .bottom { grid-row: 1; }
+  :global(#workspace-panel) .composer { grid-row: 2; margin: 7px 9px; max-width: calc(100% - 18px); }
+  :global(#workspace-panel) .taskLayout[data-mobile-pane="chat"] .bottom,
+  :global(#workspace-panel) .taskLayout[data-mobile-pane="inspect"] .conversation { display: none; }
+  :global(#workspace-panel) .bottom { border-left: 0; border-top: 1px solid var(--line); }
+  :global(#workspace-panel) .conversation { padding: 12px 8px; }
+  :global(#workspace-panel) .composer { margin: 6px 0 8px; }
+  :global(#workspace-panel) .panel { min-height: 0; height: 0; }
+}
+@media (max-width: 650px) {
+  :global(#workspace-panel) .heading { display: none; }
+  .settingsToggle { display: flex; align-items: center; gap: 6px; width: 100%; padding: 7px 10px; border: 0; border-bottom: 1px solid var(--line); background: var(--paper); color: var(--muted); font-size: 11px; text-align: left; }
+  .settingsBody { max-height: 25dvh; overflow: auto; overscroll-behavior: contain; }
+  .workspaceSettings[data-open="false"] .settingsBody { display: none; }
+  :global(#workspace-panel) .capacity { flex: 0 0 auto; max-height: 46px; overflow: auto; padding: 6px 10px; }
+  :global(#workspace-panel) .consent { flex: 0 0 auto; max-height: 72px; overflow: auto; padding: 7px 10px; }
+  :global(#workspace-panel) .workbench { display: flex; flex-direction: column; }
+  :global(#workspace-panel) .projects { flex: 0 0 auto; max-height: 90px; overflow: auto; padding: 6px 9px; }
+  :global(#workspace-panel) .projectArea { flex: 1 1 0; height: 0; }
+  :global(#workspace-panel) .projectTop { flex: 0 0 auto; height: auto; max-height: 100px; overflow: auto; align-items: stretch; flex-direction: column; gap: 5px; padding: 7px 9px; }
+  :global(#workspace-panel) .projectTop > div:first-child { display: flex; gap: 5px; flex-wrap: wrap; }
+  :global(#workspace-panel) .projectTools { min-width: 0; overflow-x: auto; flex-shrink: 0; }
+  :global(#workspace-panel) .projectTools button { flex: 0 0 auto; white-space: nowrap; }
+  :global(#workspace-panel) .taskLayout { grid-template-rows: minmax(0, 1fr) auto; }
+  :global(#workspace-panel) .chatColumn { padding: 0 9px; }
+  :global(#workspace-panel) .tabs { gap: 12px; padding: 0 9px; }
+  :global(#workspace-panel) .tabs button { padding: 11px 0 9px; }
+  :global(#workspace-panel) .editorRow { grid-template-columns: minmax(72px, 26%) minmax(0, 1fr); }
+  :global(#workspace-panel) .files > button { padding: 7px 5px; }
+  :global(#workspace-panel) .appFolder { flex-wrap: wrap; }
+  :global(#workspace-panel) .appFolder input { width: min(110px, 38vw); }
+  :global(#workspace-panel) .composer > textarea { min-height: 64px; max-height: 20dvh; }
+  :global(#workspace-panel) .composer > div > span { display: none; }
+}
+@media (max-width: 650px) and (max-height: 600px) {
+  :global(#workspace-panel) .projects { max-height: 40px; }
+  :global(#workspace-panel) .projectTop { max-height: 58px; padding-top: 3px; padding-bottom: 3px; gap: 2px; }
+  :global(#workspace-panel) .projectTop > div:first-child { flex-wrap: nowrap; white-space: nowrap; max-height: 18px; overflow: auto; flex-shrink: 0; }
+  .mobilePaneToggle { padding-top: 3px; padding-bottom: 3px; }
+  .mobilePaneToggle button { padding-top: 3px; padding-bottom: 3px; }
+  :global(#workspace-panel) .composer > div { padding: 4px 10px 7px; }
+}

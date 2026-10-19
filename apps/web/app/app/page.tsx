@@ -1,17 +1,28 @@
-import { CloudWorkspace } from "./workspace";
 import { requireBrowserSession } from "@/lib/browser-session";
 import { SessionBoundary } from "@/components/session-boundary";
+import { UnifiedWebApp } from "./unified-web-app";
+
 export const metadata = {
-  title: "Cloud workspace",
+  title: "Freecoda",
   robots: { index: false, follow: false },
 };
-export default async function AppPage() {
+
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export default async function AppPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   const user = await requireBrowserSession();
+  const params = await searchParams;
+  const thread = params.thread;
   return (
     <SessionBoundary userId={user.id}>
-    <main id="main">
-      <CloudWorkspace />
-    </main>
+      <UnifiedWebApp
+        initialView={params.view === "chat" ? "chat" : "workspace"}
+        initialThreadId={typeof thread === "string" ? thread : undefined}
+      />
     </SessionBoundary>
   );
 }

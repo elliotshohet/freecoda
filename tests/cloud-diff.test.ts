@@ -1,5 +1,14 @@
 import { test, expect } from "bun:test";
 import { publicationChanges } from "../apps/web/lib/cloud/github";
+import { sourceHasChanges, requireCleanSync } from "../apps/web/lib/cloud/source-sync";
+
+test("upstream pulls preserve additions, deletions, executable modes and binary edits", () => {
+  const base = [{ path: "run.sh", content: "echo hello", mode: "100644" as const }, { path: "image.png", content: "YQ==", encoding: "base64" as const }];
+  expect(sourceHasChanges(base, [...base].reverse())).toBe(false);
+  for (const changed of [base.slice(1), [...base, { path: "new.ts", content: "local" }], [{ ...base[0]!, mode: "100755" as const }, base[1]!], [base[0]!, { ...base[1]!, content: "Yg==" }]]) {
+    expect(() => requireCleanSync(base, changed)).toThrow("unpublished changes");
+  }
+});
 
 test("source policy changes preserve excluded tracked artifacts instead of publishing deletions", () => {
   const base = [

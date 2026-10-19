@@ -54,6 +54,16 @@ test("browser chat accepts explicit text-only consent and rejects injected roles
   expect(options.prompt[1].role).toBe("user");
   expect(options.maxOutputTokens).toBe(4096);
 });
+test("follow-up chat replays visible history without requiring or exposing private model reasoning", () => {
+  const messages = [{ role: "user" as const, content: "Remember blue" }, { role: "assistant" as const, content: "Blue remembered" }, { role: "user" as const, content: "What color?" }];
+  const options = browserModelOptions(messages);
+  expect(options.prompt.map(message => message.role)).toEqual(["system", "user", "user"]);
+  expect(JSON.stringify(options.prompt[1])).toContain("Blue remembered");
+  expect(options.prompt.at(-1)?.content).toEqual([{ type: "text", text: "What color?" }]);
+  expect(JSON.stringify(options)).not.toContain("reasoning_content");
+  expect(messages[1]!.role).toBe("assistant");
+  expect(modelCallSchema.safeParse({ protocol: 1, model: "reflection/beam-free", operation: "stream", options }).success).toBe(true);
+});
 test("browser streaming public boundary excludes provider metadata, reasoning, raw requests and errors", async () => {
   const parts = [
     { type: "response-metadata", id: "private-provider-id" },
@@ -106,7 +116,7 @@ test("actual browser handler enforces origin/session and streams only public tex
   let called = 0;
   const deps = {
     session: async () => ({ id: "fixture-user" }),
-    catalog: async () => [{ id: "approved-fixture", approved: true } as any],
+    catalog: async () => [{ id: "reflection/beam-free", approved: true, provider: "reflection", byok: false, inputMicrosPerToken: 0, outputMicrosPerToken: 0, maxContextTokens: 1_048_576 }],
     infer: async (
       req: Request,
       user: { id: string },
@@ -118,7 +128,7 @@ test("actual browser handler enforces origin/session and streams only public tex
       const body = await req.json();
       expect(modelCallSchema.safeParse(body).success).toBe(true);
       expect(body.protocol).toBe(1);
-      expect(body.model).toBe("approved-fixture");
+      expect(body.model).toBe("reflection/beam-free");
       expect(body.operation).toBe("stream");
       expect(body.options.tools).toBeUndefined();
       return new Response(
@@ -268,4 +278,24 @@ test("released free stream errors give retry feedback without exposing provider 
     type: "error",
     error: "The response was interrupted. You can retry or send your next message.",
   });
+});
+
+test("browser picker excludes paid, unapproved and misconfigured models", async () => {
+  const { eligibleChatModels } = await import("../apps/web/lib/browser-chat");
+  const key = process.env.AI_GATEWAY_API_KEY;
+  process.env.AI_GATEWAY_API_KEY = "fixture-key";
+  const free = { id: "reflection/beam-free", approved: true, provider: "reflection", byok: false, inputMicrosPerToken: 0, outputMicrosPerToken: 0, maxContextTokens: 1_048_576 };
+  try {
+    expect(eligibleChatModels([
+      free,
+      { ...free, id: "paid/model", inputMicrosPerToken: 1 },
+      { ...free, approved: false },
+      { ...free, byok: true },
+      { ...free, provider: "other" },
+      { ...free, maxContextTokens: 0 },
+    ])).toEqual([free]);
+  } finally {
+    if (key === undefined) delete process.env.AI_GATEWAY_API_KEY;
+    else process.env.AI_GATEWAY_API_KEY = key;
+  }
 });

@@ -117,6 +117,7 @@ beforeAll(async () => {
                   owner: { login: "other-owner" },
                   default_branch: "main",
                   private: true,
+                  created_at: "2025-01-01T00:00:00Z",
                 },
               ]
             : [
@@ -126,6 +127,7 @@ beforeAll(async () => {
                   owner: { login: "fixture-owner" },
                   default_branch: "main",
                   private: true,
+                  created_at: "2025-02-01T00:00:00Z",
                 },
               ],
       });
@@ -255,6 +257,7 @@ test("live repository listing excludes installations whose repositories the user
       name: "fixture",
       defaultBranch: "main",
       private: true,
+      createdAt: "2025-02-01T00:00:00Z",
     },
   ]);
   expect(result.installUrl).toBe(
