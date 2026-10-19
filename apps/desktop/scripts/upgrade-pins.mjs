@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 // Public asset identities reviewed from the canonical GitHub releases. Changing
 // the requested pair requires reviewing new binaries, never trusting a moving feed.
 const pins = {
-  '0.1.4->0.1.5': {
+  '0.1.5->0.1.6': {
     linux: {
-      from: 'sha256:070ca61fa3f5995c6f3d159faf9da89eb4ddd153c4f13c04434d165c906d799c',
-      to: 'sha256:0f15ed35df2fee675fce5f1470aaf1a4f1afc4dfc2bec64b74606ce661f29d79',
+      from: 'sha256:0f15ed35df2fee675fce5f1470aaf1a4f1afc4dfc2bec64b74606ce661f29d79',
+      to: 'sha256:6d01fbf6785c7ea4bd84487e3897af5de89796cbf181b1bbf447de6be4793d26',
     },
     win32: {
-      from: 'sha256:d954d17620dbfe333b4285a943cc5eea6dc808db22c3ebd97923d14c1673569a',
-      to: 'sha256:698931334dcc9fc2cd35a707ea787e326e343ddeda08de860b9a6c4bcfffde4e',
+      from: 'sha256:698931334dcc9fc2cd35a707ea787e326e343ddeda08de860b9a6c4bcfffde4e',
+      to: 'sha256:545690bf3ab55a4d409595bb308305e40189fa86d91eed71f38117ed83cf6ca9',
     },
   },
 };

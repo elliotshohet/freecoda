@@ -5,11 +5,11 @@ on:
       from_version:
         description: Published version to install
         required: true
-        default: 0.1.4
+        default: 0.1.5
       to_version:
         description: Expected current stable release version
         required: true
-        default: 0.1.5
+        default: 0.1.6
       platform:
         description: Native platform to qualify
         type: choice

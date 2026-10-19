@@ -71,6 +71,10 @@ export function DesktopDownloads() {
         from the desktop app.
       </p>
       <p>
+        Desktop 0.1.4 and older point to the retired release repository. Install
+        a current download once to switch to the main repository’s update feed.
+      </p>
+      <p>
         Windows and Linux AppImage builds check for updates and download them in
         the background, then install when you close the app normally. Active
         work is not interrupted. Use the app menu to check update status. macOS

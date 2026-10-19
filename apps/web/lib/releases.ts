@@ -7,7 +7,7 @@ export const CLI_INSTALL_COMMAND = `npm install --global https://github.com/elli
 
 // Public release assets and checksums verified before exposing downloads.
 export const DESKTOP_PUBLISHED = true;
-export const DESKTOP_RELEASE_VERSION = "0.1.5";
+export const DESKTOP_RELEASE_VERSION = "0.1.6";
 export const DESKTOP_RELEASE_URL = `https://github.com/elliotshohet/freecoda/releases/tag/v${DESKTOP_RELEASE_VERSION}`;
 const desktopAssetBase = `https://github.com/elliotshohet/freecoda/releases/download/v${DESKTOP_RELEASE_VERSION}`;
 export const DESKTOP_CHECKSUMS_URL = `${desktopAssetBase}/SHA256SUMS.txt`;
