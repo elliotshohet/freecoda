@@ -67,7 +67,19 @@ export type DesktopSponsor = {
   description: string;
   paid: boolean;
 };
+export type DesktopGitHubRepo = { repositoryId: number; installationId: number; owner: string; name: string; defaultBranch: string; private: boolean };
+export type DesktopGitHubPreference = { repositoryId: number; installationId: number; owner: string; name: string; branch: string; appDirectory: string; enabled: boolean };
+export type DesktopGitHubState = { repos: DesktopGitHubRepo[]; repositories: DesktopGitHubPreference[]; canInstall: boolean };
+export type DesktopExtension = { id: string; name: string; kind: "skill" | "mcp"; enabled: boolean };
 export interface DesktopBridge {
+  refreshConversations(): Promise<DesktopState>;
+  githubRepositories(): Promise<DesktopGitHubState>;
+  saveGitHubRepositories(repositories: DesktopGitHubPreference[]): Promise<DesktopGitHubState>;
+  connectGitHub(): Promise<void>;
+  listExtensions(): Promise<DesktopExtension[]>;
+  installExtension(input: { kind: "skill" | "mcp"; name: string; url: string }): Promise<DesktopExtension[]>;
+  setExtensionEnabled(input: { id: string; enabled: boolean }): Promise<DesktopExtension[]>;
+  removeExtension(id: string): Promise<DesktopExtension[]>;
   getSponsor(): Promise<DesktopSponsor>;
   reportSponsorVisible(): Promise<void>;
   openSponsor(): Promise<void>;

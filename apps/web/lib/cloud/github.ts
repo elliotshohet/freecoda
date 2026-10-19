@@ -43,6 +43,11 @@ export async function gh<T>(
     redirect: "error",
     signal: AbortSignal.timeout(20000),
   });
+  if (response.status === 401)
+    throw new ApiError(
+      403,
+      "GitHub authorization expired or was revoked. Reconnect GitHub and refresh connected repositories.",
+    );
   if (!response.ok)
     throw new ApiError(
       response.status === 404 ? 404 : response.status === 403 ? 403 : 502,
@@ -66,87 +71,153 @@ export async function installationToken(
   installationId: number,
   owner: string,
   name: string,
+  access: "read" | "write" = "write",
 ) {
-  const auth = await userToken(userId);
-  const viewer = await gh<{ id: number; login: string }>(auth, "/user");
-  const installation = await gh<{
-    id: number;
-    account: { id: number; login: string };
-  }>(appToken(), `/app/installations/${installationId}`);
-  if (installation.account.login.toLowerCase() !== owner.toLowerCase())
-    throw new ApiError(
-      403,
-      "Installation owner does not match the repository.",
-    );
-  if (installation.account.id !== viewer.id) {
-    const permissions = await gh<{ permissions?: { push?: boolean } }>(
-      auth,
-      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`,
-    );
-    if (!permissions.permissions?.push)
+  try {
+    const auth = await userToken(userId);
+    const viewer = await gh<{ id: number; login: string }>(auth, "/user");
+    const installation = await gh<{
+      id: number;
+      account: { id: number; login: string };
+    }>(appToken(), `/app/installations/${installationId}`);
+    if (installation.account.login.toLowerCase() !== owner.toLowerCase())
       throw new ApiError(
         403,
-        "Organization repositories require verified write access.",
+        "Installation owner does not match the repository.",
       );
-  }
-  const result = await gh<{ token: string }>(
-    appToken(),
-    `/app/installations/${installationId}/access_tokens`,
-    {
-      repositories: [name],
-      permissions: {
-        contents: "write",
-        pull_requests: "write",
-        metadata: "read",
+    if (installation.account.id !== viewer.id) {
+      const permissions = await gh<{ permissions?: { push?: boolean } }>(
+        auth,
+        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`,
+      );
+      if (!permissions.permissions?.push)
+        throw new ApiError(
+          403,
+          "Organization repositories require verified write access.",
+        );
+    }
+    const result = await gh<{ token: string }>(
+      appToken(),
+      `/app/installations/${installationId}/access_tokens`,
+      {
+        repositories: [name],
+        permissions: {
+          contents: access,
+          ...(access === "write" ? { pull_requests: "write" } : {}),
+          metadata: "read",
+        },
       },
-    },
-  );
-  const repository = await gh<{
-    id: number;
-    permissions?: { push?: boolean };
-    owner: { login: string };
-    default_branch: string;
-  }>(
-    result.token,
-    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`,
-  );
-  return { token: result.token, repository };
+    );
+    const repository = await gh<{
+      id: number;
+      permissions?: { push?: boolean };
+      owner: { login: string };
+      default_branch: string;
+    }>(
+      result.token,
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`,
+    );
+    return { token: result.token, repository };
+  } catch (error) {
+    if (error instanceof ApiError && [403, 404, 502].includes(error.status))
+      throw new ApiError(
+        error.status,
+        `${error.message} Refresh connected repositories or reconnect GitHub and update the Freecoda GitHub App installation before retrying.`,
+      );
+    throw error;
+  }
 }
 export async function repositories(userId: string) {
   const auth = await userToken(userId);
   const viewer = await gh<{ id: number }>(auth, "/user");
-  const installations = await gh<
-    { id: number; account: { id: number; login: string } }[]
-  >(appToken(), "/app/installations?per_page=100");
   const repos = [];
-  for (const installation of installations.filter(
-    (installation) => installation.account.id === viewer.id,
-  )) {
-    const token = await gh<{ token: string }>(
-      appToken(),
-      `/app/installations/${installation.id}/access_tokens`,
-      { permissions: { contents: "read", metadata: "read" } },
-    );
-    const result = await gh<{
-      repositories: {
-        name: string;
-        owner: { login: string };
-        default_branch: string;
-        private: boolean;
-      }[];
-    }>(token.token, "/installation/repositories?per_page=100");
-    repos.push(
-      ...result.repositories.map((repo) => ({
-        installationId: installation.id,
-        owner: repo.owner.login,
-        name: repo.name,
-        defaultBranch: repo.default_branch,
-        private: repo.private,
-      })),
-    );
+  let unavailable = false;
+  for (let page = 1; ; page++) {
+    const installations = await gh<
+      {
+        id: number;
+        account: { id: number; login: string };
+        suspended_at?: string | null;
+      }[]
+    >(appToken(), `/app/installations?per_page=100&page=${page}`);
+    for (const installation of installations) {
+      if (installation.suspended_at) {
+        unavailable = true;
+        continue;
+      }
+      try {
+        const token = await gh<{ token: string }>(
+          appToken(),
+          `/app/installations/${installation.id}/access_tokens`,
+          { permissions: { contents: "read", metadata: "read" } },
+        );
+        for (let repoPage = 1; ; repoPage++) {
+          const result = await gh<{
+            repositories: {
+              id: number;
+              name: string;
+              owner: { login: string };
+              default_branch: string;
+              private: boolean;
+            }[];
+          }>(
+            token.token,
+            `/installation/repositories?per_page=100&page=${repoPage}`,
+          );
+          for (const repo of result.repositories) {
+            // An app may be installed on accounts unrelated to this user. Only the
+            // installation owner or a user with verified write access may see it.
+            if (installation.account.id !== viewer.id) {
+              try {
+                const access = await gh<{ permissions?: { push?: boolean } }>(
+                  auth,
+                  `/repos/${encodeURIComponent(repo.owner.login)}/${encodeURIComponent(repo.name)}`,
+                );
+                if (!access.permissions?.push) continue;
+              } catch (error) {
+                if (
+                  error instanceof ApiError &&
+                  [403, 404].includes(error.status)
+                )
+                  continue;
+                throw error;
+              }
+            }
+            repos.push({
+              repositoryId: repo.id,
+              installationId: installation.id,
+              owner: repo.owner.login,
+              name: repo.name,
+              defaultBranch: repo.default_branch,
+              private: repo.private,
+            });
+          }
+          if (result.repositories.length < 100) break;
+        }
+      } catch (error) {
+        if (
+          (error instanceof ApiError &&
+            [403, 404, 502].includes(error.status)) ||
+          error instanceof TypeError ||
+          (error instanceof DOMException &&
+            ["AbortError", "TimeoutError"].includes(error.name))
+        ) {
+          unavailable = true;
+          continue;
+        }
+        throw error;
+      }
+    }
+    if (installations.length < 100) break;
   }
   return {
     repos,
+    ...(unavailable
+      ? {
+          warning:
+            "Some repositories could not be refreshed. Refresh connected repositories or update the Freecoda GitHub App installation, then retry.",
+        }
+      : {}),
     installUrl: process.env.GITHUB_APP_SLUG
       ? `https://github.com/apps/${encodeURIComponent(process.env.GITHUB_APP_SLUG)}/installations/new`
       : null,

@@ -38,7 +38,7 @@
             <option value="light">Light</option>
             <option value="dark">Dark</option>
           </select></label
-        ><button class="account-button" id="account-open">
+        ><button class="account-button" id="github-repos-open" aria-haspopup="dialog">Repositories</button><button class="account-button" id="extensions-open" aria-haspopup="dialog">Tools &amp; skills</button><button class="account-button" id="account-open">
           <span class="account-dot"></span
           ><span id="account-label">Your account</span>
         </button>
@@ -88,6 +88,7 @@
         <button id="sidebar-output" class="sidebar-action">
           <span aria-hidden="true">›_</span> Terminal & activity
         </button>
+        <button id="refresh-conversations" class="quiet-button" type="button">Sync conversations</button>
         <label class="chat-history-search"
           >Search conversations<input
             id="thread-search"
@@ -423,8 +424,8 @@ Command output will appear here. Your permission preset controls local command e
             /><span
               ><strong>Default</strong
               ><small
-                >Ask for your approval before each file change and shell
-                command.</small
+                >Ask for your approval before each file change, shell
+                command, and external tool call.</small
               ></span
             ></label
           >
@@ -436,7 +437,7 @@ Command output will appear here. Your permission preset controls local command e
             /><span
               ><strong>Full access</strong
               ><small
-                >Allow local file changes and shell commands without individual
+                >Allow file changes, shell commands, and external tool calls without individual
                 prompts. Commands can access files and network resources outside
                 your project.</small
               ></span
@@ -520,6 +521,27 @@ Command output will appear here. Your permission preset controls local command e
       </div>
       <p class="approval-footer">↑ ↓ to navigate · Enter to select · Esc to decline</p>
     </dialog>
+    <dialog id="github-repos-dialog" aria-labelledby="github-repos-title">
+      <button id="github-repos-close" class="dialog-close" aria-label="Close repositories">×</button>
+      <h2 id="github-repos-title">Connected repositories</h2>
+      <p>Choose the GitHub repositories available to your hosted account. Branch and app folder preferences sync across your devices. Local folders still require explicit trust; saving does not clone a repository.</p>
+      <div class="dialog-actions"><button id="github-connect" class="button secondary">Connect GitHub repositories</button><button id="github-repos-refresh" class="button secondary">Refresh access</button></div>
+      <form id="github-repos-form"><div id="github-repos-list"></div><div class="dialog-actions"><button id="github-repos-save" type="submit" class="button secondary">Save preferences</button></div></form>
+      <p id="github-repos-status" role="status"></p>
+    </dialog>
+    <dialog id="extensions-dialog" aria-labelledby="extensions-title" aria-describedby="extensions-description">
+      <button class="dialog-close" id="extensions-close" aria-label="Close tools and skills">×</button>
+      <h2 id="extensions-title">Tools &amp; skills</h2>
+      <p id="extensions-description">Connect an MCP tool server or install a SKILL.md instruction file. Installation saves configuration only. Enabled skills apply to coding tasks; MCP tools are available in Build mode. General Chat stays tool-free.</p>
+      <div id="extensions-list" aria-live="polite"></div>
+      <form id="extensions-form" class="extensions-form">
+        <label>Type<select id="extension-kind"><option value="skill">Skill · SKILL.md</option><option value="mcp">MCP tool server · HTTP</option></select></label>
+        <label>Name<input id="extension-name" required maxlength="80" placeholder="My extension" /></label>
+        <label>SKILL.md path or HTTPS URL / MCP HTTPS URL<input id="extension-url" type="text" required placeholder="https://example.com/SKILL.md" /></label>
+        <p>Only install instructions and tools you trust. MCP calls may share task context with the server. Tool actions still require your approval.</p>
+        <button id="extension-install" class="button secondary" type="submit">Install extension</button>
+      </form>
+    </dialog>
     <dialog id="account-dialog" aria-labelledby="account-title">
       <button
         class="dialog-close"
@@ -560,7 +582,7 @@ Command output will appear here. Your permission preset controls local command e
       </div>
       <p class="dialog-caption">
         Hosted usage is limited to invited accounts and available capacity.
-        Local files and chat stay on this computer; AI requests send the context
+        Signed-in conversations sync to your account, with a local offline copy; AI requests send the context
         needed for your task.
       </p>
     </dialog>

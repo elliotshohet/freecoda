@@ -32,6 +32,13 @@ async function fixture(ad: unknown) {
       opened.push(url);
     },
     fetch: async (url, init) => {
+      const endpoint = new URL(String(url));
+      if (endpoint.pathname === "/api/v1/conversations") {
+        expect(new Headers(init?.headers).get("authorization")).toBe("Bearer secret-device-token-abcdefghijklmnopqrstuvwxyz");
+        expect(endpoint.searchParams.get("mode")).toBe("chat");
+        return Response.json({ userId: "sponsor-fixture-account", conversations: [], nextCursor: null });
+      }
+      expect(endpoint.pathname === "/api/v1/ads" || endpoint.pathname === "/api/v1/ads/impression").toBe(true);
       requests.push({ url: String(url), init });
       return Response.json(
         String(url).includes("/impression") ? { ok: true } : ad,

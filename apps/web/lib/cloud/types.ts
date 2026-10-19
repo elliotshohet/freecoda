@@ -28,6 +28,7 @@ export type CloudProject = {
   repo?: Omit<RepositorySource, "baseFiles">;
 };
 export type ProjectPayload = {
+  extensions?: import("../../../../packages/core/src/extensions").ExtensionRegistry;
   error?: string;
   files: SourceFile[];
   repository?: RepositorySource;
@@ -44,6 +45,9 @@ export type CloudRun = {
   updatedAt: string;
 };
 export type RunPayload = {
+  conversationId?: string;
+  conversationVersion?: number;
+  extensionConsent?: boolean;
   prompt: string;
   mode: "build" | "plan" | "review";
   consentAt: string;

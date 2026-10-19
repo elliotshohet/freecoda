@@ -3,11 +3,11 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { getDb } from "./db";
 import * as schema from "./db/schema";
-import { publicConfig, appUrl } from "./config";
+import { publicConfig, authBaseURL } from "./config";
 function createAuth() {
   return betterAuth({
     secret: process.env.BETTER_AUTH_SECRET,
-    baseURL: appUrl(),
+    baseURL: authBaseURL(),
     database: drizzleAdapter(getDb(), { provider: "pg", schema }),
     socialProviders: {
       github: {

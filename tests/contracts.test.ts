@@ -5,8 +5,13 @@ import {
   nextReset,
   modelCallSchema,
   sponsorInquirySchema,
+  conversationMessagesSchema,
 } from "../packages/contracts/src";
 import { safeModelOptions, maxRequestCost } from "../apps/web/lib/inference";
+import {
+  canReleaseStaleFreeReservation,
+  isVerifiedZeroCostFreeModel,
+} from "../apps/web/lib/usage";
 import {
   hostedProviderModel,
   generationAccounting,
@@ -30,6 +35,17 @@ const model = {
   maxContextTokens: 200000,
   approved: true,
 };
+test("cloud conversation serialization strips provider fields and undefined SDK values", () => {
+  const messages = conversationMessagesSchema.parse([
+    {
+      role: "assistant",
+      content: [{ type: "text", text: "Reply", providerOptions: undefined }],
+      providerMetadata: undefined,
+      status: "complete",
+    },
+  ]);
+  expect(messages).toEqual([{ role: "assistant", content: [{ type: "text", text: "Reply" }], status: "complete" }]);
+});
 test("trusted hosted calls preserve live cancellation signals", () => {
   const controller = new AbortController();
   const options = safeModelOptions(
@@ -42,6 +58,58 @@ test("trusted hosted calls preserve live cancellation signals", () => {
   expect(options.abortSignal).toBe(controller.signal);
   controller.abort();
   expect(options.abortSignal?.aborted).toBe(true);
+});
+test("stale reservations release only for approved zero-cost Beam without a generation ID", () => {
+  const now = Date.now();
+  const config = {
+    id: "reflection/beam-free",
+    provider: "reflection",
+    byok: false,
+    inputMicrosPerToken: 0,
+    outputMicrosPerToken: 0,
+    approved: true,
+  };
+  const reservation = {
+    status: "uncertain",
+    source: "free",
+    model: "reflection/beam-free",
+    maxCostMicros: 0,
+    generationId: null,
+    createdAt: new Date(now - 6 * 60 * 1000),
+  };
+  expect(isVerifiedZeroCostFreeModel(config)).toBe(true);
+  expect(canReleaseStaleFreeReservation(reservation, now)).toBe(true);
+  expect(
+    canReleaseStaleFreeReservation(
+      { ...reservation, createdAt: new Date(now - 4 * 60 * 1000) },
+      now,
+    ),
+  ).toBe(false);
+  expect(
+    canReleaseStaleFreeReservation(
+      { ...reservation, generationId: "gateway-generation" },
+      now,
+    ),
+  ).toBe(false);
+  expect(
+    canReleaseStaleFreeReservation({ ...reservation, maxCostMicros: 1 }, now),
+  ).toBe(false);
+  expect(
+    canReleaseStaleFreeReservation({ ...reservation, source: "byok" }, now),
+  ).toBe(false);
+  expect(
+    canReleaseStaleFreeReservation({ ...reservation, model: "paid/model" }, now),
+  ).toBe(false);
+  for (const patch of [
+    { ...config, approved: false },
+    { ...config, id: "openai/gpt-4.1-nano" },
+    { ...config, provider: "openai" },
+    { ...config, byok: true },
+    { ...config, inputMicrosPerToken: 1 },
+    { ...config, outputMicrosPerToken: 1 },
+  ]) {
+    expect(isVerifiedZeroCostFreeModel(patch)).toBe(false);
+  }
 });
 test("quotas use UTC boundaries and next calendar day", () => {
   const date = new Date("2026-12-31T23:59:59.000Z");
@@ -92,6 +160,20 @@ test("reservation is an upper bound and includes output tokens", () => {
   expect(() =>
     maxRequestCost({ ...model, maxContextTokens: 500 }, 1000, 1000),
   ).toThrow();
+  expect(
+    maxRequestCost(
+      {
+        ...model,
+        id: "reflection/beam-free",
+        provider: "reflection",
+        byok: false,
+        inputMicrosPerToken: 0,
+        outputMicrosPerToken: 0,
+      },
+      1000,
+      1000,
+    ),
+  ).toBe(0);
 });
 test("no arbitrary request headers or tools are accepted", () => {
   expect(

@@ -5,6 +5,11 @@ export type Message = {
   status?: "complete" | "partial" | "stopped" | "error";
 };
 export type Conversation = {
+  mode?: "chat" | "coding";
+  cloudVersion?: number;
+  cloudDirty?: boolean;
+  cloudDeleted?: boolean;
+  cloudLoaded?: boolean;
   id: string;
   title: string;
   messages: Message[];
@@ -71,6 +76,11 @@ export function validChats(value: unknown): Conversation[] {
       title: candidate.title,
       messages,
       updatedAt: candidate.updatedAt,
+      ...(candidate.mode === "coding" ? { mode: "coding" as const } : {}),
+      ...(Number.isSafeInteger(candidate.cloudVersion) && Number(candidate.cloudVersion) > 0 ? { cloudVersion: Number(candidate.cloudVersion) } : {}),
+      ...(candidate.cloudDirty === true ? { cloudDirty: true } : {}),
+      ...(candidate.cloudDeleted === true ? { cloudDeleted: true } : {}),
+      ...(candidate.cloudLoaded === false ? { cloudLoaded: false } : {}),
     });
   }
   return chats;

@@ -681,10 +681,10 @@ export class TerminalScreen {
       this.question?.kind === "approval" && this.approvalCategory
         ? 5
         : this.question?.kind === "permissions"
-        ? 4
-        : commands.length
-          ? menuSize + 1
-          : 0;
+          ? 4
+          : commands.length
+            ? menuSize + 1
+            : 0;
     const transcript: string[] = [];
     for (const entry of this.entries) {
       const label = {
@@ -752,8 +752,12 @@ export class TerminalScreen {
     }
     if (this.question?.kind === "approval" && this.approvalCategory) {
       const category =
-        this.approvalCategory === "shell" ? "shell commands" : "file edits";
-      lines.push(palette.warning("  Approval required · review the action above"));
+        this.approvalCategory === "shell"
+          ? "commands and external tools"
+          : "file edits";
+      lines.push(
+        palette.warning("  Approval required · review the action above"),
+      );
       for (const [index, choice] of [
         "Yes, allow once",
         `Yes, allow ALL ${category} for this session`,
@@ -764,12 +768,17 @@ export class TerminalScreen {
           inner,
         );
         lines.push(
-          "  " + (index === this.approvalIndex
-            ? c.bold(palette.accent(text))
-            : palette.muted(text)),
+          "  " +
+            (index === this.approvalIndex
+              ? c.bold(palette.accent(text))
+              : palette.muted(text)),
         );
       }
-      lines.push(palette.muted("  Session approval covers the entire category, not just this action."));
+      lines.push(
+        palette.muted(
+          "  Session approval covers ALL commands/external tools or ALL file edits.",
+        ),
+      );
     }
     if (this.question?.kind === "permissions") {
       lines.push(
@@ -937,10 +946,13 @@ export function approvals() {
       if (active) return active.chooseApproval(kind);
       const answer = await ask(
         `${kind === "shell" ? "Allow command execution?" : "Allow file changes?"}\n` +
-        `1. Yes, allow once\n2. Yes, allow ALL ${kind === "shell" ? "shell commands" : "file edits"} for this session\n3. No, decline this action\n` +
-        "Session approval covers the entire category. [1/y, 2/s, 3/n]: ",
+          `1. Yes, allow once\n2. Yes, allow ALL ${kind === "shell" ? "commands and external tools" : "file edits"} for this session\n3. No, decline this action\n` +
+          "Session approval covers the entire category. [1/y, 2/s, 3/n]: ",
       );
-      return ({ "1": "y", "2": "s", "3": "n" } as Record<string, string>)[answer] || answer;
+      return (
+        ({ "1": "y", "2": "s", "3": "n" } as Record<string, string>)[answer] ||
+        answer
+      );
     },
     (description) => active?.setPermissions(description),
   );

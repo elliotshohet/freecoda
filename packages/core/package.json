@@ -4,12 +4,15 @@
   "type": "module",
   "exports": "./src/index.ts",
   "dependencies": {
-    "ai": "latest",
+    "@ai-sdk/mcp": "2.0.78",
     "@ai-sdk/openai-compatible": "latest",
-    "zod": "latest",
-    "ignore": "latest",
+    "@ai-sdk/provider": "4.0.29",
+    "@freecoda/contracts": "workspace:*",
+    "ai": "latest",
     "diff": "latest",
-    "@ai-sdk/provider": "4.0.29"
+    "ignore": "latest",
+    "undici": "7.24.5",
+    "zod": "latest"
   },
   "devDependencies": {
     "@types/diff": "latest"

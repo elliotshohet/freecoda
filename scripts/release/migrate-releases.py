@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Copy and verify legacy GitHub releases. Never deletes the source repository.
+"""One-time migration utility retained as history after migration completion.
 
-Requires authenticated gh with contents-write permission on the destination.
-Run from the workspace root: python3 scripts/release/migrate-releases.py
-Downloads are cached beneath .data/release-migration (approximately 4.9 GB).
+The source repository was removed after its releases and assets were copied and
+verified in the canonical repository. This script cannot be rerun as-is.
 """
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import pathlib
 import subprocess
+import time
 
 SOURCE = 'elliotshohet/freecoda-releases'
 DESTINATION = 'elliotshohet/freecoda'
@@ -70,15 +70,27 @@ def main():
             notes = directory / 'release-notes.md'
             notes.write_text(release.get('body') or '')
             gh('release', 'create', tag, '--repo', DESTINATION, '--draft', '--title', release['name'] or tag, '--notes-file', str(notes))
-            existing = destination_release(tag)
+            for attempt in range(15):
+                existing = destination_release(tag)
+                if existing is not None:
+                    break
+                time.sleep(1)
+            assert existing is not None, f'Created release not yet visible: {tag}; rerun safely'
         expected = {asset['name']: asset['digest'] for asset in release['assets']}
         if not existing['draft']:
             assert {asset['name']: asset['digest'] for asset in existing['assets']} == expected, f'Published destination differs: {tag}'
         else:
             assert not any(asset['name'] not in expected for asset in existing['assets']), f'Unexpected destination assets: {tag}'
-            gh('release', 'upload', tag, '--repo', DESTINATION, '--clobber', *[str(directory / asset['name']) for asset in release['assets']])
-            copied = destination_release(tag)
-            assert {asset['name']: asset['digest'] for asset in copied['assets']} == expected, f'Uploaded bytes differ: {tag}'
+            uploaded = {asset['name']: asset.get('digest') for asset in existing['assets']}
+            pending = [str(directory / asset['name']) for asset in release['assets'] if uploaded.get(asset['name']) != asset['digest']]
+            if pending:
+                gh('release', 'upload', tag, '--repo', DESTINATION, '--clobber', *pending)
+            for attempt in range(30):
+                copied = destination_release(tag)
+                if copied and {asset['name']: asset.get('digest') for asset in copied['assets']} == expected:
+                    break
+                time.sleep(1)
+            assert copied and {asset['name']: asset.get('digest') for asset in copied['assets']} == expected, f'Uploaded bytes differ: {tag}'
             if not release['draft']:
                 gh('release', 'edit', tag, '--repo', DESTINATION, '--draft=false', f'--prerelease={str(release["prerelease"]).lower()}', f'--latest={str(tag == latest).lower()}')
         print(f'Verified {tag}: {len(expected)} assets')

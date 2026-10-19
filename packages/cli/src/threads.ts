@@ -95,7 +95,10 @@ export async function saveConversation(conversation: Conversation) {
           .join(" ");
   const saved = {
     ...conversation,
-    title: (text || conversation.title)
+    title: (conversation.title.endsWith(" (local copy)")
+      ? conversation.title
+      : text || conversation.title
+    )
       .replace(/[\x00-\x1f\x7f]/g, " ")
       .slice(0, 100),
     updatedAt: new Date().toISOString(),
@@ -150,4 +153,58 @@ export async function clearConversations(root: string) {
   await unlink(historyFile(root)).catch((error) => {
     if (error.code !== "ENOENT") throw error;
   });
+}
+export async function deleteConversation(root: string, id: string) {
+  if (!validId(id)) throw Error("Invalid task ID.");
+  await unlink(path.join(directory(root), `${id}.json`)).catch((error) => {
+    if (error.code !== "ENOENT") throw error;
+  });
+  try {
+    if ((await loadConversation(root)).id === id)
+      await unlink(historyFile(root));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+}
+export async function listLocalConversationRecords(): Promise<Conversation[]> {
+  const records = new Map<string, Conversation>();
+  const folders = [path.join(stateDir(), "sessions")];
+  try {
+    for (const entry of await readdir(path.join(stateDir(), "threads"), {
+      withFileTypes: true,
+    }))
+      if (entry.isDirectory() && !entry.isSymbolicLink())
+        folders.push(path.join(stateDir(), "threads", entry.name));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  for (const folder of folders) {
+    let names: string[];
+    try {
+      names = await readdir(folder);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw error;
+    }
+    for (const name of names.filter((n) => n.endsWith(".json"))) {
+      const file = path.join(folder, name);
+      const info = await lstat(file);
+      if (
+        !info.isFile() ||
+        info.isSymbolicLink() ||
+        info.size > 20 * 1024 * 1024
+      )
+        continue;
+      const raw = JSON.parse(await readFile(file, "utf8"));
+      if (typeof raw.root !== "string") continue;
+      const record = await readConversation(file, raw.root);
+      if (
+        record &&
+        (!records.has(record.id) ||
+          records.get(record.id)!.updatedAt < record.updatedAt)
+      )
+        records.set(record.id, record);
+    }
+  }
+  return [...records.values()];
 }

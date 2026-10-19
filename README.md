@@ -6,19 +6,19 @@ A conversational assistant and coding agent for the browser, desktop, and termin
 
 The public home page introduces Freecoda and provides GitHub sign-in independently of chat availability. `/chat`, `/app`, and `/settings` require a verified browser session before showing the chat, coding workspace, or account interface. Restored tabs recheck their session; sign-out returns to the public home page. `/dashboard` redirects to `/settings` for profile, appearance, actual usage/devices, and existing GitHub repository access. Repository connections still require the configured GitHub App and cloud access; unavailable integrations report their actual state.
 
-Chat includes saved browser-local conversations, a message composer, streamed answers, and a separately labeled sponsor placement. An approved hosted invitation is required for inference. It shares the existing Gateway routing, usage reservations, rate limits, and free allowance; it does not bypass service capacity limits.
+Chat includes encrypted account conversations with offline local copies, a message composer, streamed answers, and a separately labeled sponsor placement. An approved hosted invitation is required for inference. It shares the existing Gateway routing, usage reservations, rate limits, and free allowance; it does not bypass service capacity limits.
 
-Chat history stays in the current browser rather than syncing across devices. Sending a message submits its conversation context to the hosted model provider. The interface reports unavailable service configuration explicitly and never substitutes generated-looking fixture answers for a real provider response.
+Conversation history syncs to the signed-in account across web, CLI and Desktop. Existing local histories migrate once to the current account; signing into a different account uses separate history. Sending a message submits its conversation context to the hosted model provider. The interface reports unavailable service configuration explicitly and never substitutes generated-looking fixture answers for a real provider response.
 
 ## Open source and downloads
 
-Development, contributions, documentation, and release preparation live in [elliotshohet/freecoda](https://github.com/elliotshohet/freecoda). The former release repository’s Git history and distribution documents have been merged here. Desktop release workflows and new builds now target this repository. Historical binary migration must be verified separately before removing the former repository; older installed apps require manual reinstallation to switch updater feeds. See [the consolidation and migration notes](distribution/README.md).
+Development, contributions, documentation, and release preparation live in [elliotshohet/freecoda](https://github.com/elliotshohet/freecoda). The former release repository’s Git history and distribution documents have been merged here, its five releases and 80 assets were verified in this repository, and the former repository has been removed. Desktop release workflows and new builds now target this repository. Older installed apps require manual reinstallation to switch updater feeds. See [the consolidation and migration notes](distribution/README.md).
 
 ## Workspace packages
 
-- `apps/desktop`: native Linux, macOS, and Windows client with local editor, hosted AI chat, approved commands, and private desktop history.
+- `apps/desktop`: native Linux, macOS, and Windows client with local editor, hosted AI chat, approved commands, and account history with private offline copies.
 - `apps/web`: website, GitHub sign-in, device authorization, inference proxy, transactional usage accounting, and sponsor placements.
-- `packages/cli`: interactive terminal client and local conversation history.
+- `packages/cli`: interactive terminal client with account conversation sync and local offline history.
 - `packages/core`: repository tools, approval handling, model transports, and agent loop.
 - `packages/contracts`: shared validation and allowance rules.
 - `scripts`: migrations, invitations, sponsor operations, reconciliation, and model evaluation.
@@ -69,7 +69,7 @@ cp .env.example apps/web/.env.local
 docker compose up -d --wait
 ```
 
-Edit `apps/web/.env.local`: set `DATABASE_URL` to `postgresql://freecoda:YOUR_URL_ENCODED_PASSWORD@127.0.0.1:5439/freecoda`, generate separate `BETTER_AUTH_SECRET`, `AD_SIGNING_SECRET`, and `CRON_SECRET` values, and configure `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`. Keep `BETTER_AUTH_URL=http://127.0.0.1:3010`. Register the local GitHub OAuth callback as `http://127.0.0.1:3010/api/auth/callback/github`; use a separate OAuth app for production.
+Edit `apps/web/.env.local`: set `DATABASE_URL` to `postgresql://freecoda:YOUR_URL_ENCODED_PASSWORD@127.0.0.1:5439/freecoda`, generate separate `BETTER_AUTH_SECRET`, `AD_SIGNING_SECRET`, and `CRON_SECRET` values, and configure `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`. Keep `BETTER_AUTH_URL=http://127.0.0.1:3010`. Register `http://127.0.0.1:3010/api/auth/callback/github` as the local GitHub OAuth callback; use a separate OAuth app for production. If a private SSH tunnel forwards Air browser traffic to the Mini at `127.0.0.1:13010`, add the exact callback `http://127.0.0.1:13010/api/auth/callback/github` to the local GitHub OAuth app too. Keep the tunnel bound to loopback; production auth stays on its canonical URL.
 
 ```sh
 bun run db:migrate
@@ -82,7 +82,7 @@ For a production-mode local web check, stop the dev server, run `bun --cwd apps/
 
 ## Use the web
 
-Visit [freecoda.com](https://freecoda.com), sign in with GitHub, and open `/chat` for general conversation. Create or reopen a conversation, enter a message, and read the streamed reply. Chat history is stored in the current browser; clearing browser storage removes it. Your submitted conversation is sent to the configured model provider. An invitation and available hosted capacity are required for inference.
+Visit [freecoda.com](https://freecoda.com), sign in with GitHub, and open `/chat` for general conversation. Create or reopen a conversation, enter a message, and read the streamed reply. Chat history syncs to your encrypted account history. Clearing browser storage removes the offline cache; use the history delete action to remove an account conversation. Your submitted conversation is sent to the configured model provider. An invitation and available hosted capacity are required for inference.
 
 Open `/app` for the cloud coding workspace. When enabled for your account, consent to cloud storage, create or import a project, and review proposed changes before publishing a branch and draft pull request. Cloud workspaces require additional Sandbox, Workflow, GitHub App, and encryption configuration described below; local chat setup alone does not enable them. Use `/docs` for installation and usage instructions, `/device` to approve a CLI/desktop sign-in, and `/settings` for account settings.
 
@@ -115,7 +115,50 @@ Run `node packages/cli/dist/index.js provider configure` only if you want to con
 
 </details>
 
-Repository trust precedes reading context. Writes show a diff and require approval; shell commands require separate approval and **are not an OS sandbox**. Symlinks, common credential paths, and `.gitignore` / `.freecodaignore` exclusions are respected by repository tools. Shell commands can access files beyond those tools, so review them carefully. Conversations and optional provider keys are saved locally with owner-only permissions. `history clear` removes the current repository's conversation.
+Repository trust precedes reading context. Writes show a diff and require approval; shell commands require separate approval and **are not an OS sandbox**. Symlinks, common credential paths, and `.gitignore` / `.freecodaignore` exclusions are respected by repository tools. Shell commands can access files beyond those tools, so review them carefully. Conversations keep owner-only local copies and synchronize to your signed-in account. Optional direct-provider keys remain local. `history clear` removes this directory’s local copies and queues deletion of its synchronized conversations.
+
+## Conversation history across devices
+
+Signed-in web, CLI and Desktop clients share encrypted account conversation history. General Chat and coding conversations remain separate. Use the history picker in web/Desktop or `/resume` in the CLI to continue a conversation created on another device. Resuming coding history uses your currently selected and trusted local folder; it does not grant file access to a remote machine or bypass tool approvals.
+
+Local copies allow offline access and queue unsynced turns until the connection returns. Updates use version checks: a concurrent local edit is preserved as a separate copy instead of overwriting a newer cloud conversation. Deletion syncs to the account, and stale offline copies cannot recreate a deleted conversation. Account conversations remain until you delete them or your account; the cloud coding workspace's separate source/run retention policy still applies. Existing local conversations migrate once to the first verified signed-in account. Signing out or switching accounts keeps each account’s cache separate. Provider credentials and application settings are not conversation history and are not uploaded.
+
+## Install tools and skills
+
+Freecoda supports **HTTP MCP servers** for external tools and **SKILL.md files** for reusable instructions. Installs are explicit and enabled immediately; they never run package install scripts. General Chat stays tool-free and does not load installed skills. Skills guide Agent, Plan and Review; remote MCP tools are available only in Agent mode.
+
+For the CLI:
+
+```sh
+freecoda extensions add-skill /absolute/path/to/my-skill/SKILL.md
+freecoda extensions add-skill https://raw.githubusercontent.com/OWNER/REPO/main/path/SKILL.md
+freecoda extensions add-mcp DeepWiki https://mcp.deepwiki.com/mcp
+freecoda extensions list
+freecoda extensions disable EXTENSION_ID
+freecoda extensions enable EXTENSION_ID
+freecoda extensions remove EXTENSION_ID
+freecoda --mode build --cwd /path/to/project
+```
+
+Use `/extensions` during a CLI session to see installed items. In Desktop, open **Tools & skills** to install, enable, disable or remove a skill or MCP server. CLI and Desktop installations are stored privately on that machine in their respective app data directories; they do not sync to the hosted account. Local skill installs include supported text files from the skill directory. HTTPS/GitHub file installs download the single SKILL.md; referenced support files are not downloaded. Skill installation does not execute bundled scripts.
+
+In the web cloud workspace at `/app`, select a project and open **Tools & skills**. Add a public HTTPS SKILL.md URL, paste skill instructions, or add a public HTTPS MCP endpoint. Web extensions are encrypted project settings, separate from repository files. Check **Allow enabled MCP tools for this run** before starting an Agent task; Plan and Review never connect to MCP servers. This is separate from ordinary `/chat`, which remains conversational and tool-free. Web extension settings are project-specific and do not sync to local clients.
+
+Local Agent mode asks for approval before each external tool call under the commands category. A session grant for **commands and external tools** or Full access also permits MCP calls; it covers the entire category, rather than one command. Web consent covers the selected run. External tools receive their arguments and may act outside the workspace: install only servers you trust and review what you share. No stdio process transport or interactive MCP OAuth setup is provided in this version. Hosted MCP endpoints must resolve to public Internet addresses; redirects and private/local targets are blocked.
+
+## Connected GitHub repositories
+
+Connect the Freecoda GitHub App to selected repositories, then use **Connected repositories** in the web or desktop interface to save the branch, app directory and enabled state. These settings belong to your signed-in account and are shared across the web, Desktop and CLI. They configure access and import defaults; saving a repository does not clone it, trust a local directory, or authorize a push.
+
+```sh
+freecoda repos list
+freecoda repos configured
+freecoda repos configure OWNER/REPO --branch main --directory apps/web
+# Use --installation ID if more than one installation matches.
+freecoda repos remove OWNER/REPO
+```
+
+Repository access is rechecked against your GitHub identity and current App installation before saving. A local Desktop or CLI project still requires folder selection and repository trust. Cloud imports and publishing retain their existing review and consent steps.
 
 ## Checks
 

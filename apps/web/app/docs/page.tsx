@@ -45,6 +45,24 @@ export default function Docs() {
           Hosted access is currently invite-only. Signing in creates an account;
           it does not grant an invitation or bypass capacity limits.
         </p>
+        <h2>Conversations across your devices</h2>
+        <p>
+          Sign in with the same GitHub account on the web, CLI, and desktop to
+          access your saved conversations. History is encrypted in your account
+          and persists until deleted. Each client keeps an offline copy and
+          retries sync when connected. Existing conversation context can include
+          source excerpts and tool results; syncing history does not upload an
+          entire local repository. Coding conversations are readable in browser
+          chat; a local coding task still requires folder trust.
+        </p>
+        <p>
+          Delete conversations from your client to remove the active cloud
+          record. Other devices apply that deletion on their next sync; offline
+          copies and time-limited recovery backups can remain until then or
+          until backup expiry. Clearing browser storage only removes its local
+          copy. See the <Link href="/privacy">privacy policy</Link> for provider
+          retention and backup details.
+        </p>
         <h2>Hosted model and privacy</h2>
         <p>
           Hosted chat and coding use Reflection Beam Free through Vercel AI
@@ -89,7 +107,7 @@ export default function Docs() {
         <h2 id="commands">A few useful commands</h2>
         <pre>{"/plan add a settings page\n/review\n/usage\n/new\n/exit"}</pre>
         <p>
-          Use <code>freecoda --resume</code> to reopen your latest local
+          Use <code>freecoda --resume</code> to reopen your latest
           conversation. Use <code>freecoda history clear</code> to delete saved
           conversations for the current repository. Ctrl+C cancels the current
           request.
@@ -147,9 +165,9 @@ export default function Docs() {
         <p>
           Repository tools reject paths outside the workspace and respect
           ignored files. Shell approvals are a separate boundary: approved
-          commands are not an operating-system sandbox. Terminal conversations
-          are saved locally; approved context is sent to the selected AI
-          provider.
+          commands are not an operating-system sandbox. Signed-in terminal conversations sync to your encrypted account
+          history and keep a local offline copy. Approved context is sent to
+          the selected AI provider.
         </p>
       </article>
     </main>

@@ -24,3 +24,32 @@ export const publicConfig = () => ({
 });
 export const appUrl = () =>
   process.env.BETTER_AUTH_URL || "http://127.0.0.1:3010";
+
+/**
+ * During local development, support the private SSH tunnel used by the Air
+ * browser to reach the Mini. Better Auth derives OAuth callback URLs from the
+ * request host, so this exact loopback host must be explicitly allowed. The
+ * production configuration remains a fixed canonical URL.
+ */
+export function authBaseURL(
+  configuredURL = appUrl(),
+  environment = process.env.NODE_ENV,
+) {
+  if (environment === "production") return configuredURL;
+  let configured: URL;
+  try {
+    configured = new URL(configuredURL);
+  } catch {
+    return configuredURL;
+  }
+  if (
+    configured.protocol !== "http:" ||
+    !["127.0.0.1", "localhost", "[::1]"].includes(configured.hostname)
+  )
+    return configuredURL;
+  return {
+    allowedHosts: [...new Set([configured.host, "127.0.0.1:13010"])],
+    fallback: configuredURL,
+    protocol: "http" as const,
+  };
+}

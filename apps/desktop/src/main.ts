@@ -92,6 +92,14 @@ async function chooseFolder() {
 }
 function installIPC() {
   const methods = {
+    refreshConversations: () => service.refreshConversations(),
+    githubRepositories: () => service.githubRepositories(),
+    saveGitHubRepositories: (repositories: Parameters<LocalAgentService["saveGitHubRepositories"]>[0]) => service.saveGitHubRepositories(repositories),
+    connectGitHub: async () => { await shell.openExternal(await service.githubInstallURL()); },
+    listExtensions: () => service.listExtensions(),
+    installExtension: (input: Parameters<LocalAgentService["installExtension"]>[0]) => service.installExtension(input),
+    setExtensionEnabled: (input: Parameters<LocalAgentService["setExtensionEnabled"]>[0]) => service.setExtensionEnabled(input),
+    removeExtension: (id: string) => service.removeExtension(id),
     setTheme: (theme: unknown) => {
       if (theme !== "system" && theme !== "light" && theme !== "dark")
         throw new Error("Invalid theme.");

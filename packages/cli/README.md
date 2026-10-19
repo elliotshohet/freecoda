@@ -48,7 +48,7 @@ An interactive terminal opens the full-screen interface automatically. `--theme 
 | PageUp / PageDown                              | Scroll the visible transcript                |
 | Tab                                            | Complete an unambiguous slash command        |
 | Escape / Ctrl+C during a request               | Cancel the current request                   |
-| Escape during approval                         | Decline the operation and cancel the request |
+| Escape during approval                         | Decline the operation |
 | Ctrl+C with composer text                      | Clear the composer                           |
 | Ctrl+C twice with an empty composer, or Ctrl+D | Exit                                         |
 | Ctrl+O                                         | Open the visible sponsor/announcement link   |
@@ -72,7 +72,7 @@ Bracketed paste is inserted as text, including embedded newlines and slash comma
 - `/clear`: clear the visible transcript while retaining model context.
 - `/exit`: leave the application.
 
-Start with `--resume` to reopen the latest conversation in the current directory and mode scope. General chat and coding histories are separate; crossing between them starts a new conversation. Use `/resume` to reopen an older conversation in the selected scope. `--mode build` starts coding directly. `--model <id>` chooses an approved hosted model or a model offered by your configured direct provider. Switching models retains the current conversation; use `/new` when you want fresh context.
+Start with `--resume` to reopen the latest conversation in the current directory and mode scope. General chat and coding histories are separate; crossing between them starts a new conversation. Signed-in history syncs across web, Desktop and CLI, and `/resume` lists account conversations in the selected mode. Offline turns remain in a local outbox and retry after reconnection; concurrent updates keep a separate local copy. Existing local histories migrate once to the first verified signed-in account, and account changes use separate caches. A resumed coding conversation operates only in the current trusted folder. Use `/resume` to reopen an older conversation in the selected scope. `--mode build` starts coding directly. `--model <id>` chooses an approved hosted model or a model offered by your configured direct provider. Switching models retains the current conversation; use `/new` when you want fresh context.
 
 For a single task and plain output:
 
@@ -84,9 +84,40 @@ Chat does not require repository trust. Coding modes require trust before readin
 
 ## Session permissions
 
-Every launch starts in **Default**: edits and shell commands ask for approval. Approve once with `y`, grant that category for this session with `s`, or decline with `n`. **Read only** permits reading project files but exposes no edit or shell tools. **Full access** explicitly allows edits and shell commands without approval prompts; commands run as your user, without an OS sandbox. Plan and Review always expose only read tools, including under Full access.
+Every launch starts in **Default**: edits and shell commands ask for approval. Use Up/Down or `1–3` and Enter to choose Allow once, Allow this category for the session, or Decline; Escape declines. Approve once with `y`, grant that category for this session with `s` (commands includes external MCP tools), or decline with `n`. **Read only** permits reading project files but exposes no edit or shell tools. **Full access** explicitly allows edits and shell commands without approval prompts; commands run as your user, without an OS sandbox. Plan and Review always expose only read tools, including under Full access.
 
 Changing the preset clears all previously granted categories. Presets and category grants last only for the current process; they are never saved to configuration or conversation history. `/new` and `/resume` change the task, not the current session permission preset. The composer and `/status` show the active policy. Noninteractive sessions keep the default deny-without-approval behavior.
+
+## Tools, skills and connected repositories
+
+Install a local skill directory/SKILL.md, a raw HTTPS SKILL.md (GitHub file URLs also work), or an HTTP MCP server:
+
+```sh
+freecoda extensions add-skill /absolute/path/to/skill/SKILL.md
+freecoda extensions add-skill https://raw.githubusercontent.com/OWNER/REPO/main/skill/SKILL.md
+freecoda extensions add-mcp DeepWiki https://mcp.deepwiki.com/mcp
+freecoda extensions list
+freecoda extensions disable EXTENSION_ID
+freecoda extensions enable EXTENSION_ID
+freecoda extensions remove EXTENSION_ID
+freecoda --mode build
+```
+
+`/extensions` lists items in an active session. Explicit installs start enabled. Local skill directories include supported text references/scripts, which can be read as supporting data; no installation scripts execute. URL installs download only the skill instructions, not referenced files. Skills apply to coding modes. MCP servers connect only in Agent/build mode; Chat stays tool-free, and Plan/Review do not connect to external servers. External MCP calls require commands-category approval; a session grant or Full access includes all commands and external tools. HTTP MCP endpoints use HTTPS, with loopback HTTP allowed for local development. Stdio transport and interactive MCP OAuth are not implemented.
+
+The registry is saved privately in `~/.config/freecoda/extensions.json` (or `FREECODA_CONFIG_DIR`), independently of Desktop and cloud project extensions. Third-party servers receive tool arguments and may perform outside actions. Installing a skill adds guidance, not permission to bypass approvals.
+
+Account GitHub repository settings are shared with web and Desktop:
+
+```sh
+freecoda repos list
+freecoda repos configured
+freecoda repos configure OWNER/REPO --branch main --directory apps/web
+freecoda repos configure OWNER/REPO --installation ID --disable
+freecoda repos remove OWNER/REPO
+```
+
+Sign in first and install the Freecoda GitHub App on the intended repositories using the link returned by `repos list`. Configuration saves branch/app-directory preferences after access validation; it does not clone repositories, grant local trust or push changes.
 
 ## Updates
 
@@ -103,7 +134,7 @@ The first command checks availability. `--install` explicitly invokes npm to ins
 
 Freecoda starts in general chat with no repository context or tools. Switching to build, plan, or review asks you to trust the repository before reading context. Repository tools exclude common credential files and respect `.gitignore` and `.freecodaignore`. Writes show a diff; shell commands show the requested command. Approve with `y` once, `s` for that action category during this session, or `n` to decline. Plan and review modes expose only read tools. Shell execution is not an OS sandbox, so review commands before allowing them.
 
-Conversation history and optional direct provider keys are stored under `~/.config/freecoda` with owner-only permissions. `FREECODA_CONFIG_DIR` overrides that directory. `history clear` removes saved general chat and coding conversations for the current directory; `logout` revokes the hosted terminal token. Model context can contain relevant repository excerpts and is sent to your selected provider.
+Conversation history has owner-only offline copies under `~/.config/freecoda` and synchronizes to your signed-in account. Optional direct provider keys remain local. `FREECODA_CONFIG_DIR` overrides that directory. `history clear` removes cached general chat and coding conversations for the current directory and queues their account deletion; `logout` revokes the hosted terminal token. Model context can contain relevant repository excerpts and is sent to your selected provider.
 
 ## Sponsor placements
 

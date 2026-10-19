@@ -22,11 +22,21 @@ import { usageSnapshot } from "./usage";
 import { selectAd, recordAd } from "./ads";
 import { inference } from "./inference";
 import { publicModelConfig } from "./public-model";
+import { githubRepositoryRoute } from "./github-repositories";
+import { conversationRoute } from "./conversations";
 export async function route(req: Request) {
   return handle(async () => {
     const url = new URL(req.url);
     const path = url.pathname.replace("/api/v1/", "");
     const method = req.method;
+    if (path === "conversations" || path.startsWith("conversations/")) {
+      const response = await conversationRoute(req, path);
+      if (response) return response;
+    }
+    if (path.startsWith("github/")) {
+      const response = await githubRepositoryRoute(req, path);
+      if (response) return response;
+    }
     if (path === "health" && method === "GET")
       return json({ status: "ok", ...publicConfig() });
     if (path === "ads" && method === "GET") {

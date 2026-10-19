@@ -13,7 +13,12 @@ import { modelCallSchema, type ModelConfig } from "@freecoda/contracts";
 import { getPool } from "./db";
 import { jsonBody, ApiError, json } from "./http";
 import { identity, requireInvite, rateLimit } from "./security";
-import { reserve, settle, uncertain } from "./usage";
+import {
+  isVerifiedZeroCostFreeModel,
+  reserve,
+  settle,
+  uncertain,
+} from "./usage";
 import { publicConfig } from "./config";
 import { selectFreeModel } from "./free-model-selector";
 function stripProviderOptions(value: unknown): unknown {
@@ -132,13 +137,11 @@ export function maxRequestCost(
       413,
       "This conversation is too large. Start a new conversation.",
     );
-  return Math.max(
-    1,
-    Math.ceil(
+  const amount = Math.ceil(
       inputBound * config.inputMicrosPerToken +
         maxOutput * config.outputMicrosPerToken,
-    ),
-  );
+    );
+  return isVerifiedZeroCostFreeModel(config) ? 0 : Math.max(1, amount);
 }
 export async function inference(req: Request) {
   if (!publicConfig().hostedEnabled || !publicConfig().inference)
@@ -202,6 +205,11 @@ export async function executeInference(
   const cancellation = inferenceCancellation(req, behavior.abortOnDisconnect);
   options.abortSignal = cancellation.signal;
   let generationId: string | undefined;
+  async function recordInterruptedReservation() {
+    if (isVerifiedZeroCostFreeModel(config))
+      await settle(reservation, 0, { generationId }, true);
+    else await uncertain(reservation, generationId);
+  }
   async function record(
     result:
       | LanguageModelV4GenerateResult
@@ -210,7 +218,7 @@ export async function executeInference(
     const meta = generationAccounting(result, config!);
     generationId = meta.generationId || generationId;
     if (meta.cost === undefined) {
-      await uncertain(reservation, generationId);
+      await recordInterruptedReservation();
       throw new Error("Usage is awaiting reconciliation.");
     }
     await settle(reservation, meta.cost, {
@@ -268,14 +276,16 @@ export async function executeInference(
             throw new Error("Provider stream ended without usage.");
           if (!cancelled) controller.close();
         } catch {
-          await uncertain(reservation, generationId);
+          await recordInterruptedReservation();
           if (!cancelled) {
             controller.enqueue(
               encoder.encode(
                 JSON.stringify({
                   type: "error",
                   error:
-                    "Request interrupted. Usage is awaiting reconciliation; no additional request can spend this allowance until it is resolved.",
+                    isVerifiedZeroCostFreeModel(config)
+                      ? "Request interrupted. Its zero-cost reservation was released; you can retry."
+                      : "Request interrupted. Usage is awaiting reconciliation; no additional request can spend this allowance until it is resolved.",
                 }) + "\n",
               ),
             );
@@ -297,7 +307,7 @@ export async function executeInference(
       },
     });
   } catch (e) {
-    await uncertain(reservation, generationId);
+    await recordInterruptedReservation();
     throw e;
   }
 }

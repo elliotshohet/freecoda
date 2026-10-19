@@ -10,6 +10,8 @@ import * as service from "./service";
 import * as vm from "./sandbox";
 import { cloudAgentWorkflow, cloudImportWorkflow } from "./workflow";
 import { scheduleProjectLifecycle, deleteCloudProject } from "./lifecycle";
+import { projectExtensions, configureProjectExtensions, extensionActionSchema } from "./extensions";
+import { configuredGithubRepositories } from "../github-repositories";
 const idSchema = z.uuid();
 const identifier = z.string().regex(/^[A-Za-z0-9_.-]{1,100}$/);
 const consent = z.literal(true);
@@ -41,6 +43,7 @@ const filesSchema = z
   .strict();
 const runSchema = z
   .object({
+    extensionConsent: z.boolean().default(false),
     prompt: z.string().trim().min(1).max(20000),
     mode: z.enum(["build", "plan", "review"]).default("build"),
     consent,
@@ -207,13 +210,14 @@ export async function cloudRoute(req: Request) {
     }
     if (path.join("/") === "projects/import" && method === "POST") {
       const body = await jsonBody(req, importSchema);
+      const configured = (await configuredGithubRepositories(user.id)).find(repo => repo.enabled && repo.installationId === body.installationId && repo.owner.toLowerCase() === body.owner.toLowerCase() && repo.name.toLowerCase() === body.repo.toLowerCase());
       const project = await store.createProject(user.id, body.repo, {
         files: [],
         repository: {
           installationId: body.installationId,
           owner: body.owner,
           name: body.repo,
-          defaultBranch: body.ref || "",
+          defaultBranch: body.ref || configured?.branch || "",
           baseSha: "",
           repositoryId: 0,
           baseFiles: [],
@@ -226,7 +230,7 @@ export async function cloudRoute(req: Request) {
         project.id,
         record.version,
         record.payload,
-        { status: "creating" },
+        { status: "creating", appDirectory: "/home/project/app" + (configured?.appDirectory ? "/" + configured.appDirectory : "") },
       );
       try {
         await start(cloudImportWorkflow, [project.id]);
@@ -296,6 +300,10 @@ export async function cloudRoute(req: Request) {
       throw new ApiError(404, "Cloud route not found.");
     const id = path[1];
     const record = await store.project(user.id, id);
+    if (path[2] === "extensions") {
+      if (method === "GET") return json(await projectExtensions(user.id, id));
+      if (method === "POST") return json(await configureProjectExtensions(user.id, id, await jsonBody(req, extensionActionSchema, 100_000)));
+    }
     if (path.length === 2 && method === "GET")
       return json({
         project: record.project,
@@ -368,9 +376,12 @@ export async function cloudRoute(req: Request) {
     }
     if (path[2] === "runs" && method === "POST") {
       const body = await jsonBody(req, runSchema);
+      if (body.mode === "build" && record.payload.extensions?.servers.some(server => server.enabled) && !body.extensionConsent)
+        throw new ApiError(403, "Allow installed external tools for this run before starting.");
       await service.activate(user.id, id);
       await lifecycle(id);
       const run = await store.createRun(user.id, id, {
+        extensionConsent: body.extensionConsent,
         prompt: body.prompt,
         mode: body.mode,
         consentAt: new Date().toISOString(),

@@ -8,6 +8,44 @@ import {
 } from "@freecoda/contracts";
 import { getPool, transaction } from "./db";
 import { ApiError } from "./http";
+import { PREFERRED_FREE_MODEL } from "./free-model-selector";
+
+export function isVerifiedZeroCostFreeModel(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const config = value as Record<string, unknown>;
+  return (
+    config.approved === true &&
+    config.id === PREFERRED_FREE_MODEL &&
+    config.provider === "reflection" &&
+    config.byok === false &&
+    config.inputMicrosPerToken === 0 &&
+    config.outputMicrosPerToken === 0
+  );
+}
+
+export function canReleaseStaleFreeReservation(
+  row: {
+    status: unknown;
+    source: unknown;
+    model: unknown;
+    generationId: unknown;
+    maxCostMicros: unknown;
+    createdAt: string | Date;
+  },
+  now = Date.now(),
+) {
+  const createdAt = new Date(row.createdAt).getTime();
+  return (
+    ["pending", "uncertain"].includes(String(row.status)) &&
+    row.source === "free" &&
+    row.model === PREFERRED_FREE_MODEL &&
+    Number(row.maxCostMicros) === 0 &&
+    row.generationId == null &&
+    Number.isFinite(createdAt) &&
+    createdAt <= now - 5 * 60 * 1000
+  );
+}
+
 export async function usageSnapshot(userId: string) {
   const { rows } = await getPool().query(
     'SELECT p.suspended,i.email FROM "user" u LEFT JOIN profiles p ON p.user_id=u.id LEFT JOIN invitations i ON lower(i.email)=lower(u.email) WHERE u.id=$1',
@@ -48,11 +86,21 @@ export async function reserve(
   model: string,
   maxCostMicros: number,
 ) {
-  if (!Number.isSafeInteger(maxCostMicros) || maxCostMicros <= 0)
+  if (
+    !Number.isSafeInteger(maxCostMicros) ||
+    maxCostMicros < 0 ||
+    (maxCostMicros === 0 && model !== PREFERRED_FREE_MODEL)
+  )
     throw new Error("Invalid reservation amount");
   return transaction(async (db) => {
     await db.query(
       "SELECT pg_advisory_xact_lock(hashtext('freecoda:free-budget'))",
+    );
+    // Zero-cost proof is captured at reservation time. Never infer it later
+    // from a mutable model catalog when recovering a stale request.
+    await db.query(
+      "UPDATE reservations SET status='released',actual_cost_micros=0,settled_at=now() WHERE user_id=$1 AND status IN ('pending','uncertain') AND source='free' AND model=$2 AND max_cost_micros=0 AND generation_id IS NULL AND created_at<=now()-interval '5 minutes'",
+      [userId, PREFERRED_FREE_MODEL],
     );
     const day = utcDay(),
       month = utcMonth();

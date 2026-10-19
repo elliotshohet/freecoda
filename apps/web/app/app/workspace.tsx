@@ -28,6 +28,7 @@ import styles from "./workspace.module.css";
 import { Mark } from "@/components/chrome";
 import { ThemeControl } from "@/components/theme-control";
 import { SponsorPlacement } from "@/components/sponsor-placement";
+import { ProjectExtensions } from "./extensions";
 
 type Status = {
   enabled: boolean;
@@ -66,6 +67,7 @@ type Project = {
 };
 type FileEntry = { path: string; type?: string; size?: number };
 type Repo = {
+  repositoryId?: number;
   installationId: string | number;
   owner: string;
   name: string;
@@ -146,6 +148,10 @@ export function CloudWorkspace() {
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState("build");
   const [consent, setConsent] = useState(false);
+  const [hasExternalTools, setHasExternalTools] = useState(false);
+  const [extensionConsent, setExtensionConsent] = useState(false);
+  const extensionsChanged = useCallback((enabled: boolean) => { setHasExternalTools(enabled); setExtensionConsent(false); }, []);
+  useEffect(() => { setExtensionConsent(false); setHasExternalTools(false); }, [project?.id]);
   const [tab, setTab] = useState<"files" | "changes" | "preview" | "output">(
     "files",
   );
@@ -165,6 +171,8 @@ export function CloudWorkspace() {
   >(null);
   const [repos, setRepos] = useState<Repo[]>([]);
   const [installUrl, setInstallUrl] = useState<string | null>(null);
+  const [repoPreferences, setRepoPreferences] = useState<{ repositoryId: number; owner: string; name: string; enabled: boolean }[]>([]);
+  const [repoLoadError, setRepoLoadError] = useState("");
   const [reviewed, setReviewed] = useState(false);
   const [prUrl, setPrUrl] = useState<string | null>(null);
   const projectRef = useRef<string | null>(null);
@@ -533,7 +541,7 @@ export function CloudWorkspace() {
 
   async function sendPrompt(e: React.FormEvent) {
     e.preventDefault();
-    if (!project || !prompt.trim() || !consent || dirty || running) return;
+    if (!project || !prompt.trim() || !consent || dirty || running || (hasExternalTools && mode === "build" && !extensionConsent)) return;
     const text = prompt.trim();
     setBusy(true);
     setError("");
@@ -543,9 +551,10 @@ export function CloudWorkspace() {
       const data = await api<{ run: { id: string; status: string } }>(
         `projects/${project.id}/runs`,
         "POST",
-        { prompt: text, mode, consent: true },
+        { prompt: text, mode, consent: true, extensionConsent },
       );
       setPrompt("");
+      setExtensionConsent(false);
       eventCursor.current = 0;
       setRunId(data.run.id);
     } catch (e) {
@@ -644,14 +653,23 @@ export function CloudWorkspace() {
     setDialog("import");
     setBusy(true);
     setError("");
+    setRepoLoadError("");
+    setRepos([]);
+    setRepoPreferences([]);
+    setInstallUrl(null);
     try {
       const data = await api<{ repos: Repo[]; installUrl?: string }>(
         "github/repos",
       );
       setRepos(data.repos);
-      setInstallUrl(data.installUrl || null);
+      const link = data.installUrl ? new URL(data.installUrl) : null;
+      setInstallUrl(link && link.origin === "https://github.com" && /^\/apps\/[a-z0-9-]+\/installations\/new$/.test(link.pathname) && !link.username && !link.password && !link.search && !link.hash ? link.toString() : null);
+      const response = await fetch("/api/v1/github/repositories", { cache: "no-store" });
+      const configured = await response.json();
+      if (!response.ok) throw Error(configured.error || "Could not load saved repository selections.");
+      setRepoPreferences(configured.repositories || []);
     } catch (e) {
-      setError(errorMessage(e));
+      setRepoLoadError(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -685,7 +703,6 @@ export function CloudWorkspace() {
         installationId: repo.installationId,
         owner: repo.owner,
         repo: repo.name,
-        ref: repo.defaultBranch,
         consent: true,
       });
       setProjects((current) => [...current, data.project]);
@@ -922,6 +939,11 @@ export function CloudWorkspace() {
               private customer data.
             </span>
           </label>
+          {project && <ProjectExtensions key={project.id} projectId={project.id} disabled={busy || running} onToolsChanged={extensionsChanged} />}
+          {project && hasExternalTools && mode === "build" && <label className={styles.consent}>
+            <input type="checkbox" checked={extensionConsent} disabled={running} onChange={event => setExtensionConsent(event.target.checked)} />
+            <span>Allow enabled MCP tools for this run. They may send project context to external servers and perform actions outside this workspace.</span>
+          </label>}
           <div className={styles.workbench}>
             <aside className={styles.projects} data-mobile-open={projectsOpen}>
               <button
@@ -1196,6 +1218,7 @@ export function CloudWorkspace() {
                             disabled={
                               busy ||
                               !consent ||
+                              (hasExternalTools && mode === "build" && !extensionConsent) ||
                               !prompt.trim() ||
                               dirty ||
                               inactive
@@ -1630,9 +1653,23 @@ export function CloudWorkspace() {
               <>
                 <h2 id="cloud-dialog-title">Bring your own starting point.</h2>
                 <p>
-                  Import a repository you selected for the Freecoda GitHub App.
-                  Your original repository is unchanged.
+                  GitHub controls which repositories the Freecoda GitHub App
+                  can access. Your Freecoda selections and working preferences
+                  are managed separately in account settings. Importing creates
+                  a cloud copy and leaves your original repository unchanged.
                 </p>
+                <div className={styles.repoAccessActions}>
+                  <Link className="button secondary" href="/settings#connections" target="_blank" rel="noopener noreferrer">
+                    Manage Freecoda selections <ArrowUpRight size={14} aria-hidden="true" />
+                  </Link>
+                  {installUrl && <a className="button secondary" href={installUrl} target="_blank" rel="noopener noreferrer">
+                    Manage GitHub App access <ArrowUpRight size={14} aria-hidden="true" />
+                  </a>}
+                  <button className={styles.linkButton} disabled={busy} onClick={showImport}>Refresh repository access</button>
+                </div>
+                <p className={styles.footnote}>Management opens in a new tab. After changing repository access or selections, return here and refresh. GitHub organization approval may be required for additional repositories.</p>
+                {repoLoadError && <p className={styles.repoAccessError} role="alert">{repoLoadError} Refresh access to retry, or manage your connections in settings.</p>}
+                <h3 className={styles.repoSectionTitle}>Repositories granted by GitHub</h3>
                 {repos.length ? (
                   <div className={styles.repoList}>
                     {repos.map((repo) => (
@@ -1648,6 +1685,9 @@ export function CloudWorkspace() {
                             {repo.private
                               ? "Private repository"
                               : "Public repository"}
+                            {repoPreferences.some(preference => preference.repositoryId === repo.repositoryId && preference.enabled)
+                              ? " · Selected in Freecoda"
+                              : " · Not selected in Freecoda settings"}
                           </small>
                         </span>
                         <ChevronRight size={15} />
@@ -1661,23 +1701,12 @@ export function CloudWorkspace() {
                       : "No repositories are available. Select repositories in the GitHub App installation, then refresh."}
                   </p>
                 )}
-                {installUrl && (
-                  <a
-                    className="button secondary"
-                    href={installUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Select GitHub repositories <ArrowUpRight size={14} />
-                  </a>
-                )}
-                <button
-                  className={styles.linkButton}
-                  disabled={busy}
-                  onClick={showImport}
-                >
-                  Refresh repositories
-                </button>
+                {repoPreferences.some(preference => !repos.some(repo => repo.repositoryId === preference.repositoryId)) && !busy && <div className={styles.unavailableRepos}>
+                  <h3 className={styles.repoSectionTitle}>Saved selections without current access</h3>
+                  <p>These repositories cannot be imported until GitHub access is restored. Manage GitHub App access or remove their saved configuration in Freecoda settings.</p>
+                  <ul>{repoPreferences.filter(preference => !repos.some(repo => repo.repositoryId === preference.repositoryId)).map(preference => <li key={preference.repositoryId}>{preference.owner}/{preference.name}</li>)}</ul>
+                </div>}
+
               </>
             )}
             {dialog === "publish" && (

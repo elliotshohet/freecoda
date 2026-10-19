@@ -677,3 +677,102 @@ test("desktop general conversations need no repository and remain separate from 
     await rm(f.root, { recursive: true, force: true });
   }
 });
+
+test("desktop extension installation persists without execution and exposes only public fields", async () => {
+  const f = await fixture();
+  const service = new LocalAgentService({ dataDirectory: f.data, emit: () => {}, openExternal: async () => {} });
+  try {
+    const skill = path.join(f.root, "SKILL.md");
+    await writeFile(skill, "---\nname: desktop-fixture\ndescription: Test instructions\n---\nExplain code clearly.\n");
+    const installed = await service.installExtension({ kind: "skill", name: "Fixture skill", url: skill });
+    expect(installed).toHaveLength(1);
+    expect(Object.keys(installed[0]!).sort()).toEqual(["enabled", "id", "kind", "name"]);
+    expect(installed[0]!.kind).toBe("skill");
+    const disabled = await service.setExtensionEnabled({ id: installed[0]!.id, enabled: false });
+    expect(disabled[0]!.enabled).toBe(false);
+    const server = await service.installExtension({ kind: "mcp", name: "Fixture tools", url: "https://example.com/mcp" });
+    expect(server).toHaveLength(2);
+    await expect(service.installExtension({ kind: "mcp", name: "Credentials", url: "https://user:pass@example.com/mcp" })).rejects.toThrow("credentials");
+    await expect(service.installExtension({ kind: "mcp", name: "Token", url: "https://example.com/mcp?token=private" })).rejects.toThrow("query");
+    expect((await service.getState()).running).toBe(false);
+    expect(await service.removeExtension(installed[0]!.id)).toHaveLength(1);
+  } finally { await service.dispose(); await rm(f.root, { recursive: true, force: true }); }
+});
+
+test("desktop account repository preferences use authenticated endpoints without exposing tokens or trusting folders", async () => {
+  const f = await fixture();
+  const token = "R".repeat(43), server = "https://freecoda.com";
+  await mkdir(f.data);
+  await writeFile(path.join(f.data, "desktop.json"), JSON.stringify({ server, token, trustedRoots: [], recentRoots: [] }));
+  const repo = { repositoryId: 42, installationId: 7, owner: "fixture", name: "project", defaultBranch: "main", private: true };
+  let saved: unknown;
+  let link = "https://github.com/apps/freecoda/installations/new";
+  const service = new LocalAgentService({ dataDirectory: f.data, emit: () => {}, openExternal: async () => {}, fetch: async (input, init) => {
+    expect(new Headers(init?.headers).get("Authorization")).toBe(`Bearer ${token}`);
+    const url = String(input);
+    if (url.endsWith("/github/repos")) return Response.json({ repos: [{ ...repo, token: "must-not-reach-renderer" }], installUrl: link });
+    if (init?.method === "PUT") { saved = JSON.parse(String(init.body)); return Response.json({ ok: true }); }
+    return Response.json({ repositories: [] });
+  } });
+  try {
+    const state = await service.githubRepositories();
+    expect(state.repos).toEqual([repo]);
+    expect(JSON.stringify(state)).not.toContain("must-not-reach-renderer");
+    await service.saveGitHubRepositories([{ repositoryId: 42, installationId: 7, owner: "fixture", name: "project", branch: "main", appDirectory: "apps/site", enabled: true }]);
+    expect(saved).toMatchObject({ repositories: [{ appDirectory: "apps/site" }] });
+    expect(await service.githubInstallURL()).toBe(link);
+    link = "https://github.com.evil.invalid/apps/freecoda/installations/new";
+    await expect(service.githubInstallURL()).rejects.toThrow("invalid GitHub");
+    expect((await service.getState()).workspace).toBe(null);
+  } finally { await service.dispose(); await rm(f.root, { recursive: true, force: true }); }
+});
+
+test("desktop cloud conversations sync structured history, preserve optimistic conflicts and isolate account caches", async () => {
+  const f = await fixture();
+  const dataB = path.join(f.root, "second-device");
+  const token = "S".repeat(43), server = "https://freecoda.com";
+  const cloud = new Map<string, { id: string; title: string; mode: string; messages: unknown[]; updatedAt: string; version: number }>();
+  let owner = "account-one", online = true;
+  const transport = (async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    if (!online) throw Error("offline");
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/conversations")) return Response.json({ userId: owner, conversations: owner === "account-one" ? [...cloud.values()].filter(c => c.mode === url.searchParams.get("mode")) : [], nextCursor: null });
+    const id = url.pathname.split("/").at(-1)!;
+    if (init?.method === "PUT") {
+      const body = JSON.parse(String(init.body)); const existing = cloud.get(id);
+      if ((existing?.version ?? null) !== body.expectedVersion) return Response.json({ error: "Conversation version conflict" }, { status: 409 });
+      const record = { ...body, id, updatedAt: new Date().toISOString(), version: (existing?.version || 0) + 1 }; delete record.expectedVersion;
+      cloud.set(id, record); return Response.json({ conversation: record });
+    }
+    if (init?.method === "DELETE") { cloud.delete(id); return Response.json({ ok: true }); }
+    return cloud.has(id) ? Response.json({ conversation: cloud.get(id) }) : Response.json({ error: "Not found" }, { status: 404 });
+  }) as typeof fetch;
+  for (const data of [f.data, dataB]) { await mkdir(data); await writeFile(path.join(data, "desktop.json"), JSON.stringify({ server, token, trustedRoots: [], recentRoots: [] })); }
+  const options = { emit: () => {}, openExternal: async () => {}, fetch: transport };
+  const first = new LocalAgentService({ ...options, dataDirectory: f.data });
+  const second = new LocalAgentService({ ...options, dataDirectory: dataB });
+  try {
+    const created = await first.createThread(); const id = created.activeThreadId!;
+    expect(cloud.has(id)).toBe(true);
+    cloud.get(id)!.messages = [{ role: "user", content: "Shared structured message" }, { role: "assistant", content: [{ type: "text", text: "Across devices" }] }];
+    cloud.get(id)!.version++;
+    const imported = await second.getState(); expect(imported.threads?.some(thread => thread.id === id)).toBe(true);
+    expect((await second.openThread(id)).conversation?.map(message => message.text)).toEqual(["Shared structured message", "Across devices"]);
+    cloud.get(id)!.version++;
+    await second.clearHistory();
+    expect(cloud.get(id)!.messages).toHaveLength(2);
+    const conflict = [...cloud.values()].find(record => record.id !== id)!;
+    expect(conflict.title).toContain("local conflict copy");
+    online = false;
+    await second.createThread();
+    const offlineId = (await second.getState()).activeThreadId!;
+    expect(cloud.has(offlineId)).toBe(false);
+    online = true;
+    await second.refreshConversations(); expect(cloud.has(offlineId)).toBe(true);
+    await second.deleteThread(offlineId); expect(cloud.has(offlineId)).toBe(false);
+    owner = "account-two";
+    const other = await second.refreshConversations();
+    expect(other.threads).toEqual([]); expect(other.conversation).toEqual([]);
+    expect((await second.getState()).workspace).toBe(null);
+  } finally { await first.dispose(); await second.dispose(); await rm(f.root, { recursive: true, force: true }); }
+});

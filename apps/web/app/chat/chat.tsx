@@ -21,11 +21,10 @@ import { ThemeControl } from "@/components/theme-control";
 import { SponsorPlacement } from "@/components/sponsor-placement";
 import s from "./chat.module.css";
 import {
-  validChats,
   chatContext,
   type Message,
-  type Conversation,
 } from "./history";
+import { useCloudHistory } from "./use-cloud-history";
 type Status = {
   signedIn: boolean;
   userId?: string;
@@ -133,7 +132,6 @@ function MessageContent({ text }: { text: string }) {
 }
 export default function Chat() {
   const [status, setStatus] = useState<Status | null>(null),
-    [chats, setChats] = useState<Conversation[]>([]),
     [active, setActive] = useState<string | null>(null),
     [draft, setDraft] = useState(""),
     [query, setQuery] = useState(""),
@@ -141,10 +139,8 @@ export default function Chat() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [sidebar, setSidebar] = useState(false),
-    [historyReady, setHistoryReady] = useState(false),
-    [storageError, setStorageError] = useState(false),
     [signingIn, setSigningIn] = useState(false);
-  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const { chats, setChats, historyReady, storageError, syncError, removeConversation, openConversation, opening } = useCloudHistory(status?.userId, busy);
   const abort = useRef<AbortController | null>(null),
     sending = useRef(false),
     end = useRef<HTMLDivElement>(null),
@@ -152,9 +148,7 @@ export default function Chat() {
     search = useRef<HTMLInputElement>(null);
   const selected = chats.find((c) => c.id === active),
     messages = selected?.messages || [];
-  const historyKey = status?.userId
-    ? `freecoda-chat-v1:${status.userId}`
-    : null;
+  useEffect(() => { if (selected?.cloudLoaded === false) void openConversation(selected.id); }, [selected?.id, selected?.cloudLoaded, openConversation]);
   useEffect(() => {
     let alive = true;
     fetch("/api/chat", { cache: "no-store" })
@@ -201,32 +195,7 @@ export default function Chat() {
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
   }, [status?.userId]);
-  useEffect(() => {
-    setHistoryReady(false);
-    setLoadedKey(null);
-    setChats([]);
-    setActive(null);
-    if (!historyKey) {
-      setHistoryReady(true);
-      return;
-    }
-    try {
-      const saved = localStorage.getItem(historyKey);
-      setChats(saved ? validChats(JSON.parse(saved)) : []);
-    } catch {
-      setStorageError(true);
-    }
-    setLoadedKey(historyKey);
-    setHistoryReady(true);
-  }, [historyKey]);
-  useEffect(() => {
-    if (!historyKey || !historyReady || loadedKey !== historyKey) return;
-    try {
-      localStorage.setItem(historyKey, JSON.stringify(chats));
-    } catch {
-      setStorageError(true);
-    }
-  }, [chats, historyKey, historyReady, loadedKey]);
+  useEffect(() => { setActive(null); }, [status?.userId]);
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: "instant", block: "end" });
   }, [messages, busy]);
@@ -254,12 +223,12 @@ export default function Chat() {
   function updateMessages(id: string, next: Message[]) {
     setChats((current) =>
       current.map((c) =>
-        c.id === id ? { ...c, messages: next, updatedAt: Date.now() } : c,
+        c.id === id ? { ...c, messages: next, updatedAt: Date.now(), cloudDirty: true } : c,
       ),
     );
   }
   async function send(retry = false) {
-    if (busy || sending.current || !status?.available || !historyReady) return;
+    if (busy || sending.current || !status?.available || !historyReady || selected?.mode === "coding" || selected?.cloudDeleted || selected?.cloudLoaded === false) return;
     const text = draft.trim();
     if (!retry && !text) return;
     const current = selected?.messages || [],
@@ -341,9 +310,10 @@ export default function Chat() {
             title: text.slice(0, 65),
             messages: displayedContext,
             updatedAt: Date.now(),
+            cloudDirty: true,
           },
           ...current,
-        ].slice(0, 80),
+        ],
       );
     else updateMessages(id, displayedContext);
     setActive(id);
@@ -488,17 +458,17 @@ export default function Chat() {
                   }}
                 >
                   <MessageSquare size={14} />
-                  <span>{c.title}</span>
+                  <span>{c.mode === "coding" ? "Coding · " : ""}{c.title}</span>
                 </button>
                 <button
                   disabled={busy}
                   className={s.delete}
                   aria-label={`Delete ${c.title}`}
-                  onClick={() => {
-                    if (!confirm("Delete this conversation from this browser?"))
+                  onClick={async () => {
+                    if (!confirm("Delete this conversation from your account on all platforms? Offline copies are removed when they reconnect."))
                       return;
-                    setChats(chats.filter((x) => x.id !== c.id));
-                    if (active === c.id) setActive(null);
+                    try { await removeConversation(c.id); if (active === c.id) setActive(null); }
+                    catch (error) { setError(error instanceof Error ? error.message : "Deletion could not be queued. Your history is kept."); }
                   }}
                 >
                   <Trash2 size={14} />
@@ -665,6 +635,10 @@ export default function Chat() {
               a reload.
             </p>
           )}
+          {syncError && <p className={s.storageError} role="status">{syncError} Your offline copy is kept.</p>}
+          {opening && <p className={s.availability} role="status">Opening cloud conversation…</p>}
+          {selected?.mode === "coding" && <p className={s.availability}>Coding conversation from your account. Continue it in the desktop app or CLI after trusting a local project.</p>}
+          {selected?.cloudDeleted && <p className={s.availability}>Deleted on another device. This unsynced offline copy is read-only.</p>}
           <form
             className={s.composer}
             onSubmit={(e) => {
@@ -690,7 +664,7 @@ export default function Chat() {
               placeholder="Message Freecoda"
               aria-label="Message Freecoda"
               rows={2}
-              disabled={busy}
+              disabled={busy || selected?.mode === "coding" || selected?.cloudDeleted || selected?.cloudLoaded === false}
             />
             <div className={s.composerActions}>
               <span>Ask anything. Make something.</span>
@@ -709,7 +683,7 @@ export default function Chat() {
                   className={s.send}
                   aria-label="Send message"
                   disabled={
-                    !draft.trim() || !status?.available || !historyReady
+                    !draft.trim() || !status?.available || !historyReady || selected?.mode === "coding" || selected?.cloudDeleted || selected?.cloudLoaded === false
                   }
                 >
                   <ArrowUp size={21} />
@@ -720,8 +694,7 @@ export default function Chat() {
           <p className={s.disclaimer}>
             Freecoda can make mistakes. Check important information.{" "}
             <Link href="/privacy">
-              Chats save in this browser; sending shares context with our AI
-              provider.
+              Conversations sync to your account across platforms. Sending shares context with our AI provider.
             </Link>
           </p>
         </div>

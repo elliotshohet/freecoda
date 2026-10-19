@@ -300,3 +300,60 @@ test("chat mode needs no workspace and sends conversation without repository too
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("incomplete assistant replies stay in persisted history but never become trusted model context", async () => {
+  const original: any[] = [
+    { role: "user", content: "Initial question" },
+    { role: "assistant", content: "UNFINISHED_REPLY", status: "partial" },
+    { role: "assistant", content: "STOPPED_REPLY", status: "stopped" },
+    { role: "assistant", content: "ERROR_REPLY", status: "error" },
+    { role: "assistant", content: "COMPLETE_REPLY", status: "complete" },
+    { role: "user", content: "Continue carefully" },
+  ];
+  const server = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    async fetch(req) {
+      const body = await req.json();
+      const sent = JSON.stringify(body);
+      expect(sent).not.toContain("UNFINISHED_REPLY");
+      expect(sent).not.toContain("STOPPED_REPLY");
+      expect(sent).not.toContain("ERROR_REPLY");
+      expect(sent).toContain("COMPLETE_REPLY");
+      expect((body as any).messages.some((m: any) => "status" in m)).toBe(
+        false,
+      );
+      return new Response(
+        "data: " +
+          JSON.stringify({
+            id: "safe",
+            model: "fixture",
+            object: "chat.completion.chunk",
+            choices: [
+              {
+                index: 0,
+                delta: { role: "assistant", content: "A complete new reply." },
+                finish_reason: "stop",
+              },
+            ],
+          }) +
+          "\n\ndata: [DONE]\n\n",
+        { headers: { "Content-Type": "text/event-stream" } },
+      );
+    },
+  });
+  try {
+    const result = await runAgent({
+      root: "/not-a-repository",
+      mode: "chat",
+      model: directModel(`http://127.0.0.1:${server.port}/v1`, "fixture", ""),
+      messages: original,
+      approve: async () => false,
+    });
+    expect(result.messages.slice(0, original.length)).toEqual(original);
+    expect(result.text).toBe("A complete new reply.");
+    expect(result.messages.length).toBeGreaterThan(original.length);
+  } finally {
+    await server.stop(true);
+  }
+});

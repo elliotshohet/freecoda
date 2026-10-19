@@ -25,22 +25,39 @@ export default function Privacy() {
           context with the selected provider.
         </p>
         <p>
-          When you use the local CLI, your repository, tool execution, and
-          conversation history stay on your machine. When you use your own API
+          When you use the local CLI, your repository and tool execution stay
+          on your machine. Signed-in conversation history syncs to your account,
+          including source excerpts or tool output already included in messages.
+          Freecoda does not upload your entire repository merely to sync history. When you use your own API
           key, the key is stored locally with restrictive file permissions.
           Direct provider requests bypass Freecoda.
         </p>
-        <h2>Browser conversations</h2>
+        <h2>Account conversations and offline copies</h2>
         <p>
-          Browser chat saves conversations in this browser's local storage. They
-          do not sync between devices. Anyone with access to your browser profile
-          may be able to read that history; avoid sensitive information on shared
-          devices. Delete a conversation from the sidebar to remove its local
-          copy. Sending a message shares that conversation's context with Freecoda,
-          Vercel AI Gateway, and the selected model provider. We retain usage
-          accounting, but do not save browser chat content in our application
-          database. Deleting local history does not delete provider operational
-          records described below. Advertisers do not receive your messages.
+          Signed-in conversations sync across the web, CLI, and desktop under
+          your Freecoda account. Titles, messages, responses, and structured tool
+          results are stored encrypted in our application database until you
+          delete them. Local workspace paths are not part of the cloud
+          conversation record. Sync includes the context already submitted in
+          a conversation; it does not automatically upload other source files.
+        </p>
+        <p>
+          Each client keeps a local offline copy. Anyone with access to your
+          browser profile or device account may be able to read that copy.
+          Offline changes sync when connectivity returns. Concurrent edits are
+          preserved as separate copies rather than silently overwriting another
+          device. Coding conversations can be read in browser chat; continuing
+          a local coding task still requires explicitly trusting its folder.
+        </p>
+        <p>
+          Delete a conversation to remove its active cloud record and propagate
+          deletion to your signed-in clients on their next sync. Offline devices
+          can retain a cached copy until they reconnect; clearing only browser
+          storage does not delete the cloud record. Encrypted recovery backups
+          can retain a prior copy until their scheduled expiry, currently seven
+          days. Provider records or training datasets are separate and are not
+          erased by a Freecoda conversation deletion. Advertisers do not receive
+          your messages.
         </p>
         <h2 id="cloud-workspaces">Cloud workspaces</h2>
         <p>
@@ -112,9 +129,9 @@ export default function Privacy() {
         <p>
           We retain your GitHub identity and email, authorized device records,
           invitation status, and usage metadata to operate the service. The free
-          hosted beta does not collect payment cards or sell credits. For local
-          CLI inference, we do not persist prompts, responses, source code, or
-          tool output in our application database or application logs. Optional
+          hosted beta does not collect payment cards or sell credits. Signed-in conversation history stores the message content described
+          above in encrypted application records. Operational logs do not
+          intentionally include conversation content. Optional
           cloud workspaces retain the project content described above for up to
           seven days after last activity.
         </p>
@@ -130,8 +147,9 @@ export default function Privacy() {
         </p>
         <h2>Your choices</h2>
         <p>
-          You can revoke CLI devices in your workspace and clear local history
-          with the CLI. Deleting your account removes active sessions and
+          You can revoke CLI devices in your settings and delete synced
+          conversations from your clients. Local cache removal and account
+          conversation deletion are different actions. Deleting your account removes active sessions and
           access; records required for fraud prevention or legal obligations may
           be retained. BYOK use is governed by your provider’s agreement and
           settings.

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import path from "node:path";
 import { realpath } from "node:fs/promises";
 import { platform, arch } from "node:os";
 import c from "picocolors";
@@ -10,9 +11,21 @@ import {
   hostedModel,
   validateBaseURL,
   redactSecrets,
+  loadExtensionRegistry,
+  saveExtensionRegistry,
+  installSkill,
+  installMcpServer,
+  setExtensionEnabled,
+  removeExtension,
+  publicExtensions,
 } from "@freecoda/core";
 import type { ModelMessage, LanguageModel } from "ai";
-import { loadConfig, saveConfig, type ThemePreference } from "./config";
+import {
+  loadConfig,
+  saveConfig,
+  stateDir,
+  type ThemePreference,
+} from "./config";
 import {
   ask,
   secret,
@@ -42,10 +55,14 @@ import {
   installCommand,
   installUpdate,
 } from "./update";
+import { AccountThreadSync } from "./cloud-threads";
+import { createHash } from "node:crypto";
+import { registerRepoCommands } from "./repos";
 const program = new Command()
   .name("freecoda")
   .description("Your conversational assistant and local coding workspace.")
   .version(CLI_VERSION);
+registerRepoCommands(program);
 program
   .command("update")
   .description("Check npm for a newer Freecoda CLI")
@@ -88,6 +105,65 @@ async function api(path: string, body?: unknown) {
     throw new Error(result.error || `Server returned ${response.status}.`);
   return result;
 }
+const extensionFile = () => path.join(stateDir(), "extensions.json");
+const extensionCommand = program
+  .command("extensions")
+  .description(
+    "Install and manage MCP tools and SKILL.md skills (local client only)",
+  );
+extensionCommand
+  .command("list")
+  .action(async () =>
+    console.log(
+      JSON.stringify(
+        publicExtensions(await loadExtensionRegistry(extensionFile())),
+        null,
+        2,
+      ),
+    ),
+  );
+extensionCommand
+  .command("add-skill <source>")
+  .description(
+    "Install and enable a local SKILL.md/directory or HTTPS SKILL.md URL; no install script is run",
+  )
+  .option("--name <name>")
+  .action(async (source, opts) => {
+    const registry = await installSkill(
+      await loadExtensionRegistry(extensionFile()),
+      { source, name: opts.name, allowLocal: true },
+    );
+    await saveExtensionRegistry(extensionFile(), registry);
+    console.log(
+      "Skill installed and enabled. Its guidance applies to coding modes, not general Chat.",
+    );
+  });
+extensionCommand
+  .command("add-mcp <name> <url>")
+  .description(
+    "Install and enable an HTTP MCP server; external calls require command approval",
+  )
+  .action(async (name, url) => {
+    const registry = installMcpServer(
+      await loadExtensionRegistry(extensionFile()),
+      { name, url },
+    );
+    await saveExtensionRegistry(extensionFile(), registry);
+    console.log(
+      "MCP server installed and enabled. External tools run only in Agent mode after command-category approval; session grants apply to all commands and external tools.",
+    );
+  });
+for (const operation of ["enable", "disable", "remove"] as const)
+  extensionCommand.command(`${operation} <id>`).action(async (id) => {
+    const registry = await loadExtensionRegistry(extensionFile());
+    await saveExtensionRegistry(
+      extensionFile(),
+      operation === "remove"
+        ? removeExtension(registry, id)
+        : setExtensionEnabled(registry, id, operation === "enable"),
+    );
+    console.log(`Extension ${operation}d.`);
+  });
 program
   .command("login")
   .option("--server <url>", "Freecoda server", "https://freecoda.com")
@@ -192,10 +268,16 @@ program
   )
   .action(async () => {
     const root = await realpath(program.opts().cwd || process.cwd());
+    const historyConfig = await loadConfig();
+    const sync = await AccountThreadSync.open(historyConfig);
+    if (sync) {
+      await sync.clear(root, "chat");
+      await sync.clear(root, "build");
+    }
     await clearConversations(root);
     await clearConversations(conversationScope(root, "chat"));
     console.log(
-      "All local chat and coding conversations deleted for this directory.",
+      "Chat and coding copies for this directory deleted. Account deletions sync when connected.",
     );
   });
 program
@@ -241,7 +323,22 @@ program
       await saveConfig(config);
     }
     if (defaultMode !== "chat") await ensureRepositoryTrust();
-    let scope = conversationScope(root, defaultMode);
+    const accountSync = await AccountThreadSync.open(config);
+    const scopeFor = (mode: ConversationMode) =>
+      accountSync
+        ? accountSync.scope(root, mode)
+        : config.token
+          ? `unverified-account:${createHash("sha256")
+              .update(config.server + config.token)
+              .digest("hex")}:${mode === "chat" ? "chat" : "coding"}:${root}`
+          : conversationScope(root, mode);
+    let scope = scopeFor(defaultMode);
+    const persistConversation = (
+      value: Parameters<typeof saveConversation>[0],
+    ) =>
+      accountSync
+        ? accountSync.save(value, defaultMode)
+        : saveConversation(value);
     let model: LanguageModel | undefined;
     let modelLabel = "";
     let modelId = "";
@@ -256,7 +353,8 @@ program
           process.env.FREECODA_PROVIDER_KEY || p.apiKey || "",
         );
         modelLabel = `${modelId} · direct ${new URL(p.baseURL).host}`;
-        modelPolicy = "Direct provider: requests bypass Freecoda. Your provider’s policies and charges apply.";
+        modelPolicy =
+          "Direct provider: requests bypass Freecoda. Your provider’s policies and charges apply.";
         return;
       }
       if (!config.token)
@@ -283,9 +381,14 @@ program
         : "Hosted prompt training is disallowed. Provider retention may apply. Free fair-use limits apply.";
     }
     await selectModel(opts.model);
-    const latest = await loadConversation(scope);
+    let latest = await loadConversation(scope);
+    if (opts.resume && accountSync && !latest.messages.length) {
+      const saved = await accountSync.list(root, defaultMode);
+      if (saved[0])
+        latest = await accountSync.load(root, defaultMode, saved[0].id);
+    }
     // Preserve legacy single-session history before the latest-task pointer changes.
-    if (latest.messages.length) await saveConversation(latest);
+    if (latest.messages.length) await persistConversation(latest);
     let conversation = opts.resume ? latest : newConversation(scope);
     let messages: ModelMessage[] = conversation.messages;
     const screen =
@@ -304,12 +407,12 @@ program
       console.log(
         c.bold(c.magenta("\n  freecoda")) + c.dim("  Your next big thing.\n"),
       );
-      notice(
-        modelLabel +
-          "\n" +
-          modelPolicy,
-      );
+      notice(modelLabel + "\n" + modelPolicy);
     } else screen.append("notice", modelPolicy);
+    if (accountSync)
+      notice(
+        "Conversation history syncs to your account across clients. Local copies remain available offline; /resume lists this mode’s account conversations.",
+      );
     if (screen && messages.length) {
       for (const message of messages
         .filter((item) => item.role === "user" || item.role === "assistant")
@@ -326,7 +429,9 @@ program
             text.slice(-6000),
           );
       }
-      notice("Resumed the conversation saved locally for this workspace.");
+      notice(
+        "Resumed the conversation in this workspace. Coding tasks use the currently trusted folder; Chat remains tool-free.",
+      );
     }
     let sessionOpen = true;
     if (screen)
@@ -349,9 +454,9 @@ program
     screen?.setMode(permissions.effectiveMode(defaultMode));
     async function switchMode(next: ConversationMode) {
       if (next !== "chat") await ensureRepositoryTrust();
-      const nextScope = conversationScope(root, next);
+      const nextScope = scopeFor(next);
       if (nextScope !== scope) {
-        await saveConversation({ ...conversation, messages });
+        await persistConversation({ ...conversation, messages });
         scope = nextScope;
         conversation = newConversation(scope);
         messages = [];
@@ -376,6 +481,19 @@ program
         }
         if (!input) continue;
         if (["/exit", "/quit"].includes(input)) break;
+        if (input === "/extensions") {
+          notice(
+            JSON.stringify(
+              publicExtensions(await loadExtensionRegistry(extensionFile())),
+              null,
+              2,
+            ),
+          );
+          notice(
+            "Manage with: freecoda extensions add-skill <source> | add-mcp <name> <url> | enable/disable/remove <id>. Chat never uses extensions; Agent mode asks before external tool calls.",
+          );
+          continue;
+        }
         if (input === "/permissions" || input.startsWith("/permissions ")) {
           let selected = input.slice(12).trim();
           if (!selected && screen)
@@ -440,10 +558,13 @@ program
           continue;
         }
         if (input === "/new") {
-          conversation = await saveConversation({ ...conversation, messages });
+          conversation = await persistConversation({
+            ...conversation,
+            messages,
+          });
           conversation = newConversation(scope);
           messages = [];
-          await saveConversation(conversation);
+          await persistConversation(conversation);
           screen?.clear();
           notice("New task. /resume opens earlier tasks in this project.");
           if (opts.prompt) break;
@@ -451,7 +572,9 @@ program
         }
         if (input === "/resume" || input.startsWith("/resume ")) {
           try {
-            const saved = await listConversations(scope);
+            const saved = accountSync
+              ? await accountSync.list(root, defaultMode)
+              : await listConversations(scope);
             const selected = input.slice(7).trim();
             if (!selected)
               notice(
@@ -473,10 +596,12 @@ program
                   "Task not found. Use /resume to list tasks in this project.",
                 );
               else {
-                await saveConversation({ ...conversation, messages });
-                conversation = await loadConversation(scope, item.id);
+                await persistConversation({ ...conversation, messages });
+                conversation = accountSync
+                  ? await accountSync.load(root, defaultMode, item.id)
+                  : await loadConversation(scope, item.id);
                 messages = conversation.messages;
-                await saveConversation(conversation);
+                await persistConversation(conversation);
                 screen?.clear();
                 for (const message of messages
                   .filter(
@@ -644,6 +769,7 @@ program
         try {
           const result = await runAgent({
             root,
+            extensions: await loadExtensionRegistry(extensionFile()),
             model: model!,
             messages: next,
             mode: permissions.effectiveMode(mode),
@@ -662,9 +788,13 @@ program
             },
           });
           messages = result.messages;
-          conversation = await saveConversation({ ...conversation, messages });
+          conversation = await persistConversation({
+            ...conversation,
+            messages,
+          });
+          messages = conversation.messages;
           notice(
-            `${result.usage.totalTokens ?? "?"} tokens · conversation saved locally`,
+            `${result.usage.totalTokens ?? "?"} tokens · conversation saved locally (offline copy)${accountSync ? (accountSync.hasPending() ? "; account sync pending" : "; synced to your account") : config.token ? "; account sync unavailable — retry after reconnecting" : "; sign in to sync across devices"}`,
           );
           await showSponsor(
             config.server,

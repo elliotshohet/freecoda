@@ -6,6 +6,8 @@ import {
   bigint,
   integer,
   jsonb,
+  uuid,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -102,3 +104,18 @@ export const modelCatalog = pgTable("model_catalog", {
   id: text("id").primaryKey(),
   config: jsonb("config").notNull(),
 });
+export const githubRepositorySettings = pgTable("github_repository_settings", {
+  userId: text("user_id").primaryKey().references(() => user.id, { onDelete: "cascade" }),
+  settings: jsonb("settings").notNull().default([]),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const syncedConversations = pgTable("synced_conversations", {
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  id: uuid("id").notNull(),
+  mode: text("mode").notNull(),
+  payload: text("payload"),
+  titlePayload: text("title_payload"),
+  version: integer("version").notNull().default(1),
+  updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, table => [primaryKey({ columns: [table.userId, table.id] })]);

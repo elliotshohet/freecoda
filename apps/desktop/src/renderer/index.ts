@@ -107,7 +107,7 @@ function updateControls() {
   text("sidebar-new-task", chat ? "＋ New chat" : "＋ New task");
   if (chat) {
     text("folder-name", "Coding workspace");
-    text("folder-path", "Chat history stays on this computer.");
+    text("folder-path", "Signed-in chats sync across your devices.");
   }
   const ready = (chat || trusted()) && !running && !actionBusy;
   const safe = !chat && trusted() && !running && !actionBusy;
@@ -185,7 +185,7 @@ function updateControls() {
       : preset === "read-only"
         ? "Read only · file changes and shell commands are denied."
         : preset === "full-access"
-          ? "Full access · local edits and shell commands run without approval. Session only."
+          ? "Full access · edits, commands, and external tools run without approval. Session only."
           : "Default · you approve each file change and shell command.",
   );
   hide("working", !running);
@@ -826,9 +826,9 @@ function showApproval() {
   text("approval-detail-label", request.kind === "shell" ? "Command" : "Proposed changes");
   text("approval-workspace", state?.workspace?.root || "Local workspace");
   text("approval-session-label", request.kind === "shell"
-    ? "Allow all shell commands this session"
+    ? "Allow commands and external tools this session"
     : "Allow all file changes this session");
-  text("approval-session-detail", "This category only · resets on project change or restart");
+  text("approval-session-detail", "Applies to this category · resets on project change or restart");
   dialog.dataset.kind = request.kind;
   text(
     "approval-warning",
@@ -866,6 +866,89 @@ async function decideApproval(approved: boolean, scope: "once" | "session" = "on
     button("deny-tool").disabled = false;
   }
 }
+button("refresh-conversations").addEventListener("click", async () => {
+  button("refresh-conversations").disabled = true;
+  try { renderState(await bridge.refreshConversations()); } catch (error) { showError(error); }
+  finally { button("refresh-conversations").disabled = false; }
+}, { signal });
+let githubRepos: import("../shared").DesktopGitHubRepo[] = [];
+async function refreshGitHubRepositories() {
+  const data = await bridge.githubRepositories(); githubRepos = data.repos;
+  button("github-connect").disabled = !data.canInstall;
+  const list = el("github-repos-list"); list.replaceChildren();
+  if (!data.repos.length) { const empty = document.createElement("p"); empty.textContent = "No repositories are available. Connect the GitHub App, then refresh access."; list.append(empty); }
+  for (const repo of data.repos) {
+    const preference = data.repositories.find(item => item.repositoryId === repo.repositoryId);
+    const row = document.createElement("fieldset"); row.className = "github-repo-row"; row.dataset.repo = String(repo.repositoryId);
+    const legend = document.createElement("legend"); legend.textContent = `${repo.owner}/${repo.name}${repo.private ? " · Private" : ""}`;
+    const enabledLabel = document.createElement("label"); const enabled = document.createElement("input"); enabled.type = "checkbox"; enabled.name = "enabled"; enabled.checked = preference?.enabled ?? false; enabledLabel.append(enabled, " Enable for this account");
+    row.append(legend, enabledLabel);
+    for (const [name, title, value] of [["branch", "Branch", preference?.branch || repo.defaultBranch], ["appDirectory", "App folder (empty for repository root)", preference?.appDirectory || ""]]) {
+      const label = document.createElement("label"); label.textContent = title;
+      const field = document.createElement("input"); field.name = name; field.value = value; field.maxLength = 255; label.append(field); row.append(label);
+    }
+    list.append(row);
+  }
+  text("github-repos-status", "Preferences are shared with your hosted account.");
+}
+button("github-repos-open").addEventListener("click", async () => {
+  try { await refreshGitHubRepositories(); el<HTMLDialogElement>("github-repos-dialog").showModal(); } catch (error) { showError(error); }
+}, { signal });
+button("github-repos-close").addEventListener("click", () => el<HTMLDialogElement>("github-repos-dialog").close(), { signal });
+button("github-repos-refresh").addEventListener("click", () => { void refreshGitHubRepositories().catch(error => text("github-repos-status", error instanceof Error ? error.message : "Could not refresh repositories.")); }, { signal });
+button("github-connect").addEventListener("click", () => { void bridge.connectGitHub().catch(error => text("github-repos-status", error instanceof Error ? error.message : "Could not open GitHub.")); }, { signal });
+el("github-repos-form").addEventListener("submit", async event => {
+  event.preventDefault(); button("github-repos-save").disabled = true;
+  try {
+    const repositories = githubRepos.map(repo => {
+      const row = el("github-repos-list").querySelector<HTMLElement>(`[data-repo="${repo.repositoryId}"]`)!;
+      return { repositoryId: repo.repositoryId, installationId: repo.installationId, owner: repo.owner, name: repo.name,
+        enabled: row.querySelector<HTMLInputElement>('[name="enabled"]')!.checked,
+        branch: row.querySelector<HTMLInputElement>('[name="branch"]')!.value,
+        appDirectory: row.querySelector<HTMLInputElement>('[name="appDirectory"]')!.value };
+    });
+    await bridge.saveGitHubRepositories(repositories); text("github-repos-status", "Repository preferences saved to your account.");
+  } catch (error) { text("github-repos-status", error instanceof Error ? error.message : "Could not save repositories."); }
+  finally { button("github-repos-save").disabled = false; }
+}, { signal });
+function renderExtensions(items: import("../shared").DesktopExtension[]) {
+  const list = el("extensions-list"); list.replaceChildren();
+  if (!items.length) { const empty = document.createElement("p"); empty.textContent = "No tools or skills installed."; list.append(empty); }
+  for (const item of items) {
+    const row = document.createElement("div"); row.className = "extension-row";
+    const info = document.createElement("div");
+    const name = document.createElement("strong"); name.textContent = item.name;
+    const detail = document.createElement("small"); detail.textContent = `${item.kind === "skill" ? "Skill" : "MCP server"} · ${item.enabled ? "Enabled" : "Disabled"}`;
+    info.append(name, detail);
+    const actions = document.createElement("div"); actions.className = "extension-actions";
+    const toggle = document.createElement("button"); toggle.textContent = item.enabled ? "Disable" : "Enable";
+    toggle.setAttribute("aria-label", `${toggle.textContent} ${item.name}`);
+    const remove = document.createElement("button"); remove.textContent = "Remove"; remove.setAttribute("aria-label", `Remove ${item.name}`);
+    for (const [control, operation] of [[toggle, () => bridge.setExtensionEnabled({ id: item.id, enabled: !item.enabled })], [remove, () => bridge.removeExtension(item.id)]] as const) {
+      control.addEventListener("click", async () => {
+        toggle.disabled = remove.disabled = true;
+        try { renderExtensions(await operation()); } catch (error) { showError(error); toggle.disabled = remove.disabled = false; }
+      }, { signal });
+    }
+    actions.append(toggle, remove); row.append(info, actions); list.append(row);
+  }
+}
+button("extensions-open").addEventListener("click", async () => {
+  try { renderExtensions(await bridge.listExtensions()); el<HTMLDialogElement>("extensions-dialog").showModal(); }
+  catch (error) { showError(error); }
+}, { signal });
+button("extensions-close").addEventListener("click", () => el<HTMLDialogElement>("extensions-dialog").close(), { signal });
+el("extensions-form").addEventListener("submit", async event => {
+  event.preventDefault(); button("extension-install").disabled = true;
+  try {
+    const kind = el<HTMLSelectElement>("extension-kind").value;
+    if (kind !== "skill" && kind !== "mcp") throw Error("Choose an extension type.");
+    renderExtensions(await bridge.installExtension({ kind, name: input("extension-name").value, url: input("extension-url").value }));
+    input("extension-name").value = ""; input("extension-url").value = "";
+    notify("Extension installed. Review its enabled state before the next coding task.");
+  } catch (error) { showError(error); }
+  finally { button("extension-install").disabled = false; }
+}, { signal });
 function renderAccount() {
   if (!state) return;
   text(

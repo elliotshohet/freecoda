@@ -231,6 +231,26 @@ test("uncertain requests keep their reservation until reconciled", async () => {
   await settle(id, 2000, { generationId: "generation-fixture" });
   expect((await usageSnapshot(userId)).freeRemainingMicros).toBe(98_000);
 });
+test("stale zero-cost Beam reservations release atomically before retry", async () => {
+  const before = await usageSnapshot(userId);
+  const old = await reserve(userId, "reflection/beam-free", 0);
+  await uncertain(old);
+  await pool.query(
+    "UPDATE reservations SET created_at=now()-interval '6 minutes' WHERE id=$1",
+    [old],
+  );
+
+  const retry = await reserve(userId, "reflection/beam-free", 0);
+  const { rows } = await pool.query(
+    "SELECT status,actual_cost_micros FROM reservations WHERE id=$1",
+    [old],
+  );
+  expect(rows[0]).toEqual({ status: "released", actual_cost_micros: "0" });
+  expect((await usageSnapshot(userId)).freeRemainingMicros).toBe(
+    before.freeRemainingMicros,
+  );
+  await settle(retry, 0);
+});
 test("UTC reset ignores old daily buckets but retains monthly spend", async () => {
   await pool.query(
     "INSERT INTO usage_buckets(scope,period,spent_micros) VALUES($1,$2,100000)",

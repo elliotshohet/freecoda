@@ -26,7 +26,7 @@ export default async function Settings() {
       <section className="panel" id="preferences">
         <h2>Preferences</h2>
         <p>Appearance</p><ThemeControl />
-        <p>Chat history stays in this browser. Search and delete conversations in the chat sidebar.</p>
+        <p>Signed-in conversations sync across the web, CLI, and desktop with an offline copy on each device. Search and delete them in the chat sidebar; deletions reach other clients on their next sync.</p>
       </section>
       <section className="panel" id="usage">
         <h2>Free plan & usage</h2>

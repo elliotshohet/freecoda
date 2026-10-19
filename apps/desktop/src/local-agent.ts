@@ -15,6 +15,8 @@ import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import { platform, arch } from "node:os";
 import {
+  loadExtensionRegistry, saveExtensionRegistry, installSkill, installMcpServer,
+  setExtensionEnabled, removeExtension,
   Workspace,
   runShell,
   runAgent as executeAgent,
@@ -25,6 +27,8 @@ import {
 } from "../../../packages/core/src";
 import type { ModelMessage } from "ai";
 import type {
+  DesktopGitHubState, DesktopGitHubPreference,
+  DesktopExtension,
   DesktopState,
   DesktopPermissionPreset,
   DesktopSponsor,
@@ -52,6 +56,7 @@ const text = (value: unknown, name: string, maximum: number) => {
   return value;
 };
 type Config = {
+  accountId?: string;
   server: string;
   token?: string;
   trustedRoots: string[];
@@ -106,8 +111,15 @@ export class LocalAgentService {
     title: string;
     updatedAt: string;
     messages: ModelMessage[];
+    cloudVersion?: number;
+    cloudOwner?: string;
+    cloudDirty?: boolean;
+    cloudDeleted?: boolean;
+    cloudLoaded?: boolean;
   }[] = [];
   private activeThreadId?: string;
+  private cloudAccountId?: string;
+  private syncingConversations = false;
   private selectedModel?: string;
   private allowPromptTraining?: boolean;
   private activeController?: AbortController;
@@ -173,12 +185,14 @@ export class LocalAgentService {
         trustedRoots: roots(stored.trustedRoots, 50),
         recentRoots: roots(stored.recentRoots, 12),
         ...(stored.token ? { token: stored.token } : {}),
+        ...(typeof stored.accountId === "string" ? { accountId: stored.accountId } : {}),
       };
       if (stored.token) this.secrets.add(stored.token);
       await chmod(filename, 0o600);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
+    this.cloudAccountId = this.config.accountId;
     await this.restoreHistory();
   }
   private async ensurePrivateDirectory(directory: string) {
@@ -265,6 +279,79 @@ export class LocalAgentService {
       files: trusted ? await this.listFiles() : [],
     };
   }
+  async githubRepositories(): Promise<DesktopGitHubState> {
+    await this.initialize(); this.check();
+    if (!this.config.token) throw Error("Sign in before connecting GitHub repositories.");
+    const [available, configured] = await Promise.all([
+      this.api("github/repos") as Promise<{ repos: DesktopGitHubState["repos"]; installUrl: string | null }>,
+      this.api("github/repositories") as Promise<{ repositories: DesktopGitHubPreference[] }>,
+    ]);
+    return {
+      repos: available.repos.map(({ repositoryId, installationId, owner, name, defaultBranch, private: privateRepo }) => ({ repositoryId, installationId, owner, name, defaultBranch, private: privateRepo })),
+      repositories: configured.repositories.map(({ repositoryId, installationId, owner, name, branch, appDirectory, enabled }) => ({ repositoryId, installationId, owner, name, branch, appDirectory, enabled })),
+      canInstall: !!available.installUrl,
+    };
+  }
+  async saveGitHubRepositories(repositories: DesktopGitHubPreference[]) {
+    await this.initialize(); this.check();
+    if (!this.config.token) throw Error("Sign in before configuring repositories.");
+    if (!Array.isArray(repositories) || repositories.length > 50) throw Error("Choose up to 50 repositories.");
+    await this.api("github/repositories", { repositories }, undefined, "PUT");
+    return this.githubRepositories();
+  }
+  async githubInstallURL(): Promise<string> {
+    await this.initialize(); this.check();
+    if (!this.config.token) throw Error("Sign in before connecting GitHub.");
+    const { installUrl } = await this.api("github/repos") as { installUrl: string | null };
+    if (!installUrl) throw Error("The GitHub App is not configured on this service.");
+    const url = new URL(installUrl);
+    if (url.origin !== "https://github.com" || !/^\/apps\/[a-z0-9-]+\/installations\/new$/.test(url.pathname) || url.username || url.password || url.search || url.hash)
+      throw Error("The service returned an invalid GitHub installation link.");
+    return url.toString();
+  }
+  private extensionMutation = false;
+  private extensionFile() { return path.join(this.directory, "extensions.json"); }
+  async listExtensions(): Promise<DesktopExtension[]> {
+    await this.initialize(); this.check();
+    const registry = await loadExtensionRegistry(this.extensionFile());
+    return [
+      ...registry.skills.map(({ id, name, enabled }) => ({ id, name, enabled, kind: "skill" as const })),
+      ...registry.servers.map(({ id, name, enabled }) => ({ id, name, enabled, kind: "mcp" as const })),
+    ];
+  }
+  private async changeExtensions(change: (registry: Awaited<ReturnType<typeof loadExtensionRegistry>>) => Promise<Awaited<ReturnType<typeof loadExtensionRegistry>>> | Awaited<ReturnType<typeof loadExtensionRegistry>>) {
+    await this.initialize(); this.check();
+    if (this.activeController || this.extensionMutation) throw Error("Finish the current task before changing extensions.");
+    this.extensionMutation = true;
+    try {
+      const registry = await loadExtensionRegistry(this.extensionFile());
+      await saveExtensionRegistry(this.extensionFile(), await change(registry));
+      return await this.listExtensions();
+    } finally { this.extensionMutation = false; }
+  }
+  async installExtension(input: { kind: "skill" | "mcp"; name: string; url: string }) {
+    if (!input || !["skill", "mcp"].includes(input.kind)) throw Error("Invalid extension type.");
+    const name = text(input.name, "Extension name", 80);
+    const url = text(input.url, "Extension URL", 2048);
+    if (input.kind === "skill" && path.isAbsolute(url)) {
+      return this.changeExtensions(registry => installSkill(registry, { source: url, name, allowLocal: true }));
+    }
+    const parsed = new URL(url);
+    if (parsed.username || parsed.password || parsed.search || parsed.hash) throw Error("Extension URLs must not include credentials, query strings, or fragments.");
+    if (parsed.protocol !== "https:") throw Error("Use an HTTPS extension URL.");
+    return this.changeExtensions(registry => input.kind === "skill"
+      ? installSkill(registry, { source: url, name, allowLocal: true })
+      : installMcpServer(registry, { name, url }));
+  }
+  async setExtensionEnabled(input: { id: string; enabled: boolean }) {
+    if (!input || typeof input.enabled !== "boolean") throw Error("Invalid extension state.");
+    const id = text(input.id, "Extension ID", 100);
+    return this.changeExtensions(registry => setExtensionEnabled(registry, id, input.enabled));
+  }
+  async removeExtension(value: string) {
+    const id = text(value, "Extension ID", 100);
+    return this.changeExtensions(registry => removeExtension(registry, id));
+  }
   async getState(): Promise<DesktopState> {
     await this.initialize();
     this.check();
@@ -285,7 +372,7 @@ export class LocalAgentService {
       running: !!this.activeController,
       permissionPreset: this.permissionPreset,
       conversationMode: this.conversationMode,
-      threads: this.threads.map(({ id, title, updatedAt }) => ({
+      threads: this.threads.filter(t => !t.cloudDeleted && (!t.cloudOwner || t.cloudOwner === this.cloudAccountId)).map(({ id, title, updatedAt }) => ({
         id,
         title: this.clean(title),
         updatedAt,
@@ -619,6 +706,7 @@ export class LocalAgentService {
   }
   async runAgent(input: DesktopRunInput) {
     await this.initialize();
+    if (this.extensionMutation) throw Error("Finish installing extensions before starting a task.");
     const chat = input?.mode === "chat";
     if (chat !== (this.conversationMode === "chat"))
       throw Error("Switch conversation mode before starting this request.");
@@ -632,6 +720,11 @@ export class LocalAgentService {
       throw new Error("A task or repository change is already running.");
     if (!input || !["chat", "build", "plan", "review"].includes(input.mode))
       throw new Error("Choose chat, build, plan, or review mode.");
+    const active = this.threads.find(thread => thread.id === this.activeThreadId);
+    if (active?.cloudLoaded === false && this.config.token) {
+      const { conversation } = await this.api(`conversations/${active.id}`) as { conversation: { messages: ModelMessage[]; version: number } };
+      active.messages = conversation.messages; active.cloudVersion = conversation.version; active.cloudLoaded = true; this.messages = active.messages;
+    }
     const prompt = text(input.prompt, "Prompt", 20_000);
     if (!this.config.token)
       throw new Error("Sign in to Freecoda before running a task.");
@@ -662,6 +755,7 @@ export class LocalAgentService {
         ];
         const result = await executeAgent({
           root,
+          extensions: await loadExtensionRegistry(this.extensionFile()),
           model: hostedModel(this.server, chosen.id, this.config.token!),
           messages: next,
           mode:
@@ -730,6 +824,72 @@ export class LocalAgentService {
     for (const request of this.pending.values()) request.resolve(false);
     await Promise.all([this.activeRun?.completion, this.manualCompletion]);
   }
+  private async syncConversations(upload = false) {
+    if (!this.config.token || this.syncingConversations) return;
+    this.syncingConversations = true;
+    try {
+      const catalog = await this.api(`conversations?mode=${this.conversationMode}`) as { userId: string; conversations: { id: string; title: string; updatedAt: string; version: number }[]; nextCursor?: string | null };
+      let cursor = catalog.nextCursor;
+      const seen = new Set<string>();
+      while (cursor && !seen.has(cursor)) {
+        seen.add(cursor);
+        const page = await this.api(`conversations?mode=${this.conversationMode}&cursor=${encodeURIComponent(cursor)}`) as typeof catalog;
+        if (page.userId !== catalog.userId) throw Error("Cloud account changed during sync.");
+        catalog.conversations.push(...page.conversations); cursor = page.nextCursor;
+      }
+      if (!catalog.userId) throw Error("Cloud conversation identity is unavailable.");
+      this.cloudAccountId = catalog.userId;
+      this.config.accountId = catalog.userId;
+      await this.saveConfig();
+      for (const thread of this.threads) {
+        if (!thread.cloudOwner) { thread.cloudOwner = catalog.userId; thread.cloudDirty = true; }
+      }
+      const remoteIds = new Set(catalog.conversations.map(item => item.id));
+      this.threads = this.threads.filter(thread => thread.cloudOwner !== catalog.userId || thread.cloudDirty || thread.cloudDeleted || !thread.cloudVersion || remoteIds.has(thread.id));
+      const accessible = (thread: typeof this.threads[number]) => !thread.cloudDeleted && (!thread.cloudOwner || thread.cloudOwner === catalog.userId);
+      if (!this.threads.some(t => t.id === this.activeThreadId && accessible(t))) this.activeThreadId = this.threads.find(accessible)?.id;
+      for (const summary of catalog.conversations) {
+        const local = this.threads.find(thread => thread.id === summary.id);
+        if (local?.cloudDeleted || local?.cloudDirty || local?.cloudVersion === summary.version) continue;
+        if (!local) {
+          this.threads.push({ id: summary.id, title: summary.title, updatedAt: summary.updatedAt, messages: [], cloudVersion: summary.version, cloudOwner: catalog.userId, cloudDirty: false, cloudLoaded: false });
+          continue;
+        }
+        const { conversation } = await this.api(`conversations/${summary.id}`) as { conversation: { id: string; title: string; mode: string; messages: ModelMessage[]; updatedAt: string; version: number } };
+        if (conversation.mode !== this.conversationMode || !Array.isArray(conversation.messages)) continue;
+        const synced = { id: conversation.id, title: conversation.title, messages: conversation.messages, updatedAt: conversation.updatedAt, cloudVersion: conversation.version, cloudOwner: catalog.userId, cloudDirty: false, cloudLoaded: true };
+        if (local) Object.assign(local, synced); else this.threads.push(synced);
+      }
+      if (upload) for (const thread of [...this.threads]) {
+        if (thread.cloudOwner && thread.cloudOwner !== catalog.userId) continue;
+        if (thread.cloudDeleted) {
+          await this.api(`conversations/${thread.id}`, undefined, undefined, "DELETE");
+          this.threads = this.threads.filter(t => t !== thread); continue;
+        }
+        if (!thread.cloudDirty) continue;
+        try {
+          const { conversation } = await this.api(`conversations/${thread.id}`, { title: thread.title, mode: this.conversationMode, messages: thread.messages, expectedVersion: thread.cloudVersion ?? null }, undefined, "PUT") as { conversation: { version: number } };
+          thread.cloudVersion = conversation.version; thread.cloudOwner = catalog.userId; thread.cloudDirty = false;
+        } catch (error) {
+          if ((error as { status?: number }).status === 410) {
+            thread.cloudDirty = false; thread.cloudDeleted = true; continue;
+          }
+          if ((error as { status?: number }).status !== 409) throw error;
+          // Keep both edits: a conflicting local branch receives a fresh identity.
+          const oldId = thread.id; thread.id = randomUUID(); thread.cloudVersion = undefined;
+          thread.title = `${thread.title.slice(0, 95)} (local conflict copy)`;
+          if (this.activeThreadId === oldId) this.activeThreadId = thread.id;
+          const { conversation } = await this.api(`conversations/${thread.id}`, { title: thread.title, mode: this.conversationMode, messages: thread.messages, expectedVersion: null }, undefined, "PUT") as { conversation: { version: number } };
+          thread.cloudVersion = conversation.version; thread.cloudOwner = catalog.userId; thread.cloudDirty = false;
+        }
+      }
+      if (!this.threads.some(thread => thread.id === this.activeThreadId && accessible(thread))) this.activeThreadId = this.threads.find(accessible)?.id;
+      this.messages = this.threads.find(thread => thread.id === this.activeThreadId && accessible(thread))?.messages || [];
+      await this.savePrivate(this.historyFile(), { root: this.historyScope(), activeThreadId: this.activeThreadId, threads: this.threads });
+    } catch {
+      this.emit({ type: "auth", signedIn: !!this.config.token, message: "Cloud conversation sync is unavailable. Your local copy is preserved and will retry on the next conversation refresh or turn." });
+    } finally { this.syncingConversations = false; }
+  }
   private async restoreHistory() {
     this.messages = [];
     this.threads = [];
@@ -744,7 +904,7 @@ export class LocalAgentService {
         throw Error("Invalid saved conversation.");
       if (Array.isArray(saved.threads)) {
         if (
-          saved.threads.length > 100 ||
+          saved.threads.length > 10_000 ||
           saved.threads.some(
             (t: any) =>
               !t ||
@@ -783,6 +943,7 @@ export class LocalAgentService {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
+    await this.syncConversations(true);
   }
   private async saveHistory() {
     if (!this.activeThreadId) {
@@ -796,6 +957,8 @@ export class LocalAgentService {
     }
     const thread = this.threads.find((t) => t.id === this.activeThreadId)!;
     thread.messages = this.messages;
+    thread.cloudDirty = true;
+    thread.cloudOwner ??= this.cloudAccountId;
     thread.updatedAt = new Date().toISOString();
     const first = this.messages.find((m) => m.role === "user");
     if (first && typeof first.content === "string")
@@ -812,6 +975,7 @@ export class LocalAgentService {
         "Conversation history reached its limit. Clear a thread before starting a new task.",
       );
     await this.savePrivate(this.historyFile(), value);
+    await this.syncConversations(true);
   }
   private threadChangeAllowed() {
     if (this.conversationMode === "coding") this.trustedRoot();
@@ -828,6 +992,9 @@ export class LocalAgentService {
     } finally {
       this.workspaceChanging = false;
     }
+  }
+  async refreshConversations(): Promise<DesktopState> {
+    return this.changeThread(async () => { await this.syncConversations(true); await this.emitState(); return this.getState(); });
   }
   async createThread(): Promise<DesktopState> {
     return this.changeThread(async () => {
@@ -851,11 +1018,16 @@ export class LocalAgentService {
       if (typeof id !== "string" || !/^[a-f0-9-]{36}$/.test(id))
         throw Error("Invalid conversation.");
       const thread = this.threads.find((t) => t.id === id);
-      if (!thread)
-        throw Error("Conversation does not belong to the selected repository.");
+      if (!thread || thread.cloudDeleted || (thread.cloudOwner && thread.cloudOwner !== this.cloudAccountId))
+        throw Error("Conversation does not belong to this account or selected repository.");
+      if (thread.cloudLoaded === false && this.config.token) {
+        const { conversation } = await this.api(`conversations/${id}`) as { conversation: { messages: ModelMessage[]; version: number } };
+        thread.messages = conversation.messages; thread.cloudVersion = conversation.version; thread.cloudLoaded = true;
+      }
       this.activeThreadId = id;
       this.messages = thread.messages;
-      await this.saveHistory();
+      await this.savePrivate(this.historyFile(), { root: this.historyScope(), activeThreadId: this.activeThreadId, threads: this.threads });
+      await this.syncConversations(true);
       await this.emitState();
       return this.getState();
     });
@@ -875,16 +1047,20 @@ export class LocalAgentService {
         throw Error("Invalid conversation.");
       if (!this.threads.some((t) => t.id === id))
         throw Error("Conversation does not belong to this conversation scope.");
-      this.threads = this.threads.filter((t) => t.id !== id);
+      const deleted = this.threads.find(t => t.id === id)!;
+      if (deleted.cloudOwner && deleted.cloudOwner !== this.cloudAccountId) throw Error("Conversation belongs to another account.");
+      if (this.config.token && deleted.cloudOwner) deleted.cloudDeleted = true;
+      else this.threads = this.threads.filter(t => t.id !== id);
       if (this.activeThreadId === id) {
-        this.activeThreadId = this.threads[0]?.id;
-        this.messages = this.threads[0]?.messages || [];
+        this.activeThreadId = this.threads.find(t => !t.cloudDeleted && (!t.cloudOwner || t.cloudOwner === this.cloudAccountId))?.id;
+        this.messages = this.threads.find(t => t.id === this.activeThreadId)?.messages || [];
       }
       await this.savePrivate(this.historyFile(), {
         root: this.historyScope(),
         activeThreadId: this.activeThreadId,
         threads: this.threads,
       });
+      await this.syncConversations(true);
       await this.emitState();
       return this.getState();
     });
@@ -1019,9 +1195,9 @@ export class LocalAgentService {
     await this.getSponsor();
     await this.options.openExternal(this.sponsor!.href);
   }
-  private async api(endpoint: string, body?: unknown, signal?: AbortSignal) {
+  private async api(endpoint: string, body?: unknown, signal?: AbortSignal, method?: "PUT" | "DELETE") {
     const response = await this.transport(`${this.server}/api/v1/${endpoint}`, {
-      method: body === undefined ? "GET" : "POST",
+      method: method || (body === undefined ? "GET" : "POST"),
       headers: {
         "Content-Type": "application/json",
         ...(this.config.token
@@ -1055,13 +1231,13 @@ export class LocalAgentService {
       throw new Error("The server returned an invalid response.");
     }
     if (!response.ok)
-      throw new Error(
+      throw Object.assign(new Error(
         this.clean(
           typeof (value as { error?: unknown })?.error === "string"
             ? (value as { error: string }).error
             : `Request failed (${response.status}).`,
         ).slice(0, 1000),
-      );
+      ), { status: response.status });
     return value;
   }
   async login(): Promise<DesktopLogin> {
@@ -1134,8 +1310,12 @@ export class LocalAgentService {
           )
             throw new Error("The server returned an invalid device token.");
           this.config.token = result.token;
+          this.cloudAccountId = undefined;
+          this.messages = [];
+          this.activeThreadId = undefined;
           this.secrets.add(result.token);
           await this.saveConfig();
+          await this.syncConversations(true);
           this.emit({
             type: "auth",
             signedIn: true,

@@ -15,7 +15,7 @@ export const inferenceSchema = z
   .object({
     model: z.string().min(1).max(150),
     messages: z.array(z.record(z.string(), z.unknown())).min(1).max(100),
-    tools: z.array(z.record(z.string(), z.unknown())).max(10).optional(),
+    tools: z.array(z.record(z.string(), z.unknown())).max(32).optional(),
     tool_choice: z.unknown().optional(),
     stream: z.boolean().default(true),
     stream_options: z
@@ -56,7 +56,7 @@ export const modelCallSchema = z
     options: z
       .object({
         prompt: z.array(z.record(z.string(), z.unknown())).min(1).max(100),
-        tools: z.array(z.record(z.string(), z.unknown())).max(10).optional(),
+        tools: z.array(z.record(z.string(), z.unknown())).max(32).optional(),
         toolChoice: z.unknown().optional(),
         maxOutputTokens: z.number().int().min(1).max(4096).optional(),
         temperature: z.number().min(0).max(2).optional(),
@@ -86,3 +86,6 @@ export const sponsorInquirySchema = z
     companyUrl: z.string().max(500).optional(),
   })
   .strict();
+export * from "./github-repositories";
+export * from "./extensions";
+export * from "./conversations";
