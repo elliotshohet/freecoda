@@ -201,6 +201,8 @@ h1 > span {
   font-size: 11px;
   white-space: nowrap;
   flex: 1;
+  min-width: 0;
+  overflow-x: auto;
 }
 .install-command button {
   border: 0;

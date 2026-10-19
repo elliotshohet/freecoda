@@ -110,7 +110,13 @@ node packages/cli/dist/index.js login
 node packages/cli/dist/index.js --cwd /path/to/project
 ```
 
-The CLI is published as `freecoda`; install with `npm install --global freecoda`. Sign in to use the free sponsored hosted allowance without an API key. Hosted access requires server configuration and a beta invitation; daily and shared capacity limits apply. `login`, `usage`, and `hosted` connect to the hosted service when available.
+Install the current CLI from the [GitHub release archive](https://github.com/elliotshohet/freecoda/releases/tag/cli-v0.1.5), after checking its `SHA256SUMS.txt`:
+
+```sh
+npm install --global https://github.com/elliotshohet/freecoda/releases/download/cli-v0.1.5/freecoda-0.1.5.tgz --ignore-scripts
+```
+
+The npm registry package may be an older version. Sign in to use the free sponsored hosted allowance without an API key. Hosted access requires server configuration and a beta invitation; daily and shared capacity limits apply. `login`, `usage`, and `hosted` connect to the hosted service when available.
 
 <details>
 <summary>Advanced settings: optional API key</summary>

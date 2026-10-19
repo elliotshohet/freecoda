@@ -1,6 +1,6 @@
 import { DesktopDownloads } from "@/components/desktop-downloads";
 import { Install } from "@/components/install";
-import { CLI_PUBLISHED } from "@/lib/releases";
+import { CLI_PUBLISHED, CLI_RELEASE_URL, CLI_CHECKSUMS_URL } from "@/lib/releases";
 import Link from "next/link";
 export const metadata = { title: "Documentation" };
 export default function Docs() {
@@ -41,6 +41,11 @@ export default function Docs() {
             : "Once npm publication completes, install with:"}
         </p>
         <Install compact />
+        <p>
+          The current CLI is a <a href={CLI_RELEASE_URL}>GitHub release archive</a>.
+          Verify its <a href={CLI_CHECKSUMS_URL}>SHA256 checksum</a> before installation.
+          The command installs that exact archive; the npm registry package may be an older version.
+        </p>
         <p>
           Hosted access is currently invite-only. Signing in creates an account;
           it does not grant an invitation or bypass capacity limits.
