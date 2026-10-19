@@ -2,21 +2,39 @@
 
 Desktop and CLI releases are versioned separately. Dates below are the canonical
 GitHub releases' publication dates in UTC, including releases migrated into this
-repository. Each heading links to its release notes and downloadable artifacts.
+repository. Published headings link to release notes and downloadable artifacts. Pending entries
+remain under Unreleased until publication and artifact verification are complete.
 
 ## Unreleased
 
-- Add direct recent-folder reopening, save outgoing conversation history before switching workspaces, and retain drafts separately by conversation.
-- Load owner-scoped cloud workspace metadata for desktop accounts, with explicit browser handoff to the selected cloud project.
-- Add persistent one-click light/dark theme buttons, visible Freecoda branding, a bottom-right account avatar, and active-folder file shortcuts.
+### Desktop 0.1.7 — 2026-10-19 — Release pending
 
-- Refine desktop navigation, conversation layout, composer, account settings, and plugin/MCP management with a consistent neutral interface and accessible icon actions.
-- Group local-folder conversations under their desktop workspace; show repository details and the current project conversation in web workspaces.
-- Hide model names from normal desktop, web, and CLI headers without changing model selection.
-- Align supported slash commands across clients: saved-chat `/resume`, fresh-chat `/clear`, `/copy`, `/diff`, and directory inspection. Cloud compute uses `/start`; unsupported Codex capabilities report their limitations.
-- Improve CLI plugin, MCP, and skill inventories with accurate installed/enabled states and management commands.
+[Canonical release](https://github.com/elliotshohet/freecoda/releases/tag/v0.1.7)
+(publication pending; artifacts and updater metadata are not yet verified).
 
-- Remove the desktop sidebar's manual “Sync conversations” button while keeping account conversation sync working.
+- Refine the desktop sidebar, conversation transcript, composer, account settings, and plugin/MCP management with neutral surfaces and accessible icon actions.
+- Group conversations under their local workspace, show repository details, and reopen previously selected folders without bypassing trust. Save outgoing conversation history before switching workspaces and retain drafts separately by conversation.
+- Load account-scoped cloud workspace metadata and open the selected project in the browser. Cloud workspaces remain browser workspaces; this does not add an embedded desktop cloud runner or a separate environment manager.
+- Add persistent one-click light/dark theme switching, visible Freecoda branding, a bottom-right account avatar, and active-folder file shortcuts.
+- Hide model names from normal headers while preserving model selection.
+- Align supported commands: saved-conversation `/resume`, fresh-conversation `/clear`, `/copy`, `/diff`, and working-directory inspection. Use `/start` for cloud compute where available. Unsupported Codex commands explain their limitations; this is not full Codex feature parity.
+- Remove the manual “Sync conversations” sidebar button while retaining account conversation sync.
+- Migration and limits: macOS installation remains a manual download while builds are unsigned and not notarized. Clients with the retired update feed require a manual reinstall. Cloud listing requires compatible server support and account access. Release validation and actual installed update behavior remain pending.
+
+### CLI 0.1.7 — 2026-10-19 — Release pending
+
+[Canonical release](https://github.com/elliotshohet/freecoda/releases/tag/cli-v0.1.7)
+(publication pending; archive bytes and checksums are not yet verified).
+
+- Hide model names from normal CLI headers while retaining explicit model selection.
+- Align supported conversation commands, including saved-conversation `/resume`, fresh-conversation `/clear`, `/copy`, `/diff`, and working-directory inspection. Unsupported Codex capabilities report explicit limitations instead of claiming feature parity.
+- Improve plugin, MCP server, and skill inventories with accurate installed/enabled states and management commands.
+- Migration and limits: existing folder trust and command approvals still apply. GitHub release archives and npm registry publication are separate; this entry does not claim npm publication, verified installed updates, or completed release validation.
+
+### Web changes — Unreleased
+
+- Hide model names from normal headers, retain explicit model selection, and refine consistent accessible header controls and light/dark switching.
+- Show repository details and the current project conversation in cloud workspaces; distinguish saved-conversation `/resume` from cloud-compute `/start`.
 
 ## Desktop 0.1.6 — 2026-10-19
 
