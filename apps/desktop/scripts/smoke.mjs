@@ -60,11 +60,13 @@ class CDP {
       this.socket.send(JSON.stringify({ id, method, params }));
     });
   }
-  async evaluate(expression) {
+  async evaluate(expression, phase = "renderer evaluation") {
     const result = await this.send("Runtime.evaluate", {
       expression,
       awaitPromise: true,
       returnByValue: true,
+    }).catch((error) => {
+      throw new Error(`${phase}: ${error.message}`, { cause: error });
     });
     if (result.exceptionDetails)
       throw new Error(
@@ -180,7 +182,7 @@ try {
         requireType: typeof window.require, processType: typeof window.process,
         ipcType: typeof window.ipcRenderer, electronType: typeof window.electron,
         csp: document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.content };
-    })()`);
+    })()`, "initial renderer and preload state");
     if (initial) break;
     await pause(100);
   }
@@ -218,7 +220,10 @@ try {
       // media-query change. Wait for the UI to converge, then assert all state.
       const until = performance.now() + 2000;
       while (performance.now() < until) {
-        await new Promise(resolve => requestAnimationFrame(resolve));
+        // Xvfb and occluded native windows may suspend animation frames.
+        // A timer keeps this convergence check bounded without depending on
+        // window visibility or weakening the theme assertions below.
+        await new Promise(resolve => setTimeout(resolve, 25));
         const expected = ${JSON.stringify(preference)} === 'system'
           ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
           : ${JSON.stringify(preference)};
@@ -228,7 +233,7 @@ try {
         theme: document.documentElement.dataset.theme,
         stored: localStorage.getItem('freecoda-theme'),
         systemDark: matchMedia('(prefers-color-scheme: dark)').matches };
-    })()`);
+    })()`, `${preference} theme convergence`);
     assert.equal(theme.preference, preference);
     assert.equal(theme.stored, preference);
     assert.equal(
