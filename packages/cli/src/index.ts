@@ -54,6 +54,7 @@ import {
   newerVersion,
   installCommand,
   installUpdate,
+  automaticUpdate,
 } from "./update";
 import { AccountThreadSync } from "./cloud-threads";
 import { createHash } from "node:crypto";
@@ -67,7 +68,7 @@ const program = new Command()
 registerRepoCommands(program);
 program
   .command("update")
-  .description("Check npm for a newer Freecoda CLI")
+  .description("Check GitHub Releases for a newer Freecoda CLI")
   .option(
     "--install",
     "Explicitly install the latest stable release globally using npm",
@@ -75,7 +76,7 @@ program
   .action(async (opts) => {
     const latest = await checkUpdate();
     if (!newerVersion(latest)) {
-      console.log(`Freecoda ${CLI_VERSION} is up to date (npm: ${latest}).`);
+      console.log(`Freecoda ${CLI_VERSION} is up to date (release: ${latest}).`);
       return;
     }
     console.log(`Freecoda ${latest} is available (installed: ${CLI_VERSION}).`);
@@ -878,6 +879,7 @@ program
     } finally {
       sessionOpen = false;
       screen?.close();
+      if (!opts.prompt && process.stdin.isTTY) await automaticUpdate(console.log);
     }
   });
 program

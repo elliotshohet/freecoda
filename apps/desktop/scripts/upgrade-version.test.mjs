@@ -30,3 +30,18 @@ test('reads a replaced ASAR using its fresh header instead of cached offsets', a
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test('qualification accepts the reviewed current pair and rejects unreviewed releases/platforms', async () => {
+  const { pinnedUpgrade } = await import('./upgrade-pins.mjs');
+  for (const platform of ['linux', 'win32']) {
+    const pins = pinnedUpgrade('0.1.4', '0.1.5', platform);
+    assert.match(pins.from, /^sha256:[0-9a-f]{64}$/);
+    assert.match(pins.to, /^sha256:[0-9a-f]{64}$/);
+    assert.notEqual(pins.from, pins.to);
+  }
+  assert.throws(() => pinnedUpgrade('0.1.4', '0.1.6', 'linux'), /Unreviewed/);
+  assert.throws(() => pinnedUpgrade('0.1.4', '0.1.5', 'darwin'), /Unreviewed/);
+  const workflow = await import('node:fs/promises').then(fs => fs.readFile(new URL('../../../.github/workflows/desktop-upgrade.yml', import.meta.url), 'utf8'));
+  assert.match(workflow, /default: 0\.1\.4/);
+  assert.match(workflow, /default: 0\.1\.5/);
+});

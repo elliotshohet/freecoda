@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { GitHubStars } from "./github-stars";
 import { ThemeControl } from "./theme-control";
 import { ArrowUpRight, Command } from "lucide-react";
 export function Mark() {
@@ -17,6 +18,7 @@ export function Header() {
   if (
     pathname === "/chat" ||
     pathname === "/settings" ||
+    pathname === "/admin" ||
     pathname === "/app" ||
     pathname.startsWith("/app/")
   )
@@ -31,10 +33,10 @@ export function Header() {
         <Link href="/#how-it-works">How it works</Link>
         <Link href="/pricing">Free access</Link>
         <Link href="/docs">Docs</Link>
-        <a href="https://github.com/elliotshohet/freecoda">GitHub</a>
         <Link href="/app">Build in your browser</Link>
       </nav>
       <div className="header-actions">
+        <GitHubStars />
         <ThemeControl />
         <Link className="header-cta" href="/settings">
           Your account <ArrowUpRight size={15} />
@@ -48,6 +50,7 @@ export function Footer() {
   if (
     pathname === "/chat" ||
     pathname === "/settings" ||
+    pathname === "/admin" ||
     pathname === "/app" ||
     pathname.startsWith("/app/")
   )

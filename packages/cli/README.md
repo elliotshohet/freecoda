@@ -125,14 +125,14 @@ Sign in first and install the Freecoda GitHub App on the intended repositories u
 
 ## Updates
 
-The full-screen interface checks npm for newer stable versions in the background. Exit your coding session before updating:
+The terminal checks the main GitHub repository for stable CLI releases. When an interactive session closes normally, a writable global npm installation automatically installs a newer release for the next session. Your running conversation is never restarted. Set `FREECODA_AUTO_UPDATE=0` to disable automatic installation. Source checkouts and project-local installations are never modified. You can also update explicitly:
 
 ```sh
 freecoda update
 freecoda update --install
 ```
 
-The first command checks availability. `--install` explicitly invokes npm to install the validated stable version globally from the public npm registry, with package lifecycle scripts disabled. It never uses sudo. For a permissions error, configure a user-owned npm prefix or use a Node version manager. `/update` only shows these instructions; it cannot replace the CLI while an agent is working.
+The first command checks availability. `--install` downloads the canonical `cli-vVERSION` GitHub release archive, verifies its SHA256SUMS.txt checksum, and invokes npm with lifecycle scripts disabled into the existing global installation prefix. No credentials, sudo, or shell commands are used. Offline and read-only installations remain usable. For a permissions error, configure a user-owned npm prefix or use a Node version manager. `/update` shows instructions; updates wait until the interactive session finishes. HTTPS and the repository release controls establish publisher trust; the checksum detects download corruption.
 
 ## Approvals and local state
 

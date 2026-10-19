@@ -58,7 +58,7 @@
     },
     "packages/cli": {
       "name": "freecoda",
-      "version": "0.1.5",
+      "version": "0.1.6",
       "bin": {
         "freecoda": "bin/freecoda.js",
       },

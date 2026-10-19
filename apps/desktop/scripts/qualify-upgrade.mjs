@@ -7,6 +7,7 @@ import { readFile, writeFile, mkdir, mkdtemp, chmod, readdir } from 'node:fs/pro
 import { createHash } from 'node:crypto';
 import { tmpdir, platform } from 'node:os';
 import path from 'node:path';
+import { pinnedUpgrade } from './upgrade-pins.mjs';
 import { readInstalledVersion } from './upgrade-version.mjs';
 
 assert(['win32', 'linux'].includes(platform()), 'Qualification requires native Windows/Linux.');
@@ -14,18 +15,7 @@ assert(process.env.CI === 'true', 'Run only on a disposable CI runner.');
 const from = process.env.FROM_VERSION, to = process.env.TO_VERSION;
 for (const version of [from, to]) assert(/^\d+\.\d+\.\d+$/.test(version), 'Stable semver required.');
 assert.notEqual(from, to);
-assert.equal(from, '0.1.0', 'This qualification pins the reviewed 0.1.0 source release.');
-assert.equal(to, '0.1.1', 'This qualification pins the reviewed 0.1.1 destination release.');
-const pinnedDigests = {
-  win32: {
-    from: 'sha256:3d33ed6acf35d24d5ec5ae04269a95f97d034490abf26b76d86ccf3c6a8deef3',
-    to: 'sha256:9ed00e1bee362bdf3a99ebcdac810715e09b625f25d118c74de9243c2843e75a',
-  },
-  linux: {
-    from: 'sha256:bb2620d4065d31773a4029c551eea436bf39d53dd36913ebe5283becf42939c8',
-    to: 'sha256:fbb4a50b51926819c3291b6f259e7f39781686705aa12bf6f12bd421e1aef18f',
-  },
-};
+const pinnedDigests = pinnedUpgrade(from, to, platform());
 const run = promisify(execFile);
 const root = await mkdtemp(path.join(process.env.RUNNER_TEMP || tmpdir(), 'freecoda-upgrade-'));
 const profile = path.join(root, 'profile');
@@ -187,8 +177,8 @@ try {
   const oldAsset = oldRelease.assets.find(a => a.name === `Freecoda-${from}-${suffix}`);
   const newAsset = latest.assets.find(a => a.name === `Freecoda-${to}-${suffix}`);
   assert(oldAsset && newAsset);
-  assert.equal(oldAsset.digest, pinnedDigests[platform()].from, 'Source installer identity changed.');
-  assert.equal(newAsset.digest, pinnedDigests[platform()].to, 'Destination installer identity changed.');
+  assert.equal(oldAsset.digest, pinnedDigests.from, 'Source installer identity changed.');
+  assert.equal(newAsset.digest, pinnedDigests.to, 'Destination installer identity changed.');
   const oldInstaller = await download(oldAsset, path.join(root, oldAsset.name));
   let executable, installedAsar;
   if (platform() === 'win32') {

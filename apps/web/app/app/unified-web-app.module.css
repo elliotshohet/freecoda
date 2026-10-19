@@ -99,7 +99,7 @@
     padding: 0 12px;
     gap: 7px;
   }
-  .brand span {
+  .brand > span:last-child {
     display: none;
   }
   .views button {

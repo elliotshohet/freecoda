@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { headers } from "next/headers";
+import { requireAdmin } from "@/lib/admin";
+import { appUrl } from "@/lib/config";
 import { ArrowLeft } from "lucide-react";
 import { requireBrowserSession } from "@/lib/browser-session";
 import { SessionBoundary } from "@/components/session-boundary";
@@ -11,6 +14,8 @@ import styles from "./settings.module.css";
 export const metadata = { title: "Account & settings", robots: { index: false, follow: false } };
 export default async function Settings() {
   const user = await requireBrowserSession();
+  let admin = false;
+  try { await requireAdmin(new Request(`${appUrl()}/admin`, { headers: await headers() })); admin = true; } catch { /* Private metrics remain absent for other accounts. */ }
   return <SessionBoundary userId={user.id}>
     <main className={styles.shell} id="main">
       <header className={styles.topbar}>
@@ -24,6 +29,7 @@ export default async function Settings() {
           <a href="#preferences">Appearance & conversations</a>
           <a href="#connections">Connected repositories</a>
           <a href="#usage">Usage & devices</a>
+          {admin && <Link href="/admin">Business & operations</Link>}
         </nav>
         <div className={styles.content} tabIndex={0} aria-label="Account settings">
           <div className={styles.intro}>

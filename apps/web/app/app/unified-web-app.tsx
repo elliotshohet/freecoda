@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Mark } from "@/components/chrome";
+import { GitHubStars } from "@/components/github-stars";
 import { ThemeControl } from "@/components/theme-control";
 import { PanelLeft, SlidersHorizontal, UserRound } from "lucide-react";
 import Chat from "../chat/chat";
@@ -83,6 +84,7 @@ export function UnifiedWebApp({ initialView, initialThreadId }: { initialView: V
         </Link>
         <span className={styles.roomTitle}>Conversation & project</span>
         <div className={styles.headerActions}>
+          <GitHubStars />
           {view === "chat" && <button type="button" className={styles.headerButton} aria-label="Open chat history" title="Chat history" onClick={() => window.dispatchEvent(new CustomEvent("freecoda:chat-sidebar"))}><PanelLeft size={16} /></button>}
           <button type="button" className={styles.headerButton} aria-label="Choose model" title="Choose model · /model" onClick={() => window.dispatchEvent(new CustomEvent("freecoda:show-model", { detail: { view } }))}><SlidersHorizontal size={16} /><span>Model</span></button>
           <ThemeControl />
