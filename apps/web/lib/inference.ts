@@ -169,6 +169,23 @@ export function inferenceCancellation(req: Request, abortOnDisconnect = false) {
     },
   };
 }
+// A disconnected provider may never resolve its reader. Release only proven
+// zero-cost reservations directly on abort, independently of provider cleanup.
+export function releaseZeroCostOnAbort(signal: AbortSignal, release: () => Promise<unknown>) {
+  let pending: Promise<unknown> | undefined;
+  const onAbort = () => {
+    pending ??= Promise.resolve().then(release);
+    // The request path still awaits this promise where possible. Avoid an
+    // unhandled rejection when the HTTP consumer has already disconnected.
+    void pending.catch(() => {});
+  };
+  signal.addEventListener("abort", onAbort, { once: true });
+  if (signal.aborted) onAbort();
+  return {
+    wait: () => pending ?? Promise.resolve(),
+    dispose: () => signal.removeEventListener("abort", onAbort),
+  };
+}
 export async function executeInference(
   req: Request,
   user: { id: string },
@@ -210,6 +227,9 @@ export async function executeInference(
       await settle(reservation, 0, { generationId }, true);
     else await uncertain(reservation, generationId);
   }
+  const abortRelease = isVerifiedZeroCostFreeModel(config)
+    ? releaseZeroCostOnAbort(cancellation.signal, recordInterruptedReservation)
+    : undefined;
   async function record(
     result:
       | LanguageModelV4GenerateResult
@@ -231,6 +251,7 @@ export async function executeInference(
     if (body.operation === "generate") {
       const result = await model.doGenerate(options);
       await record(result);
+      abortRelease?.dispose();
       const { request: ignoredRequest, response, ...safe } = result;
       return json(
         sanitizeProviderResult({
@@ -282,6 +303,7 @@ export async function executeInference(
               encoder.encode(
                 JSON.stringify({
                   type: "error",
+                  retryable: isVerifiedZeroCostFreeModel(config),
                   error:
                     isVerifiedZeroCostFreeModel(config)
                       ? "Request interrupted. Its zero-cost reservation was released; you can retry."
@@ -291,12 +313,16 @@ export async function executeInference(
             );
             controller.close();
           }
+        } finally {
+          abortRelease?.dispose();
         }
       },
-      cancel() {
+      async cancel() {
         cancelled = true;
         cancellation.cancel();
-        // Continue consuming any final usage; a missing finish keeps the reservation uncertain.
+        await abortRelease?.wait();
+        // Continue consuming final usage. Paid reservations remain protected
+        // until the provider finishes or reconciliation confirms their cost.
       },
     });
     return new Response(stream, {
@@ -307,6 +333,7 @@ export async function executeInference(
       },
     });
   } catch (e) {
+    abortRelease?.dispose();
     await recordInterruptedReservation();
     throw e;
   }

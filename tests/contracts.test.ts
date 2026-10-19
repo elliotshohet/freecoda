@@ -59,7 +59,7 @@ test("trusted hosted calls preserve live cancellation signals", () => {
   controller.abort();
   expect(options.abortSignal?.aborted).toBe(true);
 });
-test("stale reservations release only for approved zero-cost Beam without a generation ID", () => {
+test("stale reservations release only for zero-cost Beam including interrupted generations", () => {
   const now = Date.now();
   const config = {
     id: "reflection/beam-free",
@@ -90,7 +90,7 @@ test("stale reservations release only for approved zero-cost Beam without a gene
       { ...reservation, generationId: "gateway-generation" },
       now,
     ),
-  ).toBe(false);
+  ).toBe(true);
   expect(
     canReleaseStaleFreeReservation({ ...reservation, maxCostMicros: 1 }, now),
   ).toBe(false);

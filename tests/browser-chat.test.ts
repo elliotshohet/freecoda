@@ -230,3 +230,42 @@ test("browser generation cancellation aborts upstream while CLI signals preserve
     server.stop(true);
   }
 });
+
+test("zero-cost cancellation releases independently of a stalled provider and only once", async () => {
+  const { releaseZeroCostOnAbort } = await import("../apps/web/lib/inference");
+  const controller = new AbortController();
+  let active = true;
+  let releases = 0;
+  const lifecycle = releaseZeroCostOnAbort(controller.signal, async () => {
+    releases++;
+    active = false;
+  });
+  expect(active).toBe(true);
+  controller.abort();
+  controller.abort();
+  await lifecycle.wait();
+  expect(active).toBe(false);
+  expect(releases).toBe(1);
+  lifecycle.dispose();
+
+  const alreadyAborted = new AbortController();
+  alreadyAborted.abort();
+  const late = releaseZeroCostOnAbort(alreadyAborted.signal, async () => { releases++; });
+  await late.wait();
+  expect(releases).toBe(2);
+  late.dispose();
+
+  const completed = new AbortController();
+  const normal = releaseZeroCostOnAbort(completed.signal, async () => { releases++; });
+  normal.dispose();
+  completed.abort();
+  await normal.wait();
+  expect(releases).toBe(2);
+});
+
+test("released free stream errors give retry feedback without exposing provider diagnostics", () => {
+  expect(publicChatPart({ type: "error", retryable: true, error: "private diagnostic" })).toEqual({
+    type: "error",
+    error: "The response was interrupted. You can retry or send your next message.",
+  });
+});

@@ -40,7 +40,6 @@ export function canReleaseStaleFreeReservation(
     row.source === "free" &&
     row.model === PREFERRED_FREE_MODEL &&
     Number(row.maxCostMicros) === 0 &&
-    row.generationId == null &&
     Number.isFinite(createdAt) &&
     createdAt <= now - 5 * 60 * 1000
   );
@@ -99,8 +98,19 @@ export async function reserve(
     // Zero-cost proof is captured at reservation time. Never infer it later
     // from a mutable model catalog when recovering a stale request.
     await db.query(
-      "UPDATE reservations SET status='released',actual_cost_micros=0,settled_at=now() WHERE user_id=$1 AND status IN ('pending','uncertain') AND source='free' AND model=$2 AND max_cost_micros=0 AND generation_id IS NULL AND created_at<=now()-interval '5 minutes'",
+      "UPDATE reservations SET status='released',actual_cost_micros=0,settled_at=now() WHERE user_id=$1 AND status IN ('pending','uncertain') AND source='free' AND model=$2 AND max_cost_micros=0 AND created_at<=now()-interval '5 minutes'",
       [userId, PREFERRED_FREE_MODEL],
+    );
+    // Older Beam Free requests reserved a one-micro allowance floor. Preserve
+    // that entire bound as spend rather than leaving an orphaned request
+    // blocking the account forever or assuming its historical cost was zero.
+    const legacy = await db.query(
+      "UPDATE reservations SET status='settled',actual_cost_micros=max_cost_micros,settled_at=now() WHERE user_id=$1 AND status='uncertain' AND source='free' AND model=$2 AND max_cost_micros=1 AND generation_id IS NULL AND created_at<=now()-interval '5 minutes' RETURNING user_id,day,month,max_cost_micros",
+      [userId, PREFERRED_FREE_MODEL],
+    );
+    for (const row of legacy.rows) await db.query(
+      "UPDATE usage_buckets SET reserved_micros=reserved_micros-$4,spent_micros=spent_micros+$4 WHERE (scope=$1 AND period=$2) OR (scope='global' AND period=$3)",
+      [row.user_id, row.day, row.month, row.max_cost_micros],
     );
     const day = utcDay(),
       month = utcMonth();

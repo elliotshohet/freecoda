@@ -202,7 +202,9 @@ export function publicChatPart(value: Record<string, any>) {
     return {
       type: "error",
       error:
-        "The response was interrupted. Usage is awaiting reconciliation; try again after it is resolved.",
+        value.retryable === true
+          ? "The response was interrupted. You can retry or send your next message."
+          : "The response was interrupted. Usage is awaiting reconciliation; try again after it is resolved.",
     };
   return null;
 }
