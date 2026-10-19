@@ -33,15 +33,16 @@ test('reads a replaced ASAR using its fresh header instead of cached offsets', a
 
 test('qualification accepts the reviewed current pair and rejects unreviewed releases/platforms', async () => {
   const { pinnedUpgrade } = await import('./upgrade-pins.mjs');
+  const workflow = await import('node:fs/promises').then(fs => fs.readFile(new URL('../../../.github/workflows/desktop-upgrade.yml', import.meta.url), 'utf8'));
+  const from = workflow.match(/from_version:[\s\S]*?default: (\d+\.\d+\.\d+)/)?.[1];
+  const to = workflow.match(/to_version:[\s\S]*?default: (\d+\.\d+\.\d+)/)?.[1];
+  assert(from && to, 'Workflow must select stable version defaults');
   for (const platform of ['linux', 'win32']) {
-    const pins = pinnedUpgrade('0.1.5', '0.1.6', platform);
+    const pins = pinnedUpgrade(from, to, platform);
     assert.match(pins.from, /^sha256:[0-9a-f]{64}$/);
     assert.match(pins.to, /^sha256:[0-9a-f]{64}$/);
     assert.notEqual(pins.from, pins.to);
   }
-  assert.throws(() => pinnedUpgrade('0.1.5', '0.1.7', 'linux'), /Unreviewed/);
-  assert.throws(() => pinnedUpgrade('0.1.5', '0.1.6', 'darwin'), /Unreviewed/);
-  const workflow = await import('node:fs/promises').then(fs => fs.readFile(new URL('../../../.github/workflows/desktop-upgrade.yml', import.meta.url), 'utf8'));
-  assert.match(workflow, /default: 0\.1\.5/);
-  assert.match(workflow, /default: 0\.1\.6/);
+  assert.throws(() => pinnedUpgrade(from, '999.999.999', 'linux'), /Unreviewed/);
+  assert.throws(() => pinnedUpgrade(from, to, 'darwin'), /Unreviewed/);
 });

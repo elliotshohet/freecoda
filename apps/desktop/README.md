@@ -10,11 +10,11 @@ Type `/project` to choose a folder, then `/build`, `/plan`, or `/review` to work
 
 ## Messages and avatars
 
-In the pending source build, closing the window keeps the workspace and active
+In desktop 0.1.8, closing the window keeps the workspace and active
 work available from the Freecoda system tray or macOS menu bar. Choose **Show
 Freecoda** to restore it, or **Quit Freecoda** to exit after the unsaved-work
 warning. This does not enable launch at login. Tray visibility on Linux depends
-on the desktop environment. This behavior is not part of installed 0.1.7.
+on the desktop environment. Older 0.1.7 installations keep their previous close behavior until updated.
 
 Hosted requests use the configured approved zero-price service. If it is unavailable, Freecoda reports the failure instead of silently switching to a paid service. The conversation interface does not expose provider names or a model selector.
 

@@ -7,7 +7,7 @@ A local coding agent with a full-screen terminal workspace, streamed replies, re
 Install the Freecoda CLI with Node.js 22 or newer:
 
 ```sh
-npm install --global freecoda
+npm install --global https://github.com/elliotshohet/freecoda/releases/download/cli-v0.1.8/freecoda-0.1.8.tgz --ignore-scripts
 freecoda --help
 freecoda login
 cd /path/to/project
@@ -34,7 +34,7 @@ The bundled Node entry point is `packages/cli/dist/index.js`; `bun run cli` runs
 
 ## Terminal workspace
 
-An interactive terminal opens the full-screen interface automatically. `--theme auto|dark|light` and `/theme auto|dark|light` save your preferred palette locally. Auto uses the terminal's `COLORFGBG` background hint when available, otherwise the dark palette. Both palettes inherit the terminal's background; Freecoda does not force a black screen or change your terminal profile. `NO_COLOR` remains respected. It shows the project directory, model, current mode, streamed conversation, tool activity, and approval diffs. Its composer supports multiline messages and input history. Type `/` to open the command menu, use Up/Down to choose, Enter to run, or Tab to complete. `/new` starts a saved task; `/resume` lists tasks for this project and `/resume <number or id>` reopens one. A labeled sponsor or Freecoda announcement stays in the footer.
+An interactive terminal opens the full-screen interface automatically. `--theme auto|dark|light` and `/theme auto|dark|light` save your preferred palette locally. Auto uses the terminal's `COLORFGBG` background hint when available, otherwise the dark palette. Both palettes inherit the terminal's background; Freecoda does not force a black screen or change your terminal profile. `NO_COLOR` remains respected. It shows the project directory, connection, current mode, streamed conversation, tool activity, and approval diffs. Its composer supports multiline messages and input history. Type `/` to open the command menu, use Up/Down to choose, Enter to run, or Tab to complete. `/new` starts a saved task; `/resume` lists tasks for this project and `/resume <number or id>` reopens one. A labeled sponsor or Freecoda announcement stays separate above the composer.
 
 | Control                                        | Action                                       |
 | ---------------------------------------------- | -------------------------------------------- |

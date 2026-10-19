@@ -42,6 +42,7 @@ function InstallCommand({ command, label }: { command: string; label: string }) 
 export function Install({ compact = false }: { compact?: boolean }) {
   const [localCommand, setLocalCommand] = useState<string | null>(null);
   useEffect(() => {
+    if (CLI_SHELL_INSTALLER_PUBLISHED) return;
     const { protocol, hostname, port } = window.location;
     if (protocol !== "http:" || port !== "3010" || !["localhost", "127.0.0.1"].includes(hostname)) return;
     const abort = new AbortController();
@@ -53,12 +54,13 @@ export function Install({ compact = false }: { compact?: boolean }) {
       .catch(() => {});
     return () => abort.abort();
   }, []);
-  const shell = Boolean(localCommand) || CLI_SHELL_INSTALLER_PUBLISHED;
-  const command = localCommand || (CLI_SHELL_INSTALLER_PUBLISHED ? CLI_SHELL_INSTALL_COMMAND : CLI_INSTALL_COMMAND);
+  const localPreview = !CLI_SHELL_INSTALLER_PUBLISHED && localCommand;
+  const shell = Boolean(localPreview) || CLI_SHELL_INSTALLER_PUBLISHED;
+  const command = CLI_SHELL_INSTALLER_PUBLISHED ? CLI_SHELL_INSTALL_COMMAND : localCommand || CLI_INSTALL_COMMAND;
   return (
     <div className={compact ? "install compact" : "install"}>
-      {localCommand && <p className="install-preview-label">Local shell installer preview · public deployment pending</p>}
-      <InstallCommand command={command} label={localCommand ? "local preview install command" : "install command"} />
+      {localPreview && <p className="install-preview-label">Local shell installer preview · public deployment pending</p>}
+      <InstallCommand command={command} label={localPreview ? "local preview install command" : "install command"} />
       {!CLI_SHELL_INSTALLER_PUBLISHED && !localCommand && <p className="install-preview-label">Shell installer deployment pending. This npm command uses the published CLI.</p>}
       <details className="install-alternatives">
         <summary>{shell ? "Prefer npm?" : "Preview the upcoming shell installer"}</summary>

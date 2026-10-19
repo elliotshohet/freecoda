@@ -3,10 +3,10 @@
 set -eu
 umask 077
 
-version=0.1.7
-artifact=freecoda-0.1.7.tgz
-expected=bce00de316eaf66a7732088d7cb47763b0d64cfa59f4f2206192f0510aeba1a9
-release=https://github.com/elliotshohet/freecoda/releases/download/cli-v0.1.7
+version=0.1.8
+artifact=freecoda-0.1.8.tgz
+expected=efa17cdfb12ff0c89b3a03ae95b785b099ffcdd5de4569156d880c4e9faa5451
+release=https://github.com/elliotshohet/freecoda/releases/download/cli-v0.1.8
 check_only=false
 case ${1-} in
   '') ;;

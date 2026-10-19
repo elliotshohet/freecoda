@@ -7,34 +7,41 @@ remain under Unreleased until publication and artifact verification are complete
 
 ## Unreleased
 
-### Desktop 0.1.8 (pending validation and publication)
+- Windows/Linux installed update qualification from 0.1.7 to 0.1.8 is pending; the published binaries and updater feeds are verified. Tray-menu clicking itself remains unqualified. macOS automatic installation requires Developer ID signing and notarization.
 
-- Align desktop and web presentation with the inspected public Freebuff interfaces using original Freecoda branding: compact navigation, project and conversation hierarchy, neutral transcripts, focused composers, and clearer welcome actions. Preserve existing account, permission, and repository boundaries.
+## Desktop 0.1.8 — 2026-10-19
 
-- Show the actual runtime version prominently at bottom left, labeling source runs as local development; offer GitHub sign-in there when signed out and retain the account avatar at bottom right.
-- Expand desktop account settings with authenticated repository access, cloud workspaces, local integrations, allowance, and connected devices, with explicit loading and failure states.
-- Refine native typography, conversation spacing, and accessible circular send/stop controls.
-- Keep the desktop workspace running from the system tray or macOS menu bar when its window closes; provide Show and explicit Quit actions. Tray behavior is pending live verification.
+[Release](https://github.com/elliotshohet/freecoda/releases/tag/v0.1.8)
+Source: `e0b0f3dc3052f800552038ea41123b3c8aab59a0`.
 
-- Remove the `/model` command and model selection controls from normal client flows, keeping hosted inference configured in the background.
-- Remove underlying model branding from desktop, CLI, and web interface readouts and help.
-- Existing routing, permissions, and provider configuration remain intact. Release artifacts and installed automatic updates are not yet verified.
+Checks and native packaging passed for Linux x64, Windows x64, Intel macOS, and Apple Silicon macOS. All 16 downloaded assets, SHA-256 checksums, sizes, and three SHA-512 updater feeds were verified before publication.
 
-### CLI 0.1.8 (pending validation and publication)
+- Align the desktop with a compact navigation rail, real project and conversation controls, neutral transcript, focused composer, and separate sponsor placement. Preserve account, permission, and repository boundaries.
+- Show the actual runtime version at bottom left, labeling source runs as local development; offer GitHub sign-in there when signed out and retain the account avatar at bottom right.
+- Expand authenticated account settings with profile, repository access, cloud workspaces, local integrations, allowance, and connected devices, with loading and failure states.
+- Closing the window now keeps the workspace in the tray or macOS menu bar. Show Freecoda restores it; Quit Freecoda (Ctrl+Q / Cmd+Q) confirms unsaved work and exits. No launch-at-login behavior is added.
+- Remove the normal model picker, `/model` command, and underlying model branding while retaining background inference configuration and privacy disclosures.
+- Migration and limits: choose Quit to permit a downloaded update to install. Builds are unsigned; macOS requires manual downloads while Developer ID signing/notarization are unavailable. Windows can show SmartScreen warnings. Clients 0.1.4 and older with the retired updater feed require a manual reinstall. Installed Windows/Linux update qualification is tracked above until completed.
 
-- Refine the terminal session header and bordered composer, keep sponsor messages separate above the input, and retain existing commands and approval behavior.
-- Remove `/model` and underlying model branding from interactive help, suggestions, and status output while preserving inference configuration.
-- Publication, artifact verification, and installed automatic updates remain pending.
+## CLI 0.1.8 — 2026-10-19
 
-### Web and local development (pending validation and publication)
+[Release](https://github.com/elliotshohet/freecoda/releases/tag/cli-v0.1.8)
+Source: `e0b0f3dc3052f800552038ea41123b3c8aab59a0`.
 
-- Rebuild the public welcome page around the reference page frame, product headline, actual desktop-source preview, desktop downloads, web entry, copyable CLI command, and source banner.
-- Add useful responsive Source, Download, CLI, Web, Pricing, Docs, and Advertise navigation, with persistent theme switching and real account state.
-- Add a dedicated GitHub sign-in screen and preserve safe local app/chat destinations. Canonicalize loopback hosts before OAuth state creation to prevent localhost/127.0.0.1 state-cookie mismatches.
-- Align pricing and advertiser pages while retaining the free beta, real allowances, and reviewed sponsorship inquiries; no subscription or self-service advertising billing is introduced.
-- Add a verified-checksum shell installer for published CLI 0.1.7. The loopback preview is available locally; the public installer endpoint is not deployed.
-- Support source Fast Refresh in Docker using narrow read-only mounts and separate generated-route caches. Limit web development to two CPU cores and poll every three seconds to reduce contention on the Mini.
-- Run the web development server natively on the Mini when preferred, retaining the existing local PostgreSQL container and data.
+The exact-source CI archive, package identity/version, public bytes, SHA-256 checksum, and size were verified. CI installed and smoke-checked the archive.
+
+- Refine the branded session header and bordered composer, with command-discovery hints and sponsor messages separated above input.
+- Remove `/model` and underlying model branding from normal help and status while preserving provider configuration, repository trust, approvals, conversation scopes, and account sync.
+- Migration and limits: Node.js 22+ and npm are required. The canonical GitHub archive is published; npm registry publication remains separate. Hosted access retains beta invitation and allowance requirements.
+
+## Web and local development — 2026-10-19
+
+- Rebuild the public welcome page around the inspected reference frame, product headline, authentic desktop-source preview, working download/web/install entries, and source banner. Keep Freecoda branding and truthful capabilities.
+- Add responsive Source, Download, CLI, Web, Pricing, Docs, and Advertise navigation, persistent theme switching, and real account state.
+- Add a dedicated GitHub sign-in screen with safe app/chat return paths. Canonicalize loopback hosts before creating OAuth state to fix localhost/127.0.0.1 cookie mismatches. Fresh local and production OAuth roundtrips passed.
+- Align web chat/workspace, pricing, and advertiser interfaces. Keep the free invite-only beta and reviewed sponsorship inquiries; no subscription or self-service advertising billing is introduced.
+- Publish a checksum-pinned shell installer and point downloads to verified desktop/CLI 0.1.8 assets. Public endpoint verification is required after deployment.
+- Support optional Docker source Fast Refresh with narrow read-only mounts, separate generated-route caches, two CPU cores, and three-second polling. The Mini's active web service runs natively, preserving the existing PostgreSQL container and data.
 
 ## Desktop 0.1.7 — 2026-10-19
 
