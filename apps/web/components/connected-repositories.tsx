@@ -15,17 +15,31 @@ export function ConnectedRepositories() {
   const [settings, setSettings] = useState<Setting[]>([]);
   const [installUrl, setInstallUrl] = useState("");
   const [error, setError] = useState("");
+  const [accessWarning, setAccessWarning] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const load = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true); setError("");
+    setLoading(true); setError(""); setAccessWarning(""); setLoaded(false);
     try {
-      const [access, configured] = await Promise.all([request("repos", undefined, signal), request("repositories", undefined, signal)]);
+      const [accessResult, configuredResult] = await Promise.allSettled([
+        request("repos", undefined, signal),
+        request("repositories", undefined, signal),
+      ]);
       if (signal?.aborted) return;
-      setRepos(access.repos || []); setSettings(configured.repositories || []);
+      if (configuredResult.status === "rejected") throw configuredResult.reason;
+      const configured = configuredResult.value;
+      setSettings(configured.repositories || []);
       setLoaded(true);
+      if (accessResult.status === "rejected") {
+        setRepos([]);
+        setAccessWarning("GitHub repository access could not be refreshed. You can still remove saved configurations below; reconnect the Freecoda GitHub App and refresh access to edit repository details.");
+        return;
+      }
+      const access = accessResult.value;
+      setRepos(access.repos || []);
+      if (access.warning) setAccessWarning(access.warning);
       const link = access.installUrl ? new URL(access.installUrl) : null;
       setInstallUrl(link?.protocol === "https:" && link.hostname === "github.com" && !link.username && !link.password && !link.search && !link.hash && /^\/apps\/[a-zA-Z0-9_-]+\/installations\/new$/.test(link.pathname) ? link.toString() : "");
     } catch (error) { if (!signal?.aborted) setError(error instanceof Error ? error.message : "Repository access is unavailable."); }
@@ -49,7 +63,7 @@ export function ConnectedRepositories() {
     <div className={styles.heading}><h2>Connected repositories</h2><button type="button" className="button secondary" disabled={busy || loading} onClick={() => void load()}><RefreshCw size={15} />Refresh access</button></div>
     <p>Choose your repositories, working branch, and app folder. These account settings are shared by the web, desktop app, and CLI. They do not clone code or grant local folder trust.</p>
     {installUrl && <p><a className="text-link" href={installUrl} target="_blank" rel="noopener noreferrer">Manage GitHub App repository access</a></p>}
-    {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
+    {error && <p role="alert">{error}</p>}{accessWarning && <p role="status">{accessWarning}</p>}{notice && <p role="status">{notice}</p>}
     {loading ? <p role="status">Loading repositories…</p> : <form onSubmit={save}>
       {!repos.length && <p>No repositories available. Connect the Freecoda GitHub App, then refresh access.</p>}
       {repos.map(repo => { const setting = settings.find(item => item.repositoryId === repo.repositoryId); return <fieldset key={`${repo.installationId}:${repo.repositoryId}`} className={styles.repository} disabled={busy}>
