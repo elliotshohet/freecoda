@@ -5,14 +5,15 @@ import Link from "next/link";
 import { Mark } from "@/components/chrome";
 import { GitHubStars } from "@/components/github-stars";
 import { ThemeControl } from "@/components/theme-control";
-import { PanelLeft, SlidersHorizontal, UserRound } from "lucide-react";
+import { UserAvatar } from "@/components/user-avatar";
+import { PanelLeft, SlidersHorizontal } from "lucide-react";
 import Chat from "../chat/chat";
 import { CloudWorkspace } from "./workspace";
 import styles from "./unified-web-app.module.css";
 
 type View = "chat" | "workspace";
 
-export function UnifiedWebApp({ initialView, initialThreadId }: { initialView: View; initialThreadId?: string }) {
+export function UnifiedWebApp({ initialView, initialThreadId, user }: { initialView: View; initialThreadId?: string; user: { name?: string | null; image?: string | null } }) {
   const [view, setView] = useState<View>(initialView);
   const shell = useRef<HTMLDivElement>(null);
   const [conversationBounds, setConversationBounds] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
@@ -88,7 +89,7 @@ export function UnifiedWebApp({ initialView, initialThreadId }: { initialView: V
           {view === "chat" && <button type="button" className={styles.headerButton} aria-label="Open chat history" title="Chat history" onClick={() => window.dispatchEvent(new CustomEvent("freecoda:chat-sidebar"))}><PanelLeft size={16} /></button>}
           <button type="button" className={styles.headerButton} aria-label="Choose model" title="Choose model · /model" onClick={() => window.dispatchEvent(new CustomEvent("freecoda:show-model", { detail: { view } }))}><SlidersHorizontal size={16} /><span>Model</span></button>
           <ThemeControl />
-          <Link className={styles.account} href="/settings" aria-label="Account & settings" title="Account & settings"><UserRound size={17} /><span>Account</span></Link>
+          <Link className={styles.account} href="/settings" aria-label="Account & settings" title="Account & settings"><UserAvatar image={user.image} name={user.name} /><span className={styles.accountLabel}>Account</span></Link>
         </div>
       </header>
       <div id="workspace-panel" className={styles.panels}>

@@ -1,6 +1,6 @@
 // Public GitHub archive and checksum verified before enabling installation.
 export const CLI_PUBLISHED = true;
-export const CLI_RELEASE_VERSION = "0.1.5";
+export const CLI_RELEASE_VERSION = "0.1.6";
 export const CLI_RELEASE_URL = `https://github.com/elliotshohet/freecoda/releases/tag/cli-v${CLI_RELEASE_VERSION}`;
 export const CLI_CHECKSUMS_URL = `https://github.com/elliotshohet/freecoda/releases/download/cli-v${CLI_RELEASE_VERSION}/SHA256SUMS.txt`;
 export const CLI_INSTALL_COMMAND = `npm install --global https://github.com/elliotshohet/freecoda/releases/download/cli-v${CLI_RELEASE_VERSION}/freecoda-${CLI_RELEASE_VERSION}.tgz --ignore-scripts`;

@@ -119,14 +119,18 @@ export default function Docs() {
         </p>
         <h2>Keep your CLI up to date</h2>
         <p>
-          The full-screen interface checks for updates in the background. Exit
-          your session before installing an update. No update is installed
-          automatically while an agent is working.
+          Starting with CLI 0.1.6, a writable global npm installation checks
+          GitHub and installs a verified update when your interactive session
+          closes normally. The next session uses the new version. Set
+          <code> FREECODA_AUTO_UPDATE=0</code> to disable automatic installation.
+          Source checkouts and project-local installations are left unchanged.
+          Install the current archive above once if you use CLI 0.1.5 or older.
         </p>
         <pre>{"freecoda update\nfreecoda update --install"}</pre>
         <p>
-          The first command checks npm; the second explicitly installs the
-          latest stable version globally. Freecoda does not use sudo. If npm
+          The first command checks GitHub; the second verifies the release
+          archive checksum and installs it with npm lifecycle scripts disabled.
+          Freecoda does not use sudo. If npm
           reports a permissions error, use a Node version manager or a
           user-owned npm prefix.
         </p>

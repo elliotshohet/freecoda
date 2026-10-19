@@ -110,11 +110,13 @@ node packages/cli/dist/index.js login
 node packages/cli/dist/index.js --cwd /path/to/project
 ```
 
-Install the current CLI from the [GitHub release archive](https://github.com/elliotshohet/freecoda/releases/tag/cli-v0.1.5), after checking its `SHA256SUMS.txt`:
+Install the current CLI from the [GitHub release archive](https://github.com/elliotshohet/freecoda/releases/tag/cli-v0.1.6), after checking its `SHA256SUMS.txt`:
 
 ```sh
-npm install --global https://github.com/elliotshohet/freecoda/releases/download/cli-v0.1.5/freecoda-0.1.5.tgz --ignore-scripts
+npm install --global https://github.com/elliotshohet/freecoda/releases/download/cli-v0.1.6/freecoda-0.1.6.tgz --ignore-scripts
 ```
+
+CLI 0.1.6 and newer automatically install checksum-verified GitHub updates after a normal interactive exit when installed in a writable global npm prefix. Set `FREECODA_AUTO_UPDATE=0` to opt out. Source and project-local installs are unchanged. Install the archive above once to upgrade older clients to this updater.
 
 The npm registry package may be an older version. Sign in to use the free sponsored hosted allowance without an API key. Hosted access requires server configuration and a beta invitation; daily and shared capacity limits apply. `login`, `usage`, and `hosted` connect to the hosted service when available.
 

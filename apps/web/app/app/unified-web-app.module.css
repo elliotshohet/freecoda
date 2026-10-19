@@ -111,7 +111,7 @@
   }
   .headerActions { gap: 6px; }
   .headerButton { padding: 7px; }
-  .headerButton span, .account span { display: none; }
+  .headerButton span, .accountLabel { display: none; }
   .headerActions :global(.theme-control) { gap: 2px; padding: 0; }
   .headerActions :global(.theme-control) > span:first-child { display: none; }
   .headerActions :global(.theme-control) select { width: 59px; min-width: 0; padding: 5px 1px; font-size: 10px; }
