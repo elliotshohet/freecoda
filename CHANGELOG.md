@@ -7,10 +7,14 @@ remain under Unreleased until publication and artifact verification are complete
 
 ## Unreleased
 
-### Desktop 0.1.7 — 2026-10-19 — Release pending
+No pending versioned client changes.
 
-[Canonical release](https://github.com/elliotshohet/freecoda/releases/tag/v0.1.7)
-(publication pending; artifacts and updater metadata are not yet verified).
+## Desktop 0.1.7 — 2026-10-19
+
+[Release](https://github.com/elliotshohet/freecoda/releases/tag/v0.1.7)
+Source: `c8ee625bc0fbe072c6d3973faf47a4946c4e2988`.
+
+Checks and Linux x64, Windows x64, macOS Intel, and macOS Apple Silicon native packaging passed. The 16 downloaded assets, SHA-256 checksums, sizes, and all three updater feeds were verified before publication.
 
 - Refine the desktop sidebar, conversation transcript, composer, account settings, and plugin/MCP management with neutral surfaces and accessible icon actions.
 - Group conversations under their local workspace, show repository details, and reopen previously selected folders without bypassing trust. Save outgoing conversation history before switching workspaces and retain drafts separately by conversation.
@@ -19,22 +23,21 @@ remain under Unreleased until publication and artifact verification are complete
 - Hide model names from normal headers while preserving model selection.
 - Align supported commands: saved-conversation `/resume`, fresh-conversation `/clear`, `/copy`, `/diff`, and working-directory inspection. Use `/start` for cloud compute where available. Unsupported Codex commands explain their limitations; this is not full Codex feature parity.
 - Remove the manual “Sync conversations” sidebar button while retaining account conversation sync.
-- Migration and limits: macOS installation remains a manual download while builds are unsigned and not notarized. Clients with the retired update feed require a manual reinstall. Cloud listing requires compatible server support and account access. Release validation and actual installed update behavior remain pending.
+- Migration and limits: macOS installation remains a manual download while builds are unsigned and not notarized. Clients with the retired update feed require a manual reinstall. Cloud listing requires compatible server support and account access. Windows installers are also unsigned. Actual installed automatic updates to 0.1.7 have not been qualified.
 
-### CLI 0.1.7 — 2026-10-19 — Release pending
+- Shared web interfaces include matching header controls, theme switching, repository details, and consistent saved-conversation versus cloud-compute commands.
 
-[Canonical release](https://github.com/elliotshohet/freecoda/releases/tag/cli-v0.1.7)
-(publication pending; archive bytes and checksums are not yet verified).
+## CLI 0.1.7 — 2026-10-19
+
+[Release](https://github.com/elliotshohet/freecoda/releases/tag/cli-v0.1.7)
+Source: `c8ee625bc0fbe072c6d3973faf47a4946c4e2988`.
+
+The CI-built archive, public download checksum, byte size, and packaged version were verified.
 
 - Hide model names from normal CLI headers while retaining explicit model selection.
 - Align supported conversation commands, including saved-conversation `/resume`, fresh-conversation `/clear`, `/copy`, `/diff`, and working-directory inspection. Unsupported Codex capabilities report explicit limitations instead of claiming feature parity.
 - Improve plugin, MCP server, and skill inventories with accurate installed/enabled states and management commands.
-- Migration and limits: existing folder trust and command approvals still apply. GitHub release archives and npm registry publication are separate; this entry does not claim npm publication, verified installed updates, or completed release validation.
-
-### Web changes — Unreleased
-
-- Hide model names from normal headers, retain explicit model selection, and refine consistent accessible header controls and light/dark switching.
-- Show repository details and the current project conversation in cloud workspaces; distinguish saved-conversation `/resume` from cloud-compute `/start`.
+- Migration and limits: existing folder trust and command approvals still apply. GitHub release archives and npm registry publication are separate; npm registry publication and actual installed automatic updates to 0.1.7 remain unqualified.
 
 ## Desktop 0.1.6 — 2026-10-19
 
