@@ -60,8 +60,13 @@ test.skipIf(process.platform === "win32")(
       );
       for (let i = 0; i < 500; i++) {
         try {
-          pid = Number(await readFile(pidFile, "utf8"));
-          break;
+          const candidate = Number(await readFile(pidFile, "utf8"));
+          // File creation precedes its contents becoming visible on macOS.
+          // An empty read is zero, not a ready child process.
+          if (Number.isSafeInteger(candidate) && candidate > 0) {
+            pid = candidate;
+            break;
+          }
         } catch {}
         await new Promise((resolve) => setTimeout(resolve, 10));
       }

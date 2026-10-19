@@ -84,12 +84,20 @@ finally:
  os.close(master)
 `;
   try {
+    // A clean checkout has no dist bundle; do not depend on another test's
+    // build having run first.
+    const build = Bun.spawn([process.execPath, "packages/cli/build.ts"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const buildOutput = await new Response(build.stderr).text();
+    expect(await build.exited, buildOutput).toBe(0);
     await writeFile(path.join(dir, "config.json"), JSON.stringify({ server: server.url.origin, provider: { baseURL: `${server.url.origin}/v1`, model: "fixture" }, trustedRoots: [] }));
     const script = path.join(dir, "driver.py");
     await writeFile(script, driver);
-    const process = Bun.spawn(["python3", script, path.resolve("packages/cli/dist/index.js"), dir], { stdout: "pipe", stderr: "pipe" });
-    const [output, error] = await Promise.all([new Response(process.stdout).text(), new Response(process.stderr).text()]);
-    expect(await process.exited, error).toBe(0);
+    const driverProcess = Bun.spawn(["python3", script, path.resolve("packages/cli/dist/index.js"), dir], { stdout: "pipe", stderr: "pipe" });
+    const [output, error] = await Promise.all([new Response(driverProcess.stdout).text(), new Response(driverProcess.stderr).text()]);
+    expect(await driverProcess.exited, error).toBe(0);
     expect(output).toContain("queue PTY passed");
     expect(requests).toEqual(["ONE", "TWO", "THREE", "FAIL", "FAIL", "AFTER", "CANCEL", "CANCEL", "AFTER_CANCEL"]);
   } finally { await server.stop(true); await rm(dir, { recursive: true, force: true }); }
