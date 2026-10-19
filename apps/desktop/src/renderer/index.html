@@ -15,11 +15,6 @@
   <body>
     <a class="skip" href="#prompt">Skip to conversation</a>
     <header class="titlebar">
-      <div class="wordmark">
-        <img src="./logo.svg" alt="" width="28" height="28" /><strong
-          >freecoda</strong
-        ><span class="beta">desktop</span>
-      </div>
       <div class="workspace-switch" role="tablist" aria-label="Workspace type">
         <button role="tab" aria-selected="true" id="local-tab">
           On this computer</button
@@ -31,16 +26,22 @@
         </button>
       </div>
       <div class="titlebar-actions">
-        <label class="theme-control"
-          ><span class="sr-only">Color theme</span
-          ><select id="theme-select" aria-label="Color theme">
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select></label
-        ><button class="account-button" id="github-repos-open" aria-haspopup="dialog">Repositories</button><button class="account-button" id="extensions-open" aria-haspopup="dialog">Tools &amp; skills</button><button class="account-button" id="account-open">
-          <span class="account-dot"></span
-          ><span id="account-label">Your account</span>
+        <button id="theme-toggle" type="button" class="theme-control" aria-label="Switch to dark mode" title="Switch to dark mode">
+          <svg class="titlebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path id="theme-dark-icon" d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"/>
+            <g id="theme-light-icon" hidden><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></g>
+          </svg>
+        </button>
+        <button class="account-button titlebar-icon-button" id="github-repos-open" aria-haspopup="dialog" aria-label="GitHub repositories" title="GitHub repositories">
+          <svg class="titlebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 3v18m4-13h4m-4 4h4m-4 4h2"/></svg>
+        </button>
+        <button class="account-button titlebar-icon-button" id="extensions-open" aria-haspopup="dialog" aria-label="Plugins" title="Plugins">
+          <svg class="titlebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v5m8-5v5M6 8h12v4a6 6 0 0 1-12 0V8Zm6 10v4"/></svg>
+        </button>
+        <button class="account-button titlebar-icon-button" id="account-open" title="Your account" aria-labelledby="account-label">
+          <svg class="titlebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg>
+          <span class="account-dot" aria-hidden="true"></span>
+          <span id="account-label" class="sr-only">Your account</span>
         </button>
       </div>
     </header>
@@ -55,55 +56,40 @@
         aria-label="Projects and conversations"
         id="project-sidebar"
       >
-        <div class="sidebar-heading">
-          <span id="sidebar-heading-label">Conversations</span
-          ><button
-            id="open-folder"
-            class="icon-button"
-            title="Open a folder"
-            aria-label="Open a folder"
-          >
-            ＋
-          </button>
-        </div>
-        <button id="folder-picker" class="folder-picker">
-          <span class="folder-icon" aria-hidden="true">▱</span
-          ><span id="folder-name">Open a project folder</span
-          ><span aria-hidden="true">⌄</span>
-        </button>
-        <p id="folder-path" class="folder-path">
-          Your files stay on this computer.
-        </p>
-        <button id="sidebar-new-task" class="sidebar-action">
-          <span aria-hidden="true">＋</span> New task
-        </button>
-        <button id="current-thread" class="thread-link" aria-current="page">
-          <span aria-hidden="true">◌</span>
-          <span id="thread-title">Current conversation</span>
-        </button>
-        <div id="coding-section-label" class="sidebar-section-label">Your workspace</div>
-        <button id="sidebar-files" class="sidebar-action">
-          <span aria-hidden="true">▱</span> Files & changes
-        </button>
-        <button id="sidebar-output" class="sidebar-action">
-          <span aria-hidden="true">›_</span> Terminal & activity
-        </button>
-        <button id="refresh-conversations" class="quiet-button" type="button">Sync conversations</button>
-        <label class="chat-history-search"
-          >Search conversations<input
-            id="thread-search"
-            type="search"
-            placeholder="Search chats"
-        /></label>
-        <div
-          id="thread-history"
-          class="thread-history"
-          aria-label="Saved conversations"
-        ></div>
-        <div class="sidebar-bottom">
-          <span class="local-dot"></span> Local workspace
-          <span class="free-badge">Free</span>
-        </div>
+        <div class="sidebar-brand"><img src="./logo.svg" alt="" width="26" height="26" /><span>Freecoda</span></div>
+        <nav class="sidebar-primary" aria-label="Conversation navigation">
+          <button id="sidebar-general-chat" class="sidebar-action"><span aria-hidden="true">◌</span> General chat</button>
+          <button id="open-folder" class="sidebar-action" title="Open a local folder"><span aria-hidden="true">＋</span> Open folder…</button>
+        </nav>
+        <div class="sidebar-heading"><span id="sidebar-heading-label">Workspaces</span></div>
+        <div id="workspace-list" class="workspace-list" aria-label="Recent local workspaces"></div>
+        <section id="selected-workspace" class="workspace-context" aria-label="Selected workspace details" hidden>
+          <span id="workspace-kind" class="sr-only">Local workspace</span>
+          <strong id="folder-name" class="sr-only"></strong>
+          <details class="workspace-info"><summary>Folder details</summary><p id="folder-path" class="folder-path"></p><p id="workspace-details" class="workspace-details"></p></details>
+          <div id="workspace-tools" class="workspace-tool-actions">
+            <span id="coding-section-label" class="sr-only">Workspace tools</span>
+            <button id="sidebar-files" class="sidebar-action"><span aria-hidden="true">▱</span> Files & changes</button>
+            <button id="sidebar-output" class="sidebar-action"><span aria-hidden="true">›_</span> Terminal & activity</button>
+          </div>
+        </section>
+        <section class="cloud-workspace-section" aria-labelledby="cloud-workspaces-title">
+          <div class="sidebar-heading"><span id="cloud-workspaces-title">Cloud workspaces</span><button id="cloud-workspaces-refresh" class="icon-button" aria-label="Refresh cloud workspaces" title="Refresh cloud workspaces">↻</button></div>
+          <p class="workspace-empty">Cloud environments open in your browser.</p>
+          <div id="cloud-workspace-list" aria-live="polite"></div>
+        </section>
+        <div id="general-conversations"></div>
+        <section id="workspace-conversations" class="workspace-conversations" aria-labelledby="conversation-scope-label">
+          <h2 id="conversation-scope-label" class="sidebar-section-label">General conversations</h2>
+          <button id="sidebar-new-task" class="sidebar-action"><span aria-hidden="true">＋</span> New conversation</button>
+          <button id="current-thread" class="thread-link" aria-current="page"><span id="thread-title">New conversation</span></button>
+          <label class="chat-history-search"><span class="sr-only">Search current conversations</span><input id="thread-search" type="search" placeholder="Search conversations…" /></label>
+          <div id="thread-history" class="thread-history" aria-label="Saved conversations"></div>
+        </section>
+        <nav class="sidebar-bottom sidebar-settings" aria-label="Settings and connections">
+          <button id="sidebar-plugins" class="sidebar-action"><span aria-hidden="true">◇</span> Plugins & MCP</button>
+          <button id="sidebar-account" class="sidebar-action"><span aria-hidden="true">⚙</span> Account & settings</button>
+        </nav>
       </aside>
       <section
         class="editor-pane"
@@ -156,13 +142,14 @@
           <div class="welcome-logo">
             <img src="./logo.svg" alt="" width="76" height="76" />
           </div>
-          <h1>Your project files</h1>
-          <p>Choose a file to read or edit it alongside your conversation.</p>
+          <h1 id="files-overview-title">Your project files</h1>
+          <p id="files-overview-description">Choose a file to read or edit it alongside your conversation.</p>
           <button id="welcome-open" class="button purple">
             Open a project folder</button
           ><span class="welcome-note"
             >Your editor. Your repository. Your approval.</span
           >
+          <div id="files-overview-list" class="files-overview-list"></div>
           <div class="welcome-shortcuts">
             <span><kbd>⌘O</kbd> Open folder</span
             ><span><kbd>⌘S</kbd> Save file</span>
@@ -244,7 +231,7 @@ Command output will appear here. Your permission preset controls local command e
           </div>
         </section>
       </section>
-      <section class="agent-pane" aria-label="Coding agent">
+      <section class="agent-pane" aria-label="Ask Coda">
         <div class="agent-header">
           <div>
             <span class="agent-star" aria-hidden="true">✳</span
@@ -257,21 +244,23 @@ Command output will appear here. Your permission preset controls local command e
               aria-label="Toggle project sidebar"
               aria-expanded="true"
             >
-              ☰</button
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18"/></svg></button
             ><button
               id="toggle-workbench"
-              class="small-button"
+              class="icon-button"
+              aria-label="Toggle project tools"
+              title="Project tools"
               aria-expanded="false"
               aria-controls="workbench"
             >
-              Project tools</button
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 5-5 7 5 7m8-14 5 7-5 7m-3-16-2 18"/></svg></button
             ><button
               id="new-chat"
               class="icon-button"
               aria-label="Start a new conversation"
               title="New conversation"
             >
-              ＋
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5H5v14h14v-7M15 4l5 5m-9 4 8-8a2 2 0 0 1 3 3l-8 8-4 1z"/></svg>
             </button>
           </div>
         </div>
@@ -288,10 +277,10 @@ Command output will appear here. Your permission preset controls local command e
           aria-relevant="additions text"
         >
           <div id="chat-welcome" class="chat-welcome">
-            <span class="agent-star" aria-hidden="true">✳</span>
+            <img class="welcome-brand" src="./logo.svg" alt="Freecoda" width="42" height="42" />
             <h2 id="chat-welcome-title">What can I help with?</h2>
             <p id="chat-welcome-description">
-              A little room to think, write, and build.
+              Ask anything, or type / to work with a project.
             </p>
             <div class="prompt-suggestions">
               <button
@@ -336,16 +325,21 @@ Command output will appear here. Your permission preset controls local command e
           ><span id="working-text">Working in your project…</span>
         </div>
         <form id="chat-form" class="composer">
+          <div id="slash-menu" class="slash-menu" role="listbox" aria-label="Conversation commands" hidden></div>
           <label class="sr-only" for="prompt">Message Freecoda</label
           ><textarea
             id="prompt"
+            aria-autocomplete="list"
+            aria-controls="slash-menu"
+            aria-expanded="false"
             rows="3"
             maxlength="20000"
             placeholder="Message Freecoda…"
             disabled
           ></textarea>
           <div class="composer-controls">
-            <label
+            <button id="commands-open" type="button" class="commands-button" aria-label="Show slash commands" title="Show slash commands">/</button>
+            <label hidden
               ><span class="sr-only">Agent mode</span
               ><select id="mode" aria-label="Conversation mode">
                 <option value="chat" selected>Chat</option>
@@ -361,7 +355,7 @@ Command output will appear here. Your permission preset controls local command e
               title="Change permissions with /permissions"
             >
               Default permissions</button
-            ><span id="model-label" class="model-label">Freecoda model</span
+            ><span id="model-label" class="model-label" hidden></span
             ><span class="composer-hint">Enter to send · Ctrl+Enter to queue · Shift+Enter for a new line</span
             ><button id="send" type="submit" class="send" disabled>
               Send <span aria-hidden="true">↑</span></button
@@ -375,7 +369,7 @@ Command output will appear here. Your permission preset controls local command e
           <span aria-hidden="true">◇</span> You approve every file change and
           shell command.
         </p>
-        <p class="model-privacy-note" id="model-privacy-note">Hosted Beam Free may retain prompts and code and use them for training. Do not send sensitive content.</p>
+        <p class="model-privacy-note" id="model-privacy-note" hidden></p>
         <aside
           class="house-ad"
           id="sponsor-placement"
@@ -388,6 +382,7 @@ Command output will appear here. Your permission preset controls local command e
           </p>
           <button id="sponsor-info" class="quiet-button">Learn more ↗</button>
         </aside>
+        <footer class="account-footer"><button id="account-avatar-open" type="button" aria-label="Account & settings"><span id="account-avatar" class="account-avatar" aria-hidden="true">U</span><span id="account-footer-label">Sign in</span></button></footer>
       </section>
     </main>
     <dialog
@@ -522,29 +517,65 @@ Command output will appear here. Your permission preset controls local command e
       </div>
       <p class="approval-footer">↑ ↓ to navigate · Enter to select · Esc to decline</p>
     </dialog>
-    <dialog id="github-repos-dialog" aria-labelledby="github-repos-title">
+    <dialog id="github-repos-dialog" class="settings-dialog" aria-labelledby="github-repos-title">
       <button id="github-repos-close" class="dialog-close" aria-label="Close repositories">×</button>
-      <h2 id="github-repos-title">Connected repositories</h2>
+      <span class="settings-eyebrow">Connections</span>
+      <h2 id="github-repos-title">GitHub repositories</h2>
       <p>Choose the GitHub repositories available to your hosted account. Branch and app folder preferences sync across your devices. Local folders still require explicit trust; saving does not clone a repository.</p>
       <p>If account authorization expires, reconnect your GitHub account in Freecoda settings. App installation access is managed separately.</p>
       <div class="dialog-actions"><button id="github-reconnect" class="button secondary">Reconnect GitHub account</button><button id="github-connect" class="button secondary">Manage GitHub App access</button><button id="github-repos-refresh" class="button secondary">Refresh access</button></div>
-      <form id="github-repos-form"><div id="github-repos-list"></div><div class="dialog-actions"><button id="github-repos-save" type="submit" class="button secondary">Save preferences</button></div></form>
+      <label class="repository-search">Find a repository<input id="github-repos-search" type="search" placeholder="Search owner or repository" autocomplete="off" /></label><p id="github-repos-results" role="status"></p><form id="github-repos-form"><div id="github-repos-list"></div><div class="dialog-actions"><button id="github-repos-save" type="submit" class="button secondary">Save preferences</button></div></form>
       <p id="github-repos-status" role="status"></p>
     </dialog>
-    <dialog id="extensions-dialog" aria-labelledby="extensions-title" aria-describedby="extensions-description">
-      <button class="dialog-close" id="extensions-close" aria-label="Close tools and skills">×</button>
-      <h2 id="extensions-title">Tools &amp; skills</h2>
-      <p id="extensions-description">Connect an MCP tool server or install a SKILL.md instruction file. Installation saves configuration only. Enabled skills apply to coding tasks; MCP tools are available in Build mode. General Chat stays tool-free.</p>
-      <div id="extensions-list" aria-live="polite"></div>
-      <form id="extensions-form" class="extensions-form">
-        <label>Type<select id="extension-kind"><option value="skill">Skill · SKILL.md</option><option value="mcp">MCP tool server · HTTP</option></select></label>
-        <label>Name<input id="extension-name" required maxlength="80" placeholder="My extension" /></label>
-        <label>SKILL.md path or HTTPS URL / MCP HTTPS URL<input id="extension-url" type="text" required placeholder="https://example.com/SKILL.md" /></label>
-        <p>Only install instructions and tools you trust. MCP calls may share task context with the server. Tool actions still require your approval.</p>
-        <button id="extension-install" class="button secondary" type="submit">Install extension</button>
-      </form>
+    <dialog id="extensions-dialog" class="settings-dialog" aria-labelledby="extensions-title" aria-describedby="extensions-description">
+      <button class="dialog-close" id="extensions-close" aria-label="Close plugins">×</button>
+      <span class="settings-eyebrow">Customization</span>
+      <h2 id="extensions-title">Plugins &amp; tools</h2>
+      <p id="extensions-description">Add skills and MCP tool servers to your coding workspace. General chat stays tool-free.</p>
+      <div class="settings-nav" role="group" aria-label="Plugin categories">
+        <button type="button" data-extension-view="all" aria-pressed="true">All</button>
+        <button type="button" data-extension-view="plugins" aria-pressed="false">Plugins</button>
+        <button type="button" data-extension-view="mcp" aria-pressed="false">MCP servers</button>
+        <button type="button" data-extension-view="skills" aria-pressed="false">Skills</button>
+        <button type="button" data-extension-view="tools" aria-pressed="false">Tools</button>
+      </div>
+      <section id="desktop-extension-section" class="settings-section" aria-labelledby="extensions-list-title">
+        <h3 id="extensions-list-title">Installed skills &amp; servers</h3>
+        <p class="settings-help">Manage each skill and server below. Installing a server saves its configuration; it does not establish a persistent connection.</p>
+        <div id="extensions-list" aria-live="polite"></div>
+      </section>
+      <section id="desktop-plugin-section" class="settings-section" aria-labelledby="add-plugin-heading">
+        <h3 id="add-plugin-heading">Plugin bundles</h3>
+        <div id="plugin-bundles" aria-live="polite"></div>
+        <p class="settings-help">Review the skills and servers in a manifest before installing them together.</p>
+        <form id="plugin-form" class="extensions-form">
+          <label for="plugin-source">Manifest URL</label><input id="plugin-source" type="url" placeholder="https://example.com/plugin.json" required />
+          <button id="plugin-preview" type="submit" class="button secondary">Review plugin</button>
+        </form>
+        <section id="plugin-review" class="settings-review" aria-labelledby="plugin-review-name" hidden>
+          <span class="settings-eyebrow">Review installation</span><h3 id="plugin-review-name"></h3><p id="plugin-review-source"></p>
+          <p>Review every skill source and MCP server. Installation does not connect a server or execute a tool.</p>
+          <ul id="plugin-review-members"></ul>
+          <div class="dialog-actions"><button id="plugin-confirm" type="button" class="button secondary">Install reviewed plugin</button><button id="plugin-cancel" type="button" class="button secondary">Cancel</button></div>
+        </section>
+        <p id="plugin-error" role="alert" hidden></p>
+      </section>
+      <section class="settings-section" aria-labelledby="add-extension-heading">
+        <h3 id="add-extension-heading">Add a skill or MCP server</h3>
+        <p class="settings-help">Skills provide instructions for coding tasks. MCP servers provide tools available in Build mode.</p>
+        <form id="extensions-form" class="extensions-form">
+          <label for="extension-kind">Type</label><select id="extension-kind"><option value="skill">Skill · SKILL.md</option><option value="mcp">MCP tool server · HTTP</option></select>
+          <label for="extension-name">Name</label><input id="extension-name" required maxlength="80" placeholder="My extension" />
+          <label for="extension-url">Source</label><input id="extension-url" type="text" required placeholder="Local SKILL.md path or HTTPS URL" aria-describedby="extension-source-help" />
+          <p id="extension-source-help" class="settings-help">For a skill, enter a local SKILL.md path or HTTPS URL. For an MCP server, enter its HTTPS endpoint.</p>
+          <p id="extension-error" role="alert" hidden></p>
+          <p class="settings-help">Only install sources you trust. MCP calls can share task context with the server. Tool actions still require approval.</p>
+          <button id="extension-install" class="button secondary" type="submit">Install extension</button>
+        </form>
+      </section>
     </dialog>
-    <dialog id="account-dialog" aria-labelledby="account-title">
+    <dialog id="skill-reader" class="settings-dialog" aria-labelledby="skill-reader-title"><button id="skill-reader-close" class="dialog-close" aria-label="Close skill instructions">×</button><span class="settings-eyebrow">Installed skill</span><h2 id="skill-reader-title">Skill instructions</h2><p>Installed instructions are reference material. Reading them does not grant tool access.</p><pre id="skill-reader-content" tabindex="0" aria-label="Installed skill instructions"></pre></dialog>
+    <dialog id="account-dialog" class="settings-dialog" aria-labelledby="account-title">
       <button
         class="dialog-close"
         id="account-close"
@@ -552,8 +583,8 @@ Command output will appear here. Your permission preset controls local command e
       >
         ×
       </button>
-      <div class="dialog-icon" aria-hidden="true">◉</div>
-      <h2 id="account-title">A little room to build.</h2>
+      <span class="settings-eyebrow">Settings</span>
+      <h2 id="account-title">Your account</h2>
       <p>One free plan. Sponsor supported. No card required.</p>
       <div id="account-state" class="account-state">Loading your account…</div>
       <div id="usage-view" hidden>
@@ -588,7 +619,7 @@ Command output will appear here. Your permission preset controls local command e
         needed for your task.
       </p>
     </dialog>
-    <dialog id="model-dialog" aria-labelledby="model-title">
+    <dialog id="model-dialog" class="settings-dialog" aria-labelledby="model-title">
       <h2 id="model-title">Free model</h2>
       <p>Changes apply to your next request. Only configured free models are available.</p>
       <div id="model-options"></div>

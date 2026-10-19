@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import { codexUnsupportedCommand } from "@freecoda/contracts";
 import path from "node:path";
 import { realpath } from "node:fs/promises";
 import { platform, arch } from "node:os";
@@ -14,6 +15,9 @@ import {
   loadExtensionRegistry,
   saveExtensionRegistry,
   installSkill,
+  fetchPluginManifest,
+  installPlugin,
+  removePlugin,
   installMcpServer,
   setExtensionEnabled,
   removeExtension,
@@ -59,6 +63,9 @@ import {
 import { AccountThreadSync } from "./cloud-threads";
 import { createHash } from "node:crypto";
 import { registerRepoCommands } from "./repos";
+import { prepareInteractiveUpdate } from "./interactive-update";
+import { extensionInventory, extensionRequest, showExtension } from "./extension-commands";
+import { copyAssistantText, latestAssistantText, workspaceDiff } from "./native-commands";
 import { SessionTools } from "./session-tools";
 import { approvedFreeModels } from "./models";
 const program = new Command()
@@ -125,6 +132,9 @@ extensionCommand
       ),
     ),
   );
+extensionCommand.command("show <id>").description("Read an installed skill or MCP connection").action(async (id: string) => {
+  console.log(safeTerminalText(showExtension(await loadExtensionRegistry(extensionFile()), id)));
+});
 extensionCommand
   .command("add-skill <source>")
   .description(
@@ -167,6 +177,21 @@ for (const operation of ["enable", "disable", "remove"] as const)
     );
     console.log(`Extension ${operation}d.`);
   });
+const pluginCommand = program.command("plugins").description("Review and install plugin manifests containing MCP connections and skills");
+pluginCommand.command("list").action(async () => console.log(JSON.stringify((await loadExtensionRegistry(extensionFile())).plugins || [], null, 2)));
+pluginCommand.command("add <url>").description("Review a bounded HTTPS JSON plugin manifest before explicitly confirming installation").action(async (url: string) => {
+  const manifest = await fetchPluginManifest(url, { allowLocal: true });
+  console.log(safeTerminalText(JSON.stringify(manifest, null, 2)));
+  console.log("This installs local skill guidance and MCP connections. No scripts run and no execution permissions are granted.");
+  if (await ask("Type install to approve this plugin bundle, or Enter to cancel: ") !== "install") { console.log("Installation cancelled."); return; }
+  const registry = await installPlugin(await loadExtensionRegistry(extensionFile()), { manifest, source: url, allowLocal: true });
+  await saveExtensionRegistry(extensionFile(), registry);
+  console.log("Plugin installed locally. Existing trust and execution approvals still apply.");
+});
+pluginCommand.command("remove <id>").action(async (id: string) => {
+  await saveExtensionRegistry(extensionFile(), removePlugin(await loadExtensionRegistry(extensionFile()), id));
+  console.log("Plugin and its bundled extensions removed.");
+});
 program
   .command("login")
   .option("--server <url>", "Freecoda server", "https://freecoda.com")
@@ -475,6 +500,8 @@ program
       defaultMode = next;
       screen?.setMode(permissions.effectiveMode(defaultMode));
     }
+    let requestedUpdate: string | undefined;
+    let explicitUpdateRequested = false;
     try {
       for (;;) {
         let input: string;
@@ -505,7 +532,8 @@ program
         if (input === "/mcp" || input.startsWith("/mcp ") || input === "/tools" || input.startsWith("/tools ")) {
           try {
             const registry = await loadExtensionRegistry(extensionFile());
-            if (input.startsWith("/mcp")) {
+            if (input === "/mcp") notice(safeTerminalText(extensionInventory(registry, "", "mcp")));
+            else if (input.startsWith("/mcp")) {
               const result = await sessionTools.mcp(input.slice(4), registry);
               if (result.registry !== registry) await saveExtensionRegistry(extensionFile(), result.registry);
               notice(result.message);
@@ -521,17 +549,48 @@ program
           if (opts.prompt) break;
           continue;
         }
-        if (input === "/extensions") {
-          notice(
-            JSON.stringify(
-              publicExtensions(await loadExtensionRegistry(extensionFile())),
-              null,
-              2,
-            ),
-          );
-          notice(
-            "Manage with: freecoda extensions add-skill <source> | add-mcp <name> <url> | enable/disable/remove <id>. Chat never uses extensions; Agent mode asks before external tool calls.",
-          );
+        if (input === "/plugins" || input.startsWith("/plugins ")) {
+          try {
+            const argument = input.slice(8).trim();
+            const registry = await loadExtensionRegistry(extensionFile());
+            if (!argument) notice(safeTerminalText(extensionInventory(registry, "", "plugins")));
+            else if (argument.startsWith("install ")) {
+              if (opts.prompt || !process.stdin.isTTY) throw new Error("Plugin installation requires interactive review.");
+              const source = argument.slice(8).trim();
+              const manifest = await fetchPluginManifest(source, { allowLocal: true });
+              notice(safeTerminalText(JSON.stringify(manifest, null, 2)) + "\nInstalls local skill guidance and MCP connections. No scripts run and no execution permissions are granted.");
+              if (await ask("Type install to approve this bundle, or Enter to cancel: ") === "install") {
+                await saveExtensionRegistry(extensionFile(), await installPlugin(registry, { manifest, source, allowLocal: true }));
+                notice("Plugin installed locally. Existing trust and execution approvals still apply.");
+              } else notice("Installation cancelled.");
+            } else throw new Error("Use /plugins or /plugins install <manifest URL>.");
+          } catch (e) { error(redactSecrets(e instanceof Error ? e.message : "Could not manage plugins.")); }
+          if (opts.prompt) break;
+          continue;
+        }
+        let extensionAction;
+        try { extensionAction = extensionRequest(input); }
+        catch (e) { error(e instanceof Error ? e.message : "Invalid extension command."); if (opts.prompt) break; continue; }
+        if (extensionAction) {
+          try {
+            const registry = await loadExtensionRegistry(extensionFile());
+            if (extensionAction.action === "show") notice(safeTerminalText(showExtension(registry, extensionAction.id)));
+            else if (extensionAction.action === "list") {
+              notice(safeTerminalText(extensionInventory(registry, extensionAction.query)));
+            } else {
+              if (opts.prompt || !process.stdin.isTTY) throw new Error("Installation requires an interactive session, or use the explicit freecoda extensions add-skill/add-mcp command.");
+              const detail = extensionAction.action === "install-skill" ? `skill from ${extensionAction.source}` : `MCP connection ${extensionAction.name} at ${extensionAction.url}`;
+              notice(safeTerminalText(`Install and enable local ${detail}? Third-party guidance and tools are untrusted. No installation scripts run; existing execution approvals still apply.`));
+              if ((await ask("Type install to confirm, or Enter to cancel: ")) === "install") {
+                const next = extensionAction.action === "install-skill"
+                  ? await installSkill(registry, { source: extensionAction.source, allowLocal: true })
+                  : installMcpServer(registry, { name: extensionAction.name, url: extensionAction.url });
+                await saveExtensionRegistry(extensionFile(), next);
+                notice("Installed locally. Use /extensions to browse. Coding tools still require project trust and execution permissions.");
+              } else notice("Installation cancelled.");
+            }
+          } catch (e) { error(redactSecrets(e instanceof Error ? e.message : "Could not manage extensions.")); }
+          if (opts.prompt) break;
           continue;
         }
         if (input === "/permissions" || input.startsWith("/permissions ")) {
@@ -578,26 +637,31 @@ program
           continue;
         }
         if (input === "/update" || input.startsWith("/update ")) {
-          notice(
-            "Exit this session, then run freecoda update to check or freecoda update --install to install. Updates never replace the CLI during an active session.",
-          );
+          explicitUpdateRequested = true;
+          try {
+            const result = await prepareInteractiveUpdate({
+              interactive: !opts.prompt && Boolean(process.stdin.isTTY),
+              queued: screen?.queue.items.length || 0,
+              confirm: async version => (await ask(`Install verified CLI ${version} after saving and closing this session? Type update to confirm: `)) === "update",
+            });
+            notice(result.message);
+            if (result.version) {
+              await persistConversation({ ...conversation, messages });
+              requestedUpdate = result.version;
+              break;
+            }
+          } catch (e) { error(redactSecrets(e instanceof Error ? e.message : "Update failed; nothing was installed.")); }
           if (opts.prompt) break;
           continue;
         }
         if (input === "/help") {
           notice(
-            "/plan <task>  Read-only plan\n/review <task>  Read-only code review\n/mode chat|build|plan|review  Set the default mode\n/model [id]  List or select models\n/mcp [enable|disable|discover <id>]  Manage connections\n/tools [enable|disable <name>]  Select next-turn tools\n/extensions  List installed tools and skills\n/queue [resume|remove <id>]  Review paused or queued turns\n/permissions [read-only|default|full-access]  Session tool permissions\n/theme auto|dark|light  Save the terminal palette\n/update  Check/install instructions (exit session first)\n/usage  Hosted allowance and reset time\n/status  Current workspace and provider\n/new  Start a new saved task\n/resume [number or id]  List or reopen saved tasks\n/clear  Clear the visible transcript\n/exit  Exit Freecoda\n\nEnter sends. Ctrl+J adds a newline. Paste never submits automatically. Up/Down recalls input. PageUp/PageDown scrolls. Escape or Ctrl+C cancels a running request. Approval: y once, s category for this session, n decline.",
+            "/plan <task>  Read-only plan\n/review <task>  Read-only code review\n/mode chat|build|plan|review  Set the default mode\n/model [id]  List or select models\n/mcp [enable|disable|discover <id>]  Manage connections\n/tools [enable|disable <name>]  Select next-turn tools\n/extensions [search]  Browse installed tools and skills\n/skills show <id>  Read installed skill instructions\n/install skill <source> | mcp <name> <url>  Review a local installation\n/queue [resume|remove <id>]  Review paused or queued turns\n/permissions [read-only|default|full-access]  Session tool permissions\n/theme auto|dark|light  Save the terminal palette\n/update  Check and install after saving and closing this session\n/usage  Hosted allowance and reset time\n/status  Current workspace and provider\n/new  Start a new saved task\n/resume [number or id]  List or reopen saved tasks\n/clear  Start a fresh chat; preserve saved history\n/copy  Copy the latest assistant response (macOS)\n/diff  Show tracked diff and untracked paths (trusted workspace)\n/pwd or /cwd  Show selected directory\n/exit  Exit Freecoda\n\nEnter sends. Ctrl+J adds a newline. Paste never submits automatically. Up/Down recalls input. PageUp/PageDown scrolls. Escape or Ctrl+C cancels a running request. Approval: y once, s category for this session, n decline.",
           );
           if (opts.prompt) break;
           continue;
         }
-        if (input === "/clear") {
-          screen?.clear();
-          if (!screen) console.clear();
-          if (opts.prompt) break;
-          continue;
-        }
-        if (input === "/new") {
+        if (input === "/new" || input === "/clear") {
           conversation = await persistConversation({
             ...conversation,
             messages,
@@ -606,7 +670,31 @@ program
           messages = [];
           await persistConversation(conversation);
           screen?.clear();
-          notice("New task. /resume opens earlier tasks in this project.");
+          notice("New chat. Previous history is saved; /resume opens earlier chats.");
+          if (opts.prompt) break;
+          continue;
+        }
+        if (input === "/pwd" || input === "/cwd") {
+          notice(safeTerminalText(`Selected directory: ${root}\n${defaultMode === "chat" ? "Chat has no repository access." : "Repository access follows workspace trust and permissions."}`));
+          if (opts.prompt) break;
+          continue;
+        }
+        if (input === "/copy") {
+          try {
+            const text = latestAssistantText(messages);
+            if (!text) throw Error("No completed assistant response to copy in this chat.");
+            await copyAssistantText(text);
+            notice("Copied the latest assistant response.");
+          } catch (e) { error(e instanceof Error ? e.message : "Could not copy the response."); }
+          if (opts.prompt) break;
+          continue;
+        }
+        if (input === "/diff") {
+          try {
+            if (defaultMode === "chat") throw Error("/diff requires a coding mode and a trusted workspace. Use /build or /mode review first.");
+            await ensureRepositoryTrust();
+            notice(safeTerminalText(await workspaceDiff(root)));
+          } catch (e) { error(redactSecrets(e instanceof Error ? e.message : "Could not read repository changes.")); }
           if (opts.prompt) break;
           continue;
         }
@@ -733,8 +821,8 @@ program
           if (opts.prompt) break;
           continue;
         }
-        if (input === "/mode" || input.startsWith("/mode ")) {
-          const selected = input.slice(6).trim();
+        if (input === "/chat" || input === "/build" || input === "/mode" || input.startsWith("/mode ")) {
+          const selected = input === "/chat" ? "chat" : input === "/build" ? "build" : input.slice(6).trim();
           if (!["chat", "build", "plan", "review"].includes(selected))
             error("Use /mode chat, build, plan, or review.");
           else {
@@ -749,7 +837,7 @@ program
           continue;
         }
         if (input.startsWith("/") && !/^\/(plan|review)(?:\s|$)/.test(input)) {
-          error("Unknown command. Use /help to see available commands.");
+          error(codexUnsupportedCommand(input.trim().split(/\s+/)[0]!) || "Unknown command. Use /help to see available commands.");
           if (opts.prompt) break;
           continue;
         }
@@ -879,7 +967,12 @@ program
     } finally {
       sessionOpen = false;
       screen?.close();
-      if (!opts.prompt && process.stdin.isTTY) await automaticUpdate(console.log);
+      closeReader();
+      closeTerminal();
+      if (requestedUpdate) {
+        await installUpdate(requestedUpdate);
+        console.log(`Updated to Freecoda ${requestedUpdate}. Start freecoda again to continue.`);
+      } else if (!explicitUpdateRequested && !opts.prompt && process.stdin.isTTY) await automaticUpdate(console.log);
     }
   });
 program

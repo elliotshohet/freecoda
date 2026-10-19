@@ -1,7 +1,7 @@
 .panel { margin: 14px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .panel summary { cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 16px; min-height: 48px; }
 .panel summary span { margin-left: auto; color: var(--muted); font-size: 12px; }
-.panel summary:focus-visible, .panel button:focus-visible, .panel input:focus-visible, .panel select:focus-visible, .panel textarea:focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
+.panel summary:focus-visible, .panel button:focus-visible, .panel input:focus-visible, .panel select:focus-visible, .panel textarea:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 .body { padding: 0 20px 20px; }
 .body p { max-width: 85ch; line-height: 1.6; }
 .note, .form small { color: var(--muted); font-size: 13px; }
@@ -17,7 +17,37 @@
 .form button { justify-self: start; align-self: end; }
 .switcher { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 16px; }
 .switcher button { padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; background: transparent; color: inherit; cursor: pointer; }
-.switcher button[aria-pressed="true"] { background: var(--pale); color: var(--purple); }
+.switcher button[aria-pressed="true"] { background: light-dark(#ededed, #303030); color: var(--ink); }
 .connectionActions { display: flex; align-items: center; gap: 5px; }
 .connectionActions button { padding: 6px 9px; font-size: 12px; }
 @media (max-width: 640px) { .form { grid-template-columns: 1fr; } .panel summary { flex-wrap: wrap; } .panel summary span { margin-left: 27px; width: 100%; } }
+.list strong { overflow-wrap: anywhere; }
+.switcher button { min-height: 44px; }
+@media (max-width: 640px) { .list li { flex-wrap: wrap; } .list label { flex: 1 1 100%; } .connectionActions { flex-wrap: wrap; } }
+.pluginCard { margin: 12px 0; padding: 14px; border: 1px solid var(--line); border-radius: 10px; overflow-wrap: anywhere; }
+.pluginCard button { min-height: 44px; margin: 5px 7px 0 0; padding: 8px 12px; border: 1px solid var(--line); border-radius: 7px; background: transparent; color: inherit; }
+.pluginCard li { overflow-wrap: anywhere; margin: 8px 0; }
+
+.body > section { padding: 18px 0; border-top: 1px solid var(--line); }
+.body h3 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
+.body h4 { font-size: 14px; font-weight: 600; }
+.body button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; cursor: pointer; }
+.body button > svg { flex-shrink: 0; }
+.body button:disabled { cursor: default; opacity: .55; }
+.body input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--ink); }
+.list label { flex: 1; min-height: 44px; }
+.list label > span { min-width: 0; }
+.list button { flex-shrink: 0; padding: 8px 10px; }
+.empty { padding: 16px; border: 1px dashed var(--line); border-radius: 8px; color: var(--muted); font-size: 13px; }
+.feedback { display: flex; align-items: flex-start; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+.feedback > svg { flex-shrink: 0; margin-top: 3px; }
+.error { padding: 12px; border: 1px solid currentColor; border-radius: 8px; overflow-wrap: anywhere; }
+.chevron { flex-shrink: 0; transition: transform 150ms ease; }
+.panel[open] > summary .chevron { transform: rotate(180deg); }
+@media (max-width: 640px) {
+  .body { padding: 0 14px 14px; }
+  .panel summary strong { flex: 1; }
+  .panel summary span { order: 2; }
+  .list > li > button { flex: 0 1 auto; }
+}
+@media (prefers-reduced-motion: reduce) { .chevron { transition: none; } }

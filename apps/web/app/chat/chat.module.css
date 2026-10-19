@@ -806,3 +806,18 @@
     visibility: hidden;
   }
 }
+
+.composer { position: relative; overflow: visible; }
+
+.headerRight { margin-left: auto; gap: 8px; }
+.headerRight .modelPickerTrigger, .headerRight .signIn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  box-sizing: border-box;
+  border-radius: 7px;
+}
+.headerRight button:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }

@@ -47,3 +47,11 @@ test("discovery closes an opened connection even when catalog inspection fails",
   }) as any)).rejects.toThrow("MCP tool discovery failed.");
   expect(closed).toBe(true);
 });
+
+
+test("plugin requests reject executable or credential-bearing manifest fields", () => {
+  const base = { action: "plugin-install", source: "https://example.com/plugin.json", manifest: { version: 1, name: "Fixture", skills: [], servers: [{ name: "Fixture", url: "https://example.com/mcp" }] } };
+  expect(extensionActionSchema.safeParse(base).success).toBe(true);
+  expect(extensionActionSchema.safeParse({ ...base, manifest: { ...base.manifest, script: "run me" } }).success).toBe(false);
+  expect(extensionActionSchema.safeParse({ ...base, manifest: { ...base.manifest, servers: [{ ...base.manifest.servers[0], headers: { Authorization: "private" } }] } }).success).toBe(false);
+});

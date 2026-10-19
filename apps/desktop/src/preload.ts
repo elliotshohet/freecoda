@@ -2,6 +2,11 @@ import { contextBridge, ipcRenderer } from "electron";
 import type { DesktopBridge, DesktopEvent } from "./shared";
 // Expose individual operations, never raw IPC or Node APIs.
 const api: DesktopBridge = {
+  listPlugins: () => ipcRenderer.invoke("desktop:listPlugins"),
+  previewPlugin: (source) => ipcRenderer.invoke("desktop:previewPlugin", source),
+  installReviewedPlugin: (input) => ipcRenderer.invoke("desktop:installReviewedPlugin", input),
+  removeInstalledPlugin: (id) => ipcRenderer.invoke("desktop:removeInstalledPlugin", id),
+  checkForUpdates: () => ipcRenderer.invoke("desktop:checkForUpdates"),
   discoverTools: (id) => ipcRenderer.invoke("desktop:discoverTools", id),
   toolChoices: () => ipcRenderer.invoke("desktop:toolChoices"),
   setToolEnabled: (input) => ipcRenderer.invoke("desktop:setToolEnabled", input),
@@ -14,6 +19,7 @@ const api: DesktopBridge = {
   saveGitHubRepositories: (repositories) => ipcRenderer.invoke("desktop:saveGitHubRepositories", repositories),
   connectGitHub: () => ipcRenderer.invoke("desktop:connectGitHub"),
   reconnectGitHub: () => ipcRenderer.invoke("desktop:reconnectGitHub"),
+  readSkill: (id) => ipcRenderer.invoke("desktop:readSkill", id),
   listExtensions: () => ipcRenderer.invoke("desktop:listExtensions"),
   installExtension: (input) => ipcRenderer.invoke("desktop:installExtension", input),
   setExtensionEnabled: (input) => ipcRenderer.invoke("desktop:setExtensionEnabled", input),
@@ -25,6 +31,7 @@ const api: DesktopBridge = {
   setTheme: (theme) => ipcRenderer.invoke("desktop:setTheme", theme),
   getState: () => ipcRenderer.invoke("desktop:getState"),
   openFolder: () => ipcRenderer.invoke("desktop:openFolder"),
+  openRecentFolder: (root) => ipcRenderer.invoke("desktop:openRecentFolder", root),
   trustWorkspace: (input) =>
     ipcRenderer.invoke("desktop:trustWorkspace", input),
   listFiles: () => ipcRenderer.invoke("desktop:listFiles"),
@@ -48,6 +55,8 @@ const api: DesktopBridge = {
   copyText: (value) => ipcRenderer.invoke("desktop:copyText", value),
   clearHistory: () => ipcRenderer.invoke("desktop:clearHistory"),
   openCloud: () => ipcRenderer.invoke("desktop:openCloud"),
+  listCloudWorkspaces: () => ipcRenderer.invoke("desktop:listCloudWorkspaces"),
+  openCloudWorkspace: (id) => ipcRenderer.invoke("desktop:openCloudWorkspace", id),
   onEvent: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, data: DesktopEvent) =>
       listener(data);

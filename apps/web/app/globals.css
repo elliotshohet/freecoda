@@ -2307,3 +2307,21 @@ input:-webkit-autofill {
   margin-bottom: 0;
   min-width: 0;
 }
+
+/* Immediate appearance toggle, shared across marketing and application headers. */
+button.theme-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+button.theme-control:hover { background: light-dark(#f2f2f2, #303030); }
+button.theme-control:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }

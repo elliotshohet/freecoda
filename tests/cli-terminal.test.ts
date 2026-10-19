@@ -72,7 +72,7 @@ try:
  send('\x1b');wait_for('Permissions unchanged: Full access',start)
  start=len(output);send('/permissions 2');send('\r');wait_for('Permissions: Default',start)
  assert 'permission' not in json.dumps(json.load(open(os.path.join(config,'config.json')))).lower(),'Session policy persisted to disk'
- send('/');wait_for('Commands ·');send('\x1b[B');send('\r');wait_for('New task. /resume')
+ send('/');wait_for('Commands ·');send('\x1b[B');send('\r');wait_for('New chat. Previous history is saved; /resume')
  send('/th');wait_for('Choose auto, light, or dark');send('\t');send('light');send('\r');wait_for('Theme: light')
  assert json.load(open(os.path.join(config,'config.json')))['theme']=='light','Theme preference was not saved'
  send('/theme dark');send('\r');wait_for('Theme: dark')
@@ -96,7 +96,7 @@ try:
  wait_for('conversation saved locally',start)
  assert 'a + b' in open(os.path.join(root,'sum.ts')).read(),'Approved write did not change source'
  wait_for('House sponsor fixture')
- start=len(output);send('/new');send('\r');wait_for('New task. /resume',start)
+ start=len(output);send('/new');send('\r');wait_for('New chat. Previous history is saved; /resume',start)
  start=len(output);send('/resume 2');send('\r');wait_for('Resumed task: Fix addition',start)
  start=len(output);send('/mode chat');send('\r');wait_for('Default mode: chat',start)
  start=len(output);send('/status');send('\r');wait_for('Chat has no project access or tools',start);wait_for('Conversation: 0 messages',start)

@@ -21,7 +21,7 @@ export default async function AppPage({
     <SessionBoundary userId={user.id}>
       <UnifiedWebApp
         user={{ name: user.name, image: user.image }}
-        initialView={params.view === "chat" ? "chat" : "workspace"}
+        initialView={params.view === "chat" ? "chat" : params.view === "workspace" || params.project ? "workspace" : "chat"}
         initialThreadId={typeof thread === "string" ? thread : undefined}
       />
     </SessionBoundary>

@@ -21,6 +21,15 @@ export type DesktopLogin = {
   verificationUri: string;
   expiresAt: string;
 };
+export type DesktopCloudWorkspace = {
+  id: string;
+  name: string;
+  repository: string | null;
+  status: string;
+  appDirectory?: string;
+  branch?: string;
+};
+
 export type DesktopState = {
   workspace: DesktopWorkspace | null;
   recentFolders: { root: string; name: string; trusted: boolean }[];
@@ -71,7 +80,13 @@ export type DesktopGitHubRepo = { repositoryId: number; installationId: number; 
 export type DesktopGitHubPreference = { repositoryId: number; installationId: number; owner: string; name: string; branch: string; appDirectory: string; enabled: boolean };
 export type DesktopGitHubState = { repos: DesktopGitHubRepo[]; repositories: DesktopGitHubPreference[]; canInstall: boolean };
 export type DesktopExtension = { id: string; name: string; kind: "skill" | "mcp"; enabled: boolean };
+export type DesktopPlugin = { id: string; name: string; skillCount: number; serverCount: number };
 export interface DesktopBridge {
+  listPlugins(): Promise<DesktopPlugin[]>;
+  previewPlugin(source: string): Promise<import("../../../packages/contracts/src/extensions").PluginManifest>;
+  installReviewedPlugin(input: { source: string; manifest: import("../../../packages/contracts/src/extensions").PluginManifest }): Promise<DesktopPlugin[]>;
+  removeInstalledPlugin(id: string): Promise<DesktopPlugin[]>;
+  checkForUpdates(): Promise<void>;
   discoverTools(id: string): Promise<string[]>;
   toolChoices(): Promise<{ name: string; enabled: boolean }[]>;
   setToolEnabled(input: { name: string; enabled: boolean }): Promise<{ name: string; enabled: boolean }[]>;
@@ -84,6 +99,7 @@ export interface DesktopBridge {
   saveGitHubRepositories(repositories: DesktopGitHubPreference[]): Promise<DesktopGitHubState>;
   connectGitHub(): Promise<void>;
   reconnectGitHub(): Promise<void>;
+  readSkill(id: string): Promise<{ id: string; name: string; instructions: string }>;
   listExtensions(): Promise<DesktopExtension[]>;
   installExtension(input: { kind: "skill" | "mcp"; name: string; url: string }): Promise<DesktopExtension[]>;
   setExtensionEnabled(input: { id: string; enabled: boolean }): Promise<DesktopExtension[]>;
@@ -96,6 +112,7 @@ export interface DesktopBridge {
   setTheme(theme: "system" | "light" | "dark"): Promise<void>;
   getState(): Promise<DesktopState>;
   openFolder(): Promise<DesktopWorkspace | null>;
+  openRecentFolder(root: string): Promise<DesktopWorkspace | null>;
   trustWorkspace(input: {
     root: string;
     consent: true;
@@ -118,5 +135,7 @@ export interface DesktopBridge {
   deleteThread(id: string): Promise<DesktopState>;
   copyText(value: string): Promise<void>;
   openCloud(): Promise<void>;
+  listCloudWorkspaces(): Promise<DesktopCloudWorkspace[]>;
+  openCloudWorkspace(id: string): Promise<void>;
   onEvent(listener: (event: DesktopEvent) => void): () => void;
 }

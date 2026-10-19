@@ -11,6 +11,8 @@ import {
   Plus,
   Search,
   Square,
+  SlidersHorizontal,
+  LogIn,
   Trash2,
   X,
 } from "lucide-react";
@@ -23,6 +25,9 @@ import { useModelSelection } from "@/components/use-model-selection";
 import { ThemeControl } from "@/components/theme-control";
 import { SponsorPlacement } from "@/components/sponsor-placement";
 import s from "./chat.module.css";
+import { codexUnsupportedCommand } from "@freecoda/contracts";
+import { interceptWebConversationInput } from "../app/conversation-routing";
+import { useConversationCommands } from "../app/conversation-commands";
 import {
   boundedChatContext,
   chatContext,
@@ -75,7 +80,7 @@ function CopyButton({
 type ChatProps = {
   embedded?: boolean;
   initialThreadId?: string;
-  onOpenWorkspace?: () => void;
+  onOpenWorkspace?: (command?: string) => void;
 };
 
 export default function Chat({ embedded = false, initialThreadId, onOpenWorkspace }: ChatProps) {
@@ -186,20 +191,45 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
     setSidebar(false);
     input.current?.focus();
   };
+  const newChatRef = useRef(newChat);
+  newChatRef.current = newChat;
+  useEffect(() => {
+    const start = () => newChatRef.current();
+    window.addEventListener("freecoda:new-chat", start);
+    return () => window.removeEventListener("freecoda:new-chat", start);
+  }, []);
+  const commands = useConversationCommands(draft, (command) => { setDraft(""); interceptWebConversationInput(command, { project: value => onOpenWorkspace?.(value), conversation: value => { void runCommand(value); } }); input.current?.focus(); });
   async function runCommand(value: string) {
     const [command, ...args] = value.trim().split(/\s+/);
     const argument = args.join(" ");
     switch (command.toLowerCase()) {
       case "/help":
-        setCommandNotice("Chat commands: /help, /new, /clear, /model [id], /mode chat|build|plan|review, /status, /usage, /extensions, /mcp, /tools, /permissions. Build, files, tools, permissions, and repository actions are available in Workspace.");
+        setCommandNotice("Type / to discover commands. /project chooses a repository; /build, /plan and /review work in an explicitly selected project. /chat keeps repository access off. /tools, /mcp and /skills manage project capabilities.");
+        break;
+      case "/chat":
+        setCommandNotice("General conversation. No repository or external tool access.");
         break;
       case "/new":
         newChat();
         break;
       case "/clear":
-        setActive(null);
-        setDraft("");
-        setCommandNotice("Cleared this view. The saved conversation remains in your history.");
+        newChat();
+        setCommandNotice("Started a fresh chat. Previous conversations remain saved.");
+        break;
+      case "/resume":
+        setSidebar(true);
+        setCommandNotice("Choose a saved conversation from your history.");
+        break;
+      case "/copy": {
+        const answer = messages.filter(message => message.role === "assistant" && message.status === "complete").at(-1)?.content;
+        if (!answer) setCommandNotice("No completed assistant response to copy.");
+        else try { await navigator.clipboard.writeText(answer); setCommandNotice("Latest response copied."); }
+        catch { setCommandNotice("Clipboard access was denied. Select the response and copy it manually."); }
+        break;
+      }
+      case "/pwd":
+      case "/cwd":
+        setCommandNotice("General chat has no attached working directory. Select a cloud workspace to inspect its app directory.");
         break;
       case "/model":
         if (!argument) {
@@ -216,7 +246,7 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
         if (!argument || argument === "chat") setCommandNotice("Mode: Chat. Use Workspace for build, plan, and review modes.");
         else if (["build", "plan", "review"].includes(argument)) {
           setCommandNotice(`Switching to Workspace. Choose ${argument} mode from its mode menu.`);
-          onOpenWorkspace?.();
+          onOpenWorkspace?.(`/mode ${argument}`);
         } else setCommandNotice("Use /mode chat, build, plan, or review. Coding modes run in Workspace.");
         break;
       case "/status":
@@ -235,16 +265,16 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
       case "/extensions":
       case "/permissions":
         setCommandNotice(`${command} are configured per coding project in Workspace. Chat has no repository, filesystem, or external tool access.`);
-        onOpenWorkspace?.();
+        onOpenWorkspace?.(value);
         break;
       case "/mcp":
       case "/tools":
         setCommandNotice(`Opening ${command.slice(1)} tools in Workspace.`);
-        onOpenWorkspace?.();
+        onOpenWorkspace?.(value);
         window.dispatchEvent(new CustomEvent("freecoda:extensions", { detail: { view: command.toLowerCase() === "/mcp" ? "mcp" : "tools" } }));
         break;
       default:
-        setCommandNotice(`Unknown command “${command}”. Use /help to see commands.`);
+        setCommandNotice(codexUnsupportedCommand(command) || `Unknown command “${command}”. Use /help to see commands.`);
     }
   }
   async function signIn() {
@@ -480,12 +510,10 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
   function submitMessage() {
     const text = draft.trim();
     if (!text) return;
-    if (/^\/[a-z]+(?:\s|$)/i.test(text)) {
-      setDraft("");
-      setCommandNotice("");
-      void runCommand(text);
-      return;
-    }
+    if (interceptWebConversationInput(text, {
+      project: command => { setDraft(""); setCommandNotice(""); onOpenWorkspace?.(command); },
+      conversation: command => { setDraft(""); setCommandNotice(""); void runCommand(command); },
+    })) return;
     if (busy || sending.current || queue.length > 0) {
       setQueue((current) => [...current, { id: crypto.randomUUID(), text, status: "queued" }]);
       setDraft("");
@@ -530,7 +558,6 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
         {!embedded && <div className={s.brand}>
           <Link href="/" aria-label="Freecoda home">
             <Mark />
-            <span>freecoda</span>
           </Link>
           <button
             aria-label="Close sidebar"
@@ -598,14 +625,14 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
           )}
         </div>
         {onOpenWorkspace ? (
-          <button className={s.workspace} type="button" onClick={onOpenWorkspace}>
+          <button className={s.workspace} type="button" onClick={() => onOpenWorkspace("/project")}>
             <Code2 size={18} />
-            <span>Coding workspace</span>
+            <span>Choose a project · /project</span>
           </button>
         ) : (
           <Link className={s.workspace} href="/app">
             <Code2 size={18} />
-            <span>Coding workspace</span>
+            <span>Choose a project · /project</span>
           </Link>
         )}
         {!embedded && <div className={s.account}>
@@ -624,13 +651,10 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
           >
             <Menu size={21} />
           </button>
-          <div className={s.topBrand}>
-            Freecoda <span>Free</span>
-          </div>
           <div className={s.headerRight}>
             {status?.models?.length ? (
-              <button type="button" className={s.modelPickerTrigger} aria-haspopup="dialog" onClick={() => setModelPickerOpen(true)}>
-                {status.models.find((candidate) => candidate.id === model) ? modelDisplayName(status.models.find((candidate) => candidate.id === model)!) : "Choose model"} ▾
+              <button type="button" className={s.modelPickerTrigger} aria-haspopup="dialog" aria-label="Choose model" title="Choose model" onClick={() => setModelPickerOpen(true)}>
+                <SlidersHorizontal size={18} aria-hidden="true" />
               </button>
             ) : (
               <span className={s.modelState}>
@@ -640,10 +664,12 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
             {!status?.signedIn && status && (
               <button
                 className={s.signIn}
+                aria-label={signingIn ? "Opening GitHub" : "Sign in"}
+                title={signingIn ? "Opening GitHub…" : "Sign in"}
                 disabled={signingIn}
                 onClick={signIn}
               >
-                {signingIn ? "Opening GitHub…" : "Sign in"}
+                <LogIn size={18} aria-hidden="true" />
               </button>
             )}
           </div>
@@ -776,12 +802,15 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
               submitMessage();
             }}
           >
+            {commands.list}
             <textarea
+              {...commands.attributes}
               ref={input}
               value={draft}
               maxLength={8000}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
+                if (commands.keyDown(e)) return;
                 if (
                   e.key === "Enter" &&
                   !e.shiftKey &&
@@ -791,13 +820,13 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
                   submitMessage();
                 }
               }}
-              placeholder={busy ? "Write a message to queue…" : "Message Freecoda"}
+              placeholder={busy ? "Write a message to queue…" : "Ask Coda anything, or / for commands"}
               aria-label="Message Freecoda"
               rows={2}
               disabled={selected?.mode === "coding" || selected?.cloudDeleted || selected?.cloudLoaded === false}
             />
             <div className={s.composerActions}>
-              <span>{busy ? "Enter queues the next message. Messages run one at a time." : "Ask anything. Make something."}</span>
+              <span>{busy ? "Enter queues the next message. Messages run one at a time." : "/ for projects, tools and commands"}</span>
               {busy ? (
                 <>
                   {draft.trim() && <button type="submit" className={s.queueButton}>Queue</button>}

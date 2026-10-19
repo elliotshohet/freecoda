@@ -177,7 +177,7 @@ try {
   let initial;
   while (Date.now() < deadline) {
     initial = await client.evaluate(`(async () => {
-      if (document.readyState !== 'complete' || !window.freecoda || !document.querySelector('#theme-select')) return null;
+      if (document.readyState !== 'complete' || !window.freecoda || !document.querySelector('#theme-toggle')) return null;
       return { title: document.title, text: document.body.innerText, state: await window.freecoda.getState(),
         requireType: typeof window.require, processType: typeof window.process,
         ipcType: typeof window.ipcRenderer, electronType: typeof window.electron,
@@ -210,12 +210,103 @@ try {
       !initial.csp.includes("unsafe-inline"),
   );
 
+  const navigation = await client.evaluate(`(() => {
+    const controls = [...document.querySelectorAll('.titlebar-actions > button, .titlebar-actions > label')];
+    return {
+      titleRemoved: !document.querySelector('.titlebar .wordmark'),
+      modelHidden: getComputedStyle(document.getElementById('model-label')).display === 'none',
+      generalHistorySeparate: document.getElementById('workspace-conversations').parentElement.id === 'general-conversations',
+      scope: document.getElementById('conversation-scope-label').textContent,
+      controls: controls.map(control => {
+        const icon = control.querySelector('svg:not([hidden])');
+        const box = control.getBoundingClientRect();
+        const graphic = icon?.getBoundingClientRect();
+        return { icon: !!icon, label: control.getAttribute('aria-label') || control.querySelector('[aria-label]')?.getAttribute('aria-label') || control.getAttribute('aria-labelledby'),
+          width: box.width, height: box.height,
+          centered: !!graphic && Math.abs((graphic.x + graphic.width / 2) - (box.x + box.width / 2)) < 1 && Math.abs((graphic.y + graphic.height / 2) - (box.y + box.height / 2)) < 1 };
+      })
+    };
+  })()`, "workspace navigation and header layout");
+  assert.equal(navigation.titleRemoved, true);
+  assert.equal(navigation.modelHidden, true);
+  assert.equal(navigation.generalHistorySeparate, true);
+  assert.equal(navigation.scope, "Your chats");
+  assert.equal(navigation.controls.length, 4);
+  for (const control of navigation.controls) {
+    assert(control.icon && control.label && control.centered, "Header icons must be centered and labelled.");
+    assert.equal(control.width, control.height);
+  }
+
+  const commands = await client.evaluate(`(() => {
+    const prompt = document.getElementById('prompt');
+    const menu = document.getElementById('slash-menu');
+    const type = value => { prompt.value = value; prompt.dispatchEvent(new Event('input', { bubbles: true })); };
+    prompt.focus(); type('/');
+    const all = [...menu.querySelectorAll('strong')].map(node => node.textContent);
+    const visible = !menu.hidden;
+    type('/pla');
+    const filtered = [...menu.querySelectorAll('strong')].map(node => node.textContent);
+    prompt.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', bubbles:true, cancelable:true}));
+    const completed = prompt.value;
+    type('/');
+    prompt.dispatchEvent(new KeyboardEvent('keydown', {key:'ArrowDown', bubbles:true, cancelable:true}));
+    const selected = prompt.getAttribute('aria-activedescendant');
+    prompt.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true, cancelable:true}));
+    const dismissed = menu.hidden;
+    type('Keep my unfinished draft'); document.getElementById('commands-open').click();
+    const preserved = prompt.value;
+    type('');
+    return { all, visible, filtered, completed, selected, dismissed, preserved,
+      modeHidden: getComputedStyle(document.getElementById('mode').parentElement).display === 'none',
+      toolsHidden: document.getElementById('workbench').hidden,
+      syncButton: !!document.getElementById('sync-conversations') };
+  })()`, "unified conversation slash commands");
+  assert.equal(commands.visible, true);
+  assert(commands.all.includes('/project') && commands.all.includes('/update'));
+  assert(!commands.all.includes('/preview'), "Desktop must not suggest unsupported web commands.");
+  assert(commands.filtered.includes('/plan'));
+  assert.equal(commands.completed, '/plan ');
+  assert.equal(commands.selected, 'slash-option-1');
+  assert.equal(commands.dismissed, true);
+  assert.equal(commands.preserved, 'Keep my unfinished draft');
+  assert.equal(commands.modeHidden, true);
+  assert.equal(commands.toolsHidden, true);
+  assert.equal(commands.syncButton, false);
+
+  const pluginNavigation = await client.evaluate(`(async () => {
+    document.getElementById('extensions-open').click();
+    const until = performance.now() + 3000;
+    while (!document.getElementById('extensions-dialog').open && performance.now() < until) await new Promise(resolve => setTimeout(resolve, 25));
+    const dialog = document.getElementById('extensions-dialog');
+    const open = dialog.open;
+    document.querySelector('[data-extension-view="mcp"]').click();
+    const mcp = document.getElementById('extensions-list-title').textContent;
+    const kind = document.getElementById('extension-kind').value;
+    document.querySelector('[data-extension-view="tools"]').click();
+    const tools = !document.getElementById('tool-choices').hidden && document.getElementById('extensions-form').hidden;
+    document.querySelector('[data-extension-view="plugins"]').click();
+    const plugins = !document.getElementById('desktop-plugin-section').hidden && document.getElementById('desktop-extension-section').hidden;
+    document.getElementById('extensions-close').click();
+    return {open, mcp, kind, tools, plugins, closed: !dialog.open};
+  })()`, "real plugin category navigation without installation or connection");
+  assert.equal(pluginNavigation.open, true);
+  assert.equal(pluginNavigation.mcp, "Installed MCP connections");
+  assert.equal(pluginNavigation.kind, "mcp");
+  assert.equal(pluginNavigation.tools, true);
+  assert.equal(pluginNavigation.plugins, true);
+  assert.equal(pluginNavigation.closed, true);
+
   for (const preference of ["dark", "light", "system"]) {
     const theme = await client.evaluate(`(async () => {
-      const select = document.getElementById('theme-select');
-      select.value = ${JSON.stringify(preference)};
-      select.dispatchEvent(new Event('change', {bubbles:true}));
-      await window.freecoda.setTheme(${JSON.stringify(preference)});
+      const requested = ${JSON.stringify(preference)};
+      if (requested === 'system') {
+        localStorage.setItem('freecoda-theme', 'system');
+        window.dispatchEvent(new StorageEvent('storage', {key:'freecoda-theme', newValue:'system'}));
+      } else if (document.documentElement.dataset.theme !== requested || document.documentElement.dataset.themePreference !== requested) {
+        if (document.documentElement.dataset.theme === requested) document.getElementById('theme-toggle').click();
+        document.getElementById('theme-toggle').click();
+      }
+      await window.freecoda.setTheme(requested);
       // Native theme IPC resolves before Chromium necessarily delivers its
       // media-query change. Wait for the UI to converge, then assert all state.
       const until = performance.now() + 2000;

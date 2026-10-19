@@ -91,8 +91,36 @@ async function chooseFolder() {
     ? null
     : service.selectWorkspace(result.filePaths[0]);
 }
+async function openRecentFolder(root: string) {
+  if (!window) return null;
+  const current = await service.getState();
+  if (current.running)
+    throw new Error("Stop the active task before changing folders.");
+  if (typeof root !== "string" || !current.recentFolders.some(folder => folder.root === root))
+    throw new Error("Choose this folder with the native folder picker first.");
+  if (current.workspace) {
+    const { response } = await dialog.showMessageBox(window, {
+      type: "question",
+      buttons: ["Keep current folder", "Open recent folder"],
+      defaultId: 0,
+      cancelId: 0,
+      message: "Switch project folders?",
+      detail: "Save any unsaved editor changes before switching. Changes in the editor will be discarded.",
+    });
+    if (response !== 1) return null;
+  }
+  return service.openRecentFolder(root);
+}
 function installIPC() {
   const methods = {
+    listPlugins: () => service.listPlugins(),
+    previewPlugin: (source: string) => service.previewPlugin(source),
+    installReviewedPlugin: (input: Parameters<LocalAgentService["installReviewedPlugin"]>[0]) => service.installReviewedPlugin(input),
+    removeInstalledPlugin: (id: string) => service.removeInstalledPlugin(id),
+    checkForUpdates: async () => {
+      if (!updates) throw Error("Update checks are not ready yet.");
+      await updates.check(true);
+    },
     discoverTools: (id: string) => service.discoverTools(id),
     toolChoices: () => service.toolChoices(),
     setToolEnabled: (input: Parameters<LocalAgentService["setToolEnabled"]>[0]) => service.setToolEnabled(input),
@@ -105,6 +133,7 @@ function installIPC() {
     saveGitHubRepositories: (repositories: Parameters<LocalAgentService["saveGitHubRepositories"]>[0]) => service.saveGitHubRepositories(repositories),
     connectGitHub: async () => { await shell.openExternal(await service.githubInstallURL()); },
     reconnectGitHub: async () => { await openExternal("https://freecoda.com/settings#connections"); },
+    readSkill: (id: string) => service.readSkill(id),
     listExtensions: () => service.listExtensions(),
     installExtension: (input: Parameters<LocalAgentService["installExtension"]>[0]) => service.installExtension(input),
     setExtensionEnabled: (input: Parameters<LocalAgentService["setExtensionEnabled"]>[0]) => service.setExtensionEnabled(input),
@@ -125,6 +154,7 @@ function installIPC() {
     },
     openSponsor: () => service.openSponsor(),
     openFolder: chooseFolder,
+    openRecentFolder,
     trustWorkspace: (
       input: Parameters<LocalAgentService["trustWorkspace"]>[0],
     ) => service.trustWorkspace(input),
@@ -158,6 +188,8 @@ function installIPC() {
     },
     clearHistory: () => service.clearHistory(),
     openCloud: () => openExternal("https://freecoda.com/app"),
+    listCloudWorkspaces: () => service.listCloudWorkspaces(),
+    openCloudWorkspace: (id: string) => service.openCloudWorkspace(id),
   };
   for (const [name, handler] of Object.entries(methods)) {
     ipcMain.handle(`desktop:${name}`, async (event, input) => {

@@ -690,8 +690,14 @@ test("desktop extension installation persists without execution and exposes only
     expect(installed[0]!.kind).toBe("skill");
     const disabled = await service.setExtensionEnabled({ id: installed[0]!.id, enabled: false });
     expect(disabled[0]!.enabled).toBe(false);
+    const viewed = await service.readSkill(installed[0]!.id);
+    expect(viewed.instructions).toBe(await readFile(skill, "utf8"));
+    expect(Object.keys(viewed).sort()).toEqual(["id", "instructions", "name"]);
+    await expect(service.readSkill("../desktop.json")).rejects.toThrow("Invalid skill ID");
+    await expect(service.readSkill("missing")).rejects.toThrow("not found");
     const server = await service.installExtension({ kind: "mcp", name: "Fixture tools", url: "https://example.com/mcp" });
     expect(server).toHaveLength(2);
+    await expect(service.readSkill(server.find(item => item.kind === "mcp")!.id)).rejects.toThrow("not found");
     await expect(service.installExtension({ kind: "mcp", name: "Credentials", url: "https://user:pass@example.com/mcp" })).rejects.toThrow("credentials");
     await expect(service.installExtension({ kind: "mcp", name: "Token", url: "https://example.com/mcp?token=private" })).rejects.toThrow("query");
     expect((await service.getState()).running).toBe(false);
@@ -796,5 +802,20 @@ test("desktop model selection persists and tool choices never accept unknown too
     const restored = new LocalAgentService(options);
     try { expect((await restored.getState()).auth.model).toBe("reflection/beam-free"); }
     finally { await restored.dispose(); }
+  } finally { await service.dispose(); await rm(f.root, { recursive: true, force: true }); }
+});
+
+test("desktop plugin review is explicit, bounded to HTTPS, and never installs unreviewed bundles", async () => {
+  const f = await fixture();
+  const service = new LocalAgentService({ dataDirectory: f.data, emit: () => {}, openExternal: async () => {} });
+  try {
+    expect(await service.listPlugins()).toEqual([]);
+    await expect(service.previewPlugin("file:///tmp/plugin.json")).rejects.toThrow("HTTPS");
+    await expect(service.previewPlugin("https://user:secret@example.com/plugin.json")).rejects.toThrow("credentials");
+    await expect(service.installReviewedPlugin({ source: "https://example.com/plugin.json", manifest: { version: 1, name: "Unreviewed", skills: [], servers: [{ name: "Tools", url: "https://example.com/mcp" }] } })).rejects.toThrow("Review");
+    expect(await service.listExtensions()).toEqual([]);
+    expect(await service.listPlugins()).toEqual([]);
+    expect((await service.getState()).workspace).toBeNull();
+    await expect(service.removeInstalledPlugin("missing")).rejects.toThrow("not found");
   } finally { await service.dispose(); await rm(f.root, { recursive: true, force: true }); }
 });

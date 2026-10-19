@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, writeFile, readFile, realpath, rm } from "node:fs/promi
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
+import { prepareInteractiveUpdate } from "../packages/cli/src/interactive-update";
 import { checkUpdate, newerVersion, validVersion, downloadUpdate, installationPrefix, automaticUpdate } from "../packages/cli/src/update";
 
 test("selects the newest stable CLI release, excluding desktop, drafts and prereleases", async () => {
@@ -71,7 +72,7 @@ test.skipIf(process.platform === "win32")("installs verified release into the ex
   } finally { await rm(directory, { recursive: true, force: true }); }
 }, 30000);
 
-test.skipIf(process.platform === "win32")("bundled CLI /exit in a real PTY automatically upgrades only after the session ends", async () => {
+test.skipIf(process.platform === "win32")("bundled CLI /update in a real PTY confirms installation after the session ends", async () => {
   const directory = await mkdtemp(join(tmpdir(), "freecoda-cli-exit-test-"));
   try {
     const root = join(directory, "lib/node_modules/freecoda");
@@ -107,7 +108,7 @@ test.skipIf(process.platform === "win32")("bundled CLI /exit in a real PTY autom
 pid,fd=pty.fork()
 if pid==0:
  os.execvp('node',['node','--import',sys.argv[1],sys.argv[2],'--plain'])
-output=b''; sent=False; deadline=time.time()+35
+output=b''; sent=False; confirmed=False; deadline=time.time()+35
 try:
  while time.time()<deadline:
   ready,_,_=select.select([fd],[],[],0.1)
@@ -117,8 +118,10 @@ try:
    if not chunk: break
    output+=chunk
    if not sent and '›'.encode() in output:
-    # Real interactive exit exercises index.ts finally, not an updater helper.
-    os.write(fd,b'/exit\\n'); sent=True
+    # Exercise the real command handler, confirmation, and post-terminal installer.
+    os.write(fd,b'/exit\\n' if os.environ.get('FREECODA_AUTO_UPDATE')=='0' else b'/update\\n'); sent=True
+   if sent and not confirmed and b'Type update to confirm:' in output:
+    os.write(fd,b'update\\n'); confirmed=True
   done,status=os.waitpid(pid,os.WNOHANG)
   if done:
    print(json.dumps({'status':os.waitstatus_to_exitcode(status),'sent':sent,'output':output.decode(errors='replace')}));sys.exit(0)
@@ -138,10 +141,37 @@ finally:
       expect(result.status, result.output).toBe(0);
       expect(result.sent).toBe(true);
       expect(JSON.parse(await readFile(join(root, "package.json"), "utf8")).version).toBe(disabled ? "0.1.0" : "0.2.0");
-      if (!disabled) expect(result.output).toContain("is installed. Your next session will use it.");
+      if (!disabled) {
+        expect(result.output).toContain("Closing this saved session");
+        expect(result.output).toContain("Updated to Freecoda 0.2.0");
+      }
     }
     const next = Bun.spawn(["node", join(root, "bin/freecoda.js")], { stdout: "pipe" });
     expect(await new Response(next.stdout).text()).toContain("next-session-0.2.0");
     expect(await next.exited).toBe(0);
   } finally { await rm(directory, { recursive: true, force: true }); }
 }, 60000);
+
+
+test("interactive source update never checks the network or asks to install", async () => {
+  const result = await prepareInteractiveUpdate({ entry: import.meta.path, interactive: true, check: async () => { throw Error("must not call network"); }, confirm: async () => { throw Error("must not confirm"); } });
+  expect(result.version).toBeUndefined();
+  expect(result.message).toContain("never overwrites source");
+});
+
+test.skipIf(process.platform === "win32")("interactive update preserves queued work and cancellation", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "freecoda-interactive-update-"));
+  try {
+    const root = join(directory, "lib/node_modules/freecoda");
+    await mkdir(join(root, "bin"), { recursive: true });
+    const entry = join(root, "bin/freecoda.js");
+    await writeFile(entry, "old launcher");
+    await writeFile(join(root, "package.json"), JSON.stringify({ name: "freecoda", bin: { freecoda: "bin/freecoda.js" } }));
+    const queued = await prepareInteractiveUpdate({ entry, queued: 1, interactive: true, check: async () => { throw Error("No check while queued"); }, confirm: async () => { throw Error("No confirm while queued"); } });
+    expect(queued.message).toContain("queued requests");
+    const cancelled = await prepareInteractiveUpdate({ entry, interactive: true, check: async () => "9.0.0", confirm: async () => false });
+    expect(cancelled.version).toBeUndefined();
+    expect(cancelled.message).toContain("cancelled");
+    expect(await readFile(entry, "utf8")).toBe("old launcher");
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});

@@ -64,7 +64,7 @@ export function UnifiedWebApp({ initialView, initialThreadId, user }: { initialV
     };
   }, []);
   useEffect(() => {
-    const restoreView = () => setView(new URLSearchParams(window.location.search).get("view") === "chat" ? "chat" : "workspace");
+    const restoreView = () => setView(new URLSearchParams(window.location.search).get("view") === "workspace" ? "workspace" : "chat");
     window.addEventListener("popstate", restoreView);
     return () => window.removeEventListener("popstate", restoreView);
   }, []);
@@ -72,7 +72,7 @@ export function UnifiedWebApp({ initialView, initialThreadId, user }: { initialV
     setView(next);
     const url = new URL(window.location.href);
     if (next === "chat") url.searchParams.set("view", "chat");
-    else url.searchParams.delete("view");
+    else url.searchParams.set("view", "workspace");
     window.history.replaceState(null, "", url);
   }
 
@@ -81,27 +81,24 @@ export function UnifiedWebApp({ initialView, initialThreadId, user }: { initialV
       <header className={styles.topbar}>
         <Link href="/" className={styles.brand} aria-label="Freecoda home">
           <Mark />
-          <span>freecoda</span>
         </Link>
-        <span className={styles.roomTitle}>Conversation & project</span>
         <div className={styles.headerActions}>
-          <GitHubStars />
-          {view === "chat" && <button type="button" className={styles.headerButton} aria-label="Open chat history" title="Chat history" onClick={() => window.dispatchEvent(new CustomEvent("freecoda:chat-sidebar"))}><PanelLeft size={16} /></button>}
-          <button type="button" className={styles.headerButton} aria-label="Choose model" title="Choose model · /model" onClick={() => window.dispatchEvent(new CustomEvent("freecoda:show-model", { detail: { view } }))}><SlidersHorizontal size={16} /><span>Model</span></button>
+          <div className={styles.githubControl}><GitHubStars /></div>
+          {view === "chat" && <button type="button" className={styles.headerButton} aria-label="Open chat history" title="Chat history" onClick={() => window.dispatchEvent(new CustomEvent("freecoda:chat-sidebar"))}><PanelLeft size={18} aria-hidden="true" /></button>}
+          <button type="button" className={styles.headerButton} aria-label="Choose model" title="Choose model · /model" onClick={() => window.dispatchEvent(new CustomEvent("freecoda:show-model", { detail: { view } }))}><SlidersHorizontal size={18} aria-hidden="true" /></button>
           <ThemeControl />
-          <Link className={styles.account} href="/settings" aria-label="Account & settings" title="Account & settings"><UserAvatar image={user.image} name={user.name} /><span className={styles.accountLabel}>Account</span></Link>
+          <Link className={styles.account} href="/settings" aria-label="Account & settings" title="Account & settings"><UserAvatar image={user.image} name={user.name} /></Link>
         </div>
       </header>
       <div id="workspace-panel" className={styles.panels}>
-        <CloudWorkspace conversationMode={view === "chat" ? "ask" : "project"} />
+        <CloudWorkspace conversationMode={view === "chat" ? "ask" : "project"} onOpenProject={() => selectView("workspace")} onOpenChat={() => selectView("chat")} />
       </div>
       <section className={styles.conversationSurface} hidden={!conversationBounds || conversationBounds.width <= 0 || conversationBounds.height <= 0} style={conversationBounds || undefined} aria-label="Conversation">
-        <div className={styles.conversationModes} role="group" aria-label="Conversation mode">
-          <button type="button" aria-pressed={view === "chat"} onClick={() => selectView("chat")}>Ask Coda</button>
-          <button type="button" aria-pressed={view === "workspace"} onClick={() => selectView("workspace")}>Work on project</button>
-        </div>
         <div className={styles.chatSurface} hidden={view !== "chat"}>
-          <Chat embedded initialThreadId={initialThreadId} onOpenWorkspace={() => selectView("workspace")} />
+          <Chat embedded initialThreadId={initialThreadId} onOpenWorkspace={(command = "/project") => {
+            if (!["/project", "/repos"].includes(command.trim().split(/\s+/)[0].toLowerCase())) selectView("workspace");
+            window.dispatchEvent(new CustomEvent("freecoda:project-command", { detail: { command } }));
+          }} />
         </div>
       </section>
     </div>

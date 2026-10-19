@@ -4,9 +4,9 @@ Electron desktop application for Freecoda. Application ID: `com.freecoda.desktop
 
 ## Chat and coding
 
-Freecoda starts in Chat: a general conversation with no repository access or tools. You can start and reopen saved conversations without selecting a folder. Use **Sync conversations** to refresh changes from another device. Signed-in conversations sync to your encrypted account history across web, CLI, and desktop, with a private local offline copy. Chat and coding remain separate modes. Sending a message shares that conversation with the selected provider.
+Freecoda starts in Chat: a general conversation with no repository access or tools. You can start and reopen saved conversations without selecting a folder. Signed-in conversations sync to your encrypted account history across web, CLI, and desktop, with a private local offline copy. One composer supports general conversations and project work; their histories and access boundaries remain separate. Sending a message shares that conversation with the selected provider.
 
-Choose Build, Plan, or Review to work with a repository. Coding still requires selecting and trusting the folder. Returning to Chat restores the separate general conversations, hides repository tools, and resets session permission grants. Search, deletion, response copying, and clearly labeled sponsor placements remain part of the conversation interface.
+Type `/project` to choose a folder, then `/build`, `/plan`, or `/review` to work with it. Type `/chat` to return to general conversation. Type `/` to browse commands with arrow keys and Enter or Tab. Coding still requires selecting and trusting the folder. Returning to Chat restores the separate general conversations, hides repository tools, and resets session permission grants. Search, deletion, response copying, and clearly labeled sponsor placements remain part of the conversation interface.
 
 ## Models, messages, and avatars
 
@@ -20,7 +20,7 @@ Signed-in message bubbles use the account's public GitHub avatar when available.
 
 When signed in, Freecoda uploads completed conversations and existing local history for the selected mode to your account. Conversation records include structured messages and tool results, but no local workspace path. Server storage is encrypted; model-provider training and retention still follow the hosted privacy policy. Coding conversations can be opened in a trusted local folder; a cloud conversation never grants folder access or command permissions.
 
-Offline changes remain in the private local copy and retry at the next turn or **Sync conversations**. Concurrent edits create a separate local conflict copy with a new conversation ID, preserving the remote version. Deleting a conversation removes the cloud record when connectivity returns; a stale client cannot recreate a deleted ID. Synced local caches are bound to the account and are not uploaded to a different signed-in account. Keep the application data directory if you need to recover an unsynced offline copy.
+Offline changes remain in the private local copy and retry at the next turn. Concurrent edits create a separate local conflict copy with a new conversation ID, preserving the remote version. Deleting a conversation removes the cloud record when connectivity returns; a stale client cannot recreate a deleted ID. Synced local caches are bound to the account and are not uploaded to a different signed-in account. Keep the application data directory if you need to recover an unsynced offline copy.
 
 ## Session permissions
 
@@ -28,15 +28,15 @@ Type `/permissions` in the conversation composer to select **Read only**, **Defa
 
 ## Connected GitHub repositories
 
-Open **Repositories** in the title bar after signing in. **Connect GitHub repositories** opens the configured GitHub App installation page in your browser; select the repositories you want to authorize there, then return and choose **Refresh access**. For each available repository, choose whether it is enabled and configure its branch and app folder (leave the folder empty for the repository root). **Save preferences** stores these settings on your hosted account so the web, CLI, and desktop can use the same configuration. The server checks current GitHub access and the chosen branch before saving.
+Use `/repos` or **GitHub repositories** in the title bar after signing in. Search by owner or name and expand a repository to edit its preferences. **Connect GitHub repositories** opens the configured GitHub App installation page in your browser; select the repositories you want to authorize there, then return and choose **Refresh access**. For each available repository, choose whether it is enabled and configure its branch and app folder (leave the folder empty for the repository root). **Save preferences** stores these settings on your hosted account so the web, CLI, and desktop can use the same configuration. The server checks current GitHub access and the chosen branch before saving.
 
 Saving preferences does not clone a repository, read a local folder, or grant local trust. Use **Open folder** and review the explicit trust prompt to work with a local checkout. Device credentials and GitHub tokens remain outside the renderer.
 
 ## Tools and skills
 
-Open **Tools & skills** in the title bar. Choose **Skill · SKILL.md**, enter a name and an absolute local SKILL.md path or HTTPS source URL, then install. Choose **MCP tool server · HTTP** to register a trusted HTTPS MCP endpoint. Installations save configuration; they do not run a command or call an MCP server. Explicit installations start enabled; use **Disable** or **Remove** to control future tasks.
+Open **Plugins** in the title bar or use `/plugins`. Installed skills are instructions, and installed MCP servers are configurations; installation alone does not mean a server is connected. Choose **Skill · SKILL.md**, enter a name and an absolute local SKILL.md path or HTTPS source URL, then install. Choose **MCP tool server · HTTP** to register a trusted HTTPS MCP endpoint. Installations save configuration; they do not run a command or call an MCP server. Explicit installations start enabled; use **Disable** or **Remove** to control future tasks.
 
-Use `/mcp`, `/tools`, or `/extensions` to open these controls. **Check & list tools** explicitly connects to an enabled MCP server, discovers its actual tool names, and closes the connection without executing a tool. A failed check displays an error; a successful check describes availability at that check, not a permanent connection. Individual tool checkboxes apply to the next task for this desktop session only. Disabling a tool can narrow access but cannot override mode restrictions or approvals.
+Use `/skills`, `/mcp`, `/tools`, or `/extensions` to open these controls. `/skills install URL` or “install this skill URL” prepares the existing installation form; review the source, enter a name, and explicitly install. **View instructions** reads the full installed SKILL.md, including disabled skills, without executing it. **Check & list tools** explicitly connects to an enabled MCP server, discovers its actual tool names, and closes the connection without executing a tool. A failed check displays an actionable error (including authentication requirements when detected); a successful check describes availability at that check and closes its connection. Individual tool checkboxes apply to the next task for this desktop session only. Disabling a tool can narrow access but cannot override mode restrictions or approvals.
 
 Enabled skills supply instructions to coding modes. MCP tools are available in Build mode and each external tool call follows command approval (including its session grants and Full access preset); Plan and Review do not gain external tools. General Chat remains tool-free. External servers receive tool arguments and may return untrusted content. Only install instructions and endpoints you trust. Never put credentials in a URL; this UI does not accept authentication headers. Local configuration is stored in the desktop application's private `extensions.json` under Electron's user-data directory. It is separate from CLI and cloud-project registries. Changes apply to the next task and are blocked while a task is running.
 
@@ -133,3 +133,7 @@ release. The app's macOS Developer ID check and Windows signature verification
 remain enabled. A new signed release needs a new version and fresh native
 artifacts; never overwrite the current stable binaries. These credentials have
 not been configured or validated yet.
+
+### Plugin bundles
+
+In **Plugins**, enter an HTTPS plugin manifest URL and choose **Review plugin**. Review every listed skill source and MCP endpoint, then choose **Install reviewed plugin**. The exact reviewed manifest is used; it is not fetched again during confirmation. Bundles contain instructions and server configurations, never install scripts or authentication headers. A failed member installation leaves the saved registry unchanged. Installed bundles show their actual member counts; remove a bundle to remove its owned members. Installation does not connect MCP servers: check individual servers explicitly, and follow any reported authentication requirements.

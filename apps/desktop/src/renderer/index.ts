@@ -1,3 +1,4 @@
+import { filterConversationCommands, parseSkillInstallIntent, codexUnsupportedCommand } from "../../../../packages/contracts/src/conversation-commands";
 import { canDeliverQueuedPrompt, settleQueuedPrompt, type QueuedPrompt } from "./prompt-queue";
 import { parseMarkdownBlocks, safeMarkdownLink } from "./markdown";
 import type {
@@ -107,21 +108,83 @@ function isChat() {
 function workspaceName() {
   return state?.workspace?.name || "Your project";
 }
+let workspaceNavigationKey = "";
+function renderWorkspaceNavigation() {
+  const workspace = state?.workspace;
+  const chat = isChat();
+  const blocked = running || actionBusy || commandInFlight || promptQueue.length > 0;
+  const recent = [...(state?.recentFolders || [])];
+  if (workspace && !recent.some(folder => folder.root === workspace.root)) recent.unshift(workspace);
+  const key = JSON.stringify([chat, workspace?.root, workspace?.trusted, workspace?.files.length, recent, blocked]);
+  if (key === workspaceNavigationKey) return;
+  workspaceNavigationKey = key;
+  const sidebar = el("project-sidebar");
+  const list = el("workspace-list");
+  const context = el("selected-workspace");
+  const conversations = el("workspace-conversations");
+  // Keep these persistent nodes and their input/listeners while rebuilding rows.
+  sidebar.append(context, conversations);
+  list.replaceChildren();
+  hide("selected-workspace", chat || !workspace);
+  button("sidebar-general-chat").setAttribute("aria-current", chat ? "page" : "false");
+  text("folder-name", workspace?.name || "");
+  text("folder-path", workspace?.root || "");
+  text("workspace-details", workspace?.trusted ? `Trusted folder · ${workspace.files.length} files in explorer` : "Trust this folder before accessing its files.");
+  text("conversation-scope-label", chat ? "Your chats" : "Conversations");
+  input("thread-search").placeholder = chat ? "Search chats…" : "Search workspace chats…";
+  if (!recent.length) {
+    const empty = document.createElement("p"); empty.className = "workspace-empty";
+    empty.textContent = "Open a folder to keep its tasks and conversations together."; list.append(empty);
+  }
+  for (const folder of recent) {
+    const group = document.createElement("section"); group.className = "workspace-group";
+    const active = !chat && workspace?.root === folder.root;
+    const control = document.createElement("button"); control.type = "button";
+    control.className = "workspace-select"; control.disabled = blocked;
+    control.setAttribute("aria-expanded", String(active));
+    if (active) control.setAttribute("aria-current", "page");
+    control.title = folder.root;
+    const icon = document.createElement("span"); icon.setAttribute("aria-hidden", "true"); icon.textContent = active ? "⌄" : "›";
+    const name = document.createElement("span"); name.textContent = folder.name;
+    control.append(icon, name);
+    control.addEventListener("click", () => { if (!active) void openRecentWorkspace(folder.root); }, { signal });
+    group.append(control);
+    if (active) group.append(context, conversations);
+    list.append(group);
+  }
+  if (chat) el("general-conversations").append(conversations);
+  // Context remains hidden outside the active group in general chat.
+  if (chat) el("general-conversations").append(context);
+}
+async function openRecentWorkspace(root: string) {
+  if (running || actionBusy || commandInFlight || promptQueue.length) { notify("Finish the current action and queued messages before switching workspaces."); return; }
+  if (dirty()) { showError(new Error("Save your editor changes before switching workspaces.")); return; }
+  actionBusy = true; updateControls(); clearError();
+  try {
+    const workspace = await bridge.openRecentFolder(root);
+    if (!workspace) return;
+    renderState({ ...(await bridge.getState()), workspace });
+    if (!workspace.trusted) {
+      pendingFolder = workspace; input("trust-check").checked = false; button("trust-confirm").disabled = true;
+      text("trust-path", workspace.root); const dialog = el<HTMLDialogElement>("trust-dialog"); dialog.returnValue = "";
+      if (!dialog.open) dialog.showModal();
+    } else { mode.value = "build"; notify(`Opened ${workspace.name}. Its saved conversations are in the sidebar.`); }
+  } catch (error) { showError(error); }
+  finally { actionBusy = false; updateControls(); }
+}
 function updateControls() {
   const chat = isChat();
-  text("sidebar-heading-label", chat ? "Your chats" : "Workspace");
-  hide("coding-section-label", chat);
-  text("sidebar-new-task", chat ? "＋ New chat" : "＋ New task");
-  if (chat) {
-    text("folder-name", "Coding workspace");
-    text("folder-path", "Signed-in chats sync across your devices.");
-  }
+  text("sidebar-heading-label", "Workspaces");
+  hide("workspace-tools", chat);
+  renderWorkspaceNavigation();
+  text("sidebar-new-task", "＋ New conversation");
   const ready = (chat || trusted()) && !running && !actionBusy;
   const safe = !chat && trusted() && !running && !actionBusy;
   const readOnly = state?.permissionPreset === "read-only";
-  const localCommand = /^\/permissions(?:\s|$)/i.test(prompt.value.trim());
+  if (!chat && trusted()) text("agent-context", `Local · ${workspaceName()} · ${mode.value === "build" ? "Build" : mode.value === "plan" ? "Plan · read only" : "Review · read only"}`);
+  const localCommand = prompt.value.trim().startsWith("/") || !!parseSkillInstallIntent(prompt.value);
   button("open-folder").disabled = running || actionBusy;
-  button("folder-picker").disabled = running || actionBusy;
+  button("sidebar-general-chat").disabled = running || actionBusy || commandInFlight || promptQueue.length > 0;
   button("welcome-open").disabled = running || actionBusy;
   button("refresh-files").disabled = !safe;
   button("save-file").disabled =
@@ -168,7 +231,7 @@ function updateControls() {
   document
     .querySelectorAll<HTMLButtonElement>("[data-conversation]")
     .forEach((node) => {
-      node.hidden = node.dataset.conversation !== (chat ? "chat" : "coding");
+      node.hidden = false;
     });
   for (const id of ["toggle-workbench", "sidebar-files", "sidebar-output"]) {
     button(id).disabled = chat || running || actionBusy;
@@ -214,7 +277,12 @@ function updateControls() {
   );
   hide("dirty-indicator", !dirty());
 }
+const conversationDrafts = new Map<string, string>();
+function draftScope(value: DesktopState | null | undefined) { return `${value?.conversationMode === "coding" ? value.workspace?.root || "none" : "chat"}:${value?.activeThreadId || "new"}`; }
 function renderState(next: DesktopState) {
+  const previousScope = draftScope(state);
+  const nextScope = draftScope(next);
+  if (state && previousScope !== nextScope) conversationDrafts.set(previousScope, prompt.value.trim().startsWith("/") ? "" : prompt.value);
   const oldRoot = state?.workspace?.root;
   const oldMode = state?.conversationMode;
   const oldThread = state?.activeThreadId;
@@ -238,20 +306,14 @@ function renderState(next: DesktopState) {
   else if (mode.value === "chat") mode.value = "build";
   text(
     "chat-welcome-title",
-    next.conversationMode === "chat"
-      ? "What can I help with?"
-      : "What are we building?",
+    "What can I help with?",
   );
   text(
     "chat-welcome-description",
-    next.conversationMode === "chat"
-      ? "A little room to think, write, and build."
-      : "Ask about your project, plan a change, or build something new.",
+    "Ask anything, or type / to work with a project.",
   );
   prompt.placeholder =
-    next.conversationMode === "chat"
-      ? "Message Freecoda…"
-      : "Ask about your project…";
+    "Ask Coda… Type / for commands";
   if (oldRoot !== next.workspace?.root) {
     file = null;
     editor.value = "";
@@ -289,8 +351,8 @@ function renderState(next: DesktopState) {
     next.conversationMode === "chat"
       ? "Chat · saved on this computer"
       : next.workspace?.trusted
-        ? next.workspace.name
-        : "Open a folder to start",
+        ? `Local · ${next.workspace.name}`
+        : "Choose a project with /project",
   );
   text(
     "account-label",
@@ -310,13 +372,13 @@ function renderState(next: DesktopState) {
     for (const item of next.conversation) appendMessage(item.role, item.text);
     conversationRoot = conversationKey;
   }
+  if (previousScope !== nextScope) prompt.value = conversationDrafts.get(nextScope) || "";
   renderFiles();
   renderThreads();
-  text("model-label", next.auth.model || "Freecoda model");
   text("model-privacy-note", next.auth.allowPromptTraining === false
     ? "Provider prompt training is disallowed for this hosted model. Provider operational retention may still apply."
     : next.auth.allowPromptTraining === true || !next.auth.model
-      ? "Hosted Beam Free may retain prompts and code and use them for training. Do not send sensitive content."
+      ? "The hosted provider may retain prompts and code and use them for training. Do not send sensitive content."
       : "Provider training and retention policy is unavailable. Do not send sensitive content.");
   updateControls();
   renderAccount();
@@ -338,6 +400,17 @@ function renderFiles() {
   const tree = el("file-tree");
   tree.replaceChildren();
   const workspace = state?.workspace;
+  const overview = el("files-overview-list"); overview.replaceChildren();
+  text("files-overview-title", workspace ? workspace.name : "Your project files");
+  text("files-overview-description", workspace?.trusted ? `${workspace.files.length} project files available. Choose one here or in the explorer to read and edit it.` : workspace ? "Trust this selected folder before accessing its files." : "Open a local folder to explore its files alongside your conversation.");
+  hide("welcome-open", !!workspace);
+  if (workspace?.trusted) {
+    for (const entry of [...workspace.files].sort((a, b) => a.path.localeCompare(b.path)).slice(0, 6)) {
+      const control = document.createElement("button"); control.type = "button"; control.textContent = entry.path; control.title = entry.path;
+      control.disabled = running || actionBusy;
+      control.addEventListener("click", () => void openFile(entry.path), { signal }); overview.append(control);
+    }
+  }
   if (!workspace?.trusted) {
     const p = document.createElement("p");
     p.className = "file-empty";
@@ -394,7 +467,7 @@ async function refreshFiles() {
   }
 }
 async function chooseFolder() {
-  if (running || actionBusy) return;
+  if (running || actionBusy || commandInFlight || promptQueue.length) { notify("Finish the current action and queued messages before opening a folder."); return; }
   if (
     dirty() &&
     !window.confirm(
@@ -410,7 +483,8 @@ async function chooseFolder() {
     if (!next) return;
     if (next.trusted) {
       renderState({ ...(await bridge.getState()), workspace: next });
-      notify(`Opened ${next.name}.`);
+      mode.value = "build";
+      notify(`Opened ${next.name} locally. Project tools are ready.`);
     } else {
       pendingFolder = next;
       input("trust-check").checked = false;
@@ -442,7 +516,8 @@ async function trustFolder() {
       consent: true,
     });
     renderState({ ...(await bridge.getState()), workspace });
-    notify(`Opened ${workspace.name}.`);
+    mode.value = "build";
+    notify(`Opened ${workspace.name} locally. Project tools are ready.`);
   } catch (error) {
     showError(error);
   } finally {
@@ -692,10 +767,17 @@ async function sendPrompt(event?: Event) {
     notify("A task is running. Press Ctrl+Enter to add this message to the queue.");
     return;
   }
-  if (await runSlashCommand(prompt.value.trim())) {
-    prompt.value = "";
-    updateControls();
-    return true;
+  try {
+    const commandInput = prompt.value;
+    if (await runSlashCommand(commandInput.trim())) {
+      if (prompt.value === commandInput) prompt.value = "";
+      closeSlashMenu();
+      updateControls();
+      return true;
+    }
+  } catch (error) {
+    showError(error);
+    return;
   }
   if (/^\/permissions(?:\s|$)/i.test(prompt.value.trim())) {
     if (prompt.value.trim().toLowerCase() !== "/permissions") {
@@ -817,19 +899,146 @@ async function drainPromptQueue() {
     drainingPromptQueue = false;
   }
 }
+let slashSelection = 0;
+let slashDismissed = false;
+function slashMatches() {
+  return /^\/[^\s]*$/.test(prompt.value) && !slashDismissed
+    ? filterConversationCommands(prompt.value, "desktop", 30) : [];
+}
+function closeSlashMenu() {
+  hide("slash-menu");
+  prompt.setAttribute("aria-expanded", "false");
+  prompt.removeAttribute("aria-activedescendant");
+}
+function chooseSlashCommand(name: string) {
+  prompt.value = name + " ";
+  closeSlashMenu();
+  prompt.focus();
+  updateControls();
+}
+function renderSlashMenu() {
+  const matches = slashMatches();
+  const menu = el("slash-menu");
+  menu.replaceChildren();
+  if (!matches.length) { closeSlashMenu(); return; }
+  slashSelection = Math.min(slashSelection, matches.length - 1);
+  matches.forEach((command, index) => {
+    const option = document.createElement("div");
+    option.id = `slash-option-${index}`;
+    option.setAttribute("role", "option");
+    option.setAttribute("aria-selected", String(index === slashSelection));
+    const title = document.createElement("strong"); title.textContent = command.name;
+    const description = document.createElement("span"); description.textContent = command.description;
+    option.append(title, description);
+    option.addEventListener("mousedown", event => { event.preventDefault(); chooseSlashCommand(command.name); }, { signal });
+    menu.append(option);
+  });
+  hide("slash-menu", false);
+  prompt.setAttribute("aria-expanded", "true");
+  prompt.setAttribute("aria-activedescendant", `slash-option-${slashSelection}`);
+  el(`slash-option-${slashSelection}`).scrollIntoView({ block: "nearest" });
+}
+function handleSlashKey(event: KeyboardEvent) {
+  if (event.isComposing || event.ctrlKey || event.metaKey || event.shiftKey) return false;
+  const matches = slashMatches();
+  if (!matches.length || el("slash-menu").hidden) return false;
+  if (event.key === "Escape") { event.preventDefault(); slashDismissed = true; closeSlashMenu(); return true; }
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    slashSelection = (slashSelection + (event.key === "ArrowDown" ? 1 : -1) + matches.length) % matches.length;
+    renderSlashMenu(); return true;
+  }
+  if (event.key === "Tab" || event.key === "Enter") {
+    event.preventDefault(); chooseSlashCommand(matches[slashSelection].name); return true;
+  }
+  return false;
+}
+button("commands-open").addEventListener("click", () => {
+  if (prompt.value.trim() && !prompt.value.startsWith("/")) { notify("Type / at the start of a message to discover commands. Your draft is unchanged."); prompt.focus(); return; }
+  prompt.value = "/"; slashDismissed = false; slashSelection = 0; prompt.focus(); renderSlashMenu(); updateControls();
+}, { signal });
+prompt.addEventListener("blur", () => closeSlashMenu(), { signal });
+prompt.addEventListener("focus", renderSlashMenu, { signal });
+async function openExtensions(kind?: "skill" | "mcp", source?: string | null) {
+  if (running || promptQueue.length) { notify("Finish or remove queued messages before changing tools or skills."); return; }
+  hide("extension-error");
+  setExtensionView(kind === "mcp" ? "mcp" : kind === "skill" ? "skills" : "all");
+  renderExtensions(await bridge.listExtensions());
+  renderPluginBundles(await bridge.listPlugins());
+  await renderToolChoices();
+  if (kind) el<HTMLSelectElement>("extension-kind").value = kind;
+  if (source) input("extension-url").value = source;
+  const dialog = el<HTMLDialogElement>("extensions-dialog");
+  if (!dialog.open) dialog.showModal();
+  if (kind) input("extension-url").focus();
+}
 async function runSlashCommand(value: string): Promise<boolean> {
+  const installIntent = parseSkillInstallIntent(value);
+  if (installIntent) { await openExtensions("skill", installIntent.source); return true; }
   if (!value.startsWith("/")) return false;
   const [command, ...args] = value.trim().split(/\s+/);
   switch (command.toLowerCase()) {
     case "/help":
-      appendMessage("assistant", "Desktop commands: /help, /new, /clear, /mode chat|build|plan|review, /model, /permissions, /usage, /status, /sync status|pull, /mcp, /tools, /extensions. Tool access still follows the selected mode, trusted folder, and permission approvals.");
+      appendMessage("assistant", "Commands: /project to choose a folder, /build to work on it, /plan and /review for read-only project tasks, /chat to return to general chat, /files, /terminal, /repos, /model, /permissions, /usage, /status, /sync status|pull, /mcp, /skills, /tools, /new, /clear, /resume, /copy, /diff, /pwd. Project access requires folder trust; changes and commands follow your permissions.");
       return true;
     case "/new":
       await newConversation();
       return true;
     case "/clear":
-      clearConversation(false);
-      notify("Visible conversation cleared. Saved conversation history is unchanged.");
+      await newConversation();
+      return true;
+    case "/resume":
+      if (args.length) {
+        const saved = state?.threads?.find(thread => thread.id === args.join(" "));
+        if (!saved) notify("Conversation not found. Use /resume to browse this workspace’s saved conversations.");
+        else if (!running && !actionBusy && !promptQueue.length) renderState(await bridge.openThread(saved.id));
+        else notify("Finish the current task and queued messages before resuming another conversation.");
+      } else {
+        el("app").classList.remove("sidebar-hidden"); hide("project-sidebar", false);
+        button("toggle-sidebar").setAttribute("aria-expanded", "true"); input("thread-search").focus();
+        notify("Choose a saved conversation in this workspace’s sidebar.");
+      }
+      return true;
+    case "/copy": {
+      if (running) { notify("Wait for the response to finish before copying it."); return true; }
+      const replies = el("conversation").querySelectorAll<HTMLElement>(".message.assistant .chat-message-content");
+      const answer = replies[replies.length - 1]?.innerText.trim();
+      if (!answer) notify("No completed assistant response to copy.");
+      else { await bridge.copyText(answer); notify("Latest response copied."); }
+      return true;
+    }
+    case "/pwd":
+    case "/cwd":
+      notify(isChat() ? "General chat has no attached working directory." : state?.workspace?.root || "No local workspace selected.");
+      return true;
+    case "/diff": {
+      if (isChat() || !trusted()) { notify("Open and trust a folder with /build before reviewing its changes."); return true; }
+      if (running || actionBusy || commandInFlight || dirty()) { notify("Finish the current action and save editor changes before reviewing the diff."); return true; }
+      showWorkbench(true); outputTab("output");
+      const result = await bridge.runCommand({ command: "git -c core.hooksPath=/dev/null diff --no-ext-diff --no-textconv HEAD && git -c core.hooksPath=/dev/null ls-files --others --exclude-standard" });
+      appendOutput(`\nRepository changes (tracked diff, then untracked paths only):\n${result.output}\nExit: ${result.exitCode}\n`);
+      return true;
+    }
+    case "/chat":
+    case "/build":
+    case "/plan":
+    case "/review":
+      await switchAgentMode(command.slice(1).toLowerCase() as AgentMode);
+      return true;
+    case "/project":
+      await chooseFolder();
+      if (trusted() && state?.conversationMode === "coding") await switchAgentMode("build");
+      return true;
+    case "/files":
+    case "/terminal":
+      if (isChat() || !trusted()) notify("Use /build, /plan, or /review to select a trusted project first.");
+      else {
+        showWorkbench(true);
+        if (command.toLowerCase() === "/terminal") { outputTab("output"); input("command").focus(); }
+      }
+      return true;
+    case "/repos":
+      button("github-repos-open").click();
       return true;
     case "/mode": {
       const selected = args[0] as AgentMode | undefined;
@@ -840,6 +1049,9 @@ async function runSlashCommand(value: string): Promise<boolean> {
       await switchAgentMode(selected);
       return true;
     }
+    case "/update":
+      await bridge.checkForUpdates();
+      return true;
     case "/model":
       await openModels();
       return true;
@@ -851,7 +1063,7 @@ async function runSlashCommand(value: string): Promise<boolean> {
       openAccount();
       return true;
     case "/status":
-      notify(`${isChat() ? "Chat" : `${mode.value} workspace · ${workspaceName()}`} · ${trusted() ? "folder trusted" : "no trusted folder"} · ${state?.permissionPreset || "default"} permissions · ${state?.auth.model || "Beam Free"}`);
+      notify(`${isChat() ? "Chat" : `${mode.value} workspace · ${workspaceName()}`} · ${trusted() ? "folder trusted" : "no trusted folder"} · ${state?.permissionPreset || "default"} permissions`);
       return true;
     case "/sync": {
       const action = args[0] || "status";
@@ -863,13 +1075,21 @@ async function runSlashCommand(value: string): Promise<boolean> {
       appendMessage("assistant", `${result.repository || "Repository"} · ${result.branch || "detached HEAD"} → ${result.upstream || "no upstream"}\n${result.ahead} ahead · ${result.behind} behind · ${result.dirty ? "local changes present" : "clean"} · ${result.conflicts ? "conflicts present" : "no conflicts"}${result.operationInProgress ? " · Git operation in progress" : ""}${action === "status" ? "\nCounts reflect the last fetch. /sync pull explicitly fetches and fast-forwards a clean checkout." : "\nSync finished. Nothing was uploaded."}`);
       return true;
     }
+    case "/skills":
+      await openExtensions("skill");
+      return true;
     case "/mcp":
+      await openExtensions("mcp");
+      return true;
     case "/tools":
+    case "/plugins":
     case "/extensions":
-      button("extensions-open").click();
+      await openExtensions();
+      if (command.toLowerCase() === "/tools") setExtensionView("tools");
+      if (command.toLowerCase() === "/plugins") setExtensionView("plugins");
       return true;
     default:
-      notify(`Unknown command: ${command}. Use /help to see desktop commands.`);
+      notify(codexUnsupportedCommand(command) || `Unknown command: ${command}. Use /help to see desktop commands.`);
       return true;
   }
 }
@@ -1026,11 +1246,6 @@ async function decideApproval(approved: boolean, scope: "once" | "session" = "on
     button("deny-tool").disabled = false;
   }
 }
-button("refresh-conversations").addEventListener("click", async () => {
-  button("refresh-conversations").disabled = true;
-  try { renderState(await bridge.refreshConversations()); } catch (error) { showError(error); }
-  finally { button("refresh-conversations").disabled = false; }
-}, { signal });
 let githubRepos: import("../shared").DesktopGitHubRepo[] = [];
 async function refreshGitHubRepositories() {
   const data = await bridge.githubRepositories(); githubRepos = data.repos;
@@ -1047,10 +1262,23 @@ async function refreshGitHubRepositories() {
       const label = document.createElement("label"); label.textContent = title;
       const field = document.createElement("input"); field.name = name; field.value = value; field.maxLength = 255; label.append(field); row.append(label);
     }
-    list.append(row);
+    const compact = document.createElement("details"); compact.dataset.repositoryName = `${repo.owner}/${repo.name}`.toLowerCase();
+    const summary = document.createElement("summary"); summary.textContent = `${repo.owner}/${repo.name}${enabled.checked ? " · Enabled" : ""}`;
+    compact.append(summary, row); list.append(compact);
   }
+  filterRepositories();
   text("github-repos-status", "Preferences are shared with your hosted account.");
 }
+function filterRepositories() {
+  const query = input("github-repos-search").value.trim().toLowerCase();
+  let count = 0;
+  el("github-repos-list").querySelectorAll<HTMLDetailsElement>("details").forEach(row => {
+    row.hidden = !row.dataset.repositoryName?.includes(query);
+    if (!row.hidden) count++;
+  });
+  text("github-repos-results", `${count} ${count === 1 ? "repository" : "repositories"}`);
+}
+input("github-repos-search").addEventListener("input", filterRepositories, { signal });
 button("github-repos-open").addEventListener("click", async () => {
   try { await refreshGitHubRepositories(); el<HTMLDialogElement>("github-repos-dialog").showModal(); } catch (error) { showError(error); }
 }, { signal });
@@ -1072,23 +1300,107 @@ el("github-repos-form").addEventListener("submit", async event => {
   } catch (error) { text("github-repos-status", error instanceof Error ? error.message : "Could not save repositories."); }
   finally { button("github-repos-save").disabled = false; }
 }, { signal });
+let reviewedPlugin: { source: string; manifest: Awaited<ReturnType<DesktopBridge["previewPlugin"]>> } | null = null;
+function renderPluginBundles(plugins: import("../shared").DesktopPlugin[]) {
+  const list = el("plugin-bundles"); list.replaceChildren();
+  if (!plugins.length) { const empty = document.createElement("p"); empty.className = "settings-empty"; empty.textContent = "No plugin bundles installed. Review a manifest to add its skills and MCP connections."; list.append(empty); }
+  for (const plugin of plugins) {
+    const row = document.createElement("div"); row.className = "extension-row";
+    const info = document.createElement("div"); const name = document.createElement("strong"); name.textContent = plugin.name;
+    const detail = document.createElement("small"); detail.textContent = `Installed bundle · ${plugin.skillCount} skills · ${plugin.serverCount} MCP servers · connection status shown below`;
+    info.append(name, detail);
+    const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "Remove bundle";
+    remove.addEventListener("click", async () => {
+      if (running || promptQueue.length) { notify("Finish or remove queued messages before changing plugins."); return; }
+      remove.disabled = true;
+      try { renderPluginBundles(await bridge.removeInstalledPlugin(plugin.id)); renderExtensions(await bridge.listExtensions()); await renderToolChoices(); }
+      catch (error) { text("plugin-error", message(error)); hide("plugin-error", false); remove.disabled = false; }
+    }, { signal });
+    row.append(info, remove); list.append(row);
+  }
+}
+el("plugin-form").addEventListener("submit", async event => {
+  event.preventDefault(); hide("plugin-error"); reviewedPlugin = null; hide("plugin-review");
+  button("plugin-preview").disabled = true;
+  try {
+    if (running || promptQueue.length) throw Error("Finish or remove queued messages before reviewing plugins.");
+    const source = input("plugin-source").value.trim();
+    const manifest = await bridge.previewPlugin(source);
+    reviewedPlugin = { source, manifest };
+    text("plugin-review-name", manifest.name);
+    text("plugin-review-source", source);
+    const list = el("plugin-review-members"); list.replaceChildren();
+    for (const member of [...manifest.skills.map(skill => `Skill: ${skill.name || "SKILL.md"} — ${skill.source}`), ...manifest.servers.map(server => `MCP: ${server.name} — ${server.url}`)]) {
+      const row = document.createElement("li"); row.textContent = member; list.append(row);
+    }
+    hide("plugin-review", false);
+  } catch (error) { text("plugin-error", message(error)); hide("plugin-error", false); }
+  finally { button("plugin-preview").disabled = false; }
+}, { signal });
+button("plugin-cancel").addEventListener("click", () => { reviewedPlugin = null; hide("plugin-review"); }, { signal });
+button("plugin-confirm").addEventListener("click", async () => {
+  if (!reviewedPlugin) return;
+  button("plugin-confirm").disabled = true; hide("plugin-error");
+  try {
+    if (running || promptQueue.length) throw Error("Finish or remove queued messages before installing plugins.");
+    renderPluginBundles(await bridge.installReviewedPlugin(reviewedPlugin));
+    reviewedPlugin = null; hide("plugin-review"); renderExtensions(await bridge.listExtensions()); await renderToolChoices();
+  } catch (error) { text("plugin-error", message(error)); hide("plugin-error", false); }
+  finally { button("plugin-confirm").disabled = false; }
+}, { signal });
+type ExtensionView = "all" | "plugins" | "mcp" | "skills" | "tools";
+let extensionView: ExtensionView = "all";
+let installedExtensions: import("../shared").DesktopExtension[] = [];
+function setExtensionView(view: ExtensionView) {
+  extensionView = view;
+  for (const control of document.querySelectorAll<HTMLButtonElement>("[data-extension-view]")) {
+    control.setAttribute("aria-pressed", String(control.dataset.extensionView === view));
+  }
+  hide("desktop-plugin-section", view !== "all" && view !== "plugins");
+  hide("desktop-extension-section", view === "plugins" || view === "tools");
+  hide("extensions-form", view === "plugins" || view === "tools");
+  text("extensions-list-title", view === "mcp" ? "Installed MCP connections" : view === "skills" ? "Installed skills" : "Skills and MCP connections");
+  const tools = document.getElementById("tool-choices");
+  if (tools) tools.hidden = view !== "all" && view !== "tools";
+  if (view === "mcp" || view === "skills") el<HTMLSelectElement>("extension-kind").value = view === "mcp" ? "mcp" : "skill";
+  renderExtensions(installedExtensions);
+}
+for (const control of document.querySelectorAll<HTMLButtonElement>("[data-extension-view]")) {
+  control.addEventListener("click", () => setExtensionView(control.dataset.extensionView as ExtensionView), { signal });
+}
+const pluginChecks = new Map<string, { status: string; names: string[] }>();
 function renderExtensions(items: import("../shared").DesktopExtension[]) {
+  installedExtensions = items;
   const list = el("extensions-list"); list.replaceChildren();
-  if (!items.length) { const empty = document.createElement("p"); empty.textContent = "No tools or skills installed."; list.append(empty); }
-  for (const item of items) {
+  const visible = items.filter(item => extensionView === "mcp" ? item.kind === "mcp" : extensionView === "skills" ? item.kind === "skill" : true);
+  if (!visible.length) { const empty = document.createElement("p"); empty.className = "settings-empty"; empty.textContent = extensionView === "mcp" ? "No MCP connections installed. Add a trusted HTTPS endpoint below." : extensionView === "skills" ? "No skills installed. Add a SKILL.md source below." : "No tools or skills installed."; list.append(empty); }
+  for (const item of visible) {
     const row = document.createElement("div"); row.className = "extension-row";
     const info = document.createElement("div");
     const name = document.createElement("strong"); name.textContent = item.name;
-    const detail = document.createElement("small"); detail.textContent = `${item.kind === "skill" ? "Skill" : "MCP server"} · ${item.enabled ? "Enabled" : "Disabled"}`;
+    const detail = document.createElement("small"); detail.textContent = item.kind === "skill" ? `Installed skill · ${item.enabled ? "Enabled" : "Disabled"}` : `Installed MCP server · ${item.enabled ? pluginChecks.get(item.id)?.status || "Not checked · not connected" : "Disabled · not connected"}`;
     info.append(name, detail);
     const actions = document.createElement("div"); actions.className = "extension-actions";
+    if (item.kind === "skill") {
+      const view = document.createElement("button"); view.textContent = "View instructions";
+      view.setAttribute("aria-label", `View ${item.name} instructions`);
+      view.addEventListener("click", async () => {
+        try {
+          const skill = await bridge.readSkill(item.id);
+          text("skill-reader-title", skill.name);
+          text("skill-reader-content", skill.instructions);
+          el<HTMLDialogElement>("skill-reader").showModal();
+        } catch (error) { showError(error); }
+      }, { signal });
+      actions.append(view);
+    }
     const toggle = document.createElement("button"); toggle.textContent = item.enabled ? "Disable" : "Enable";
     toggle.setAttribute("aria-label", `${toggle.textContent} ${item.name}`);
     const remove = document.createElement("button"); remove.textContent = "Remove"; remove.setAttribute("aria-label", `Remove ${item.name}`);
     for (const [control, operation] of [[toggle, () => bridge.setExtensionEnabled({ id: item.id, enabled: !item.enabled })], [remove, () => bridge.removeExtension(item.id)]] as const) {
       control.addEventListener("click", async () => {
         toggle.disabled = remove.disabled = true;
-        try { if (running || promptQueue.length) throw Error("Finish or remove queued messages before changing tools or skills."); renderExtensions(await operation()); } catch (error) { showError(error); toggle.disabled = remove.disabled = false; }
+        try { if (running || promptQueue.length) throw Error("Finish or remove queued messages before changing tools or skills."); pluginChecks.delete(item.id); renderExtensions(await operation()); renderPluginBundles(await bridge.listPlugins()); await renderToolChoices(); } catch (error) { showError(error); toggle.disabled = remove.disabled = false; }
       }, { signal });
     }
     if (item.kind === "mcp") {
@@ -1096,8 +1408,18 @@ function renderExtensions(items: import("../shared").DesktopExtension[]) {
       discover.disabled = !item.enabled || running;
       discover.addEventListener("click", async () => {
         discover.disabled = true;
-        try { const names = await bridge.discoverTools(item.id); detail.textContent = `Available at last check · ${names.join(", ") || "No tools returned"}`; await renderToolChoices(); }
-        catch (error) { detail.textContent = `Check failed: ${message(error)}`; }
+        try {
+          detail.textContent = "Checking connection…";
+          const names = await bridge.discoverTools(item.id);
+          const status = `Ready at last check · ${names.join(", ") || "No tools returned"} · connection closed`;
+          pluginChecks.set(item.id, { status, names }); detail.textContent = status;
+          await renderToolChoices();
+        } catch (error) {
+          const reason = message(error);
+          const signIn = /(?:401|403|unauthori[sz]ed|authentication required|sign.in|oauth)/i.test(reason);
+          const status = signIn ? `Needs sign-in · ${reason}. Check this server’s authentication requirements; authenticated server setup is not available in this form.` : `Check failed · ${reason}. Verify the HTTPS endpoint and try Check & list tools again.`;
+          pluginChecks.set(item.id, { status, names: [] }); detail.textContent = status;
+        }
         finally { discover.disabled = !item.enabled; }
       }, { signal });
       actions.append(discover);
@@ -1105,14 +1427,11 @@ function renderExtensions(items: import("../shared").DesktopExtension[]) {
     actions.append(toggle, remove); row.append(info, actions); list.append(row);
   }
 }
-button("extensions-open").addEventListener("click", async () => {
-  if (running || promptQueue.length) { notify("Finish or remove queued messages before changing tools or skills."); return; }
-  try { renderExtensions(await bridge.listExtensions()); await renderToolChoices(); el<HTMLDialogElement>("extensions-dialog").showModal(); }
-  catch (error) { showError(error); }
-}, { signal });
+button("extensions-open").addEventListener("click", () => void openExtensions().catch(showError), { signal });
+button("skill-reader-close").addEventListener("click", () => el<HTMLDialogElement>("skill-reader").close(), { signal });
 button("extensions-close").addEventListener("click", () => el<HTMLDialogElement>("extensions-dialog").close(), { signal });
 el("extensions-form").addEventListener("submit", async event => {
-  event.preventDefault(); button("extension-install").disabled = true;
+  event.preventDefault(); button("extension-install").disabled = true; hide("extension-error");
   try {
     if (running || promptQueue.length) throw Error("Finish or remove queued messages before changing tools or skills.");
     const kind = el<HTMLSelectElement>("extension-kind").value;
@@ -1120,17 +1439,61 @@ el("extensions-form").addEventListener("submit", async event => {
     renderExtensions(await bridge.installExtension({ kind, name: input("extension-name").value, url: input("extension-url").value }));
     input("extension-name").value = ""; input("extension-url").value = "";
     notify("Extension installed. Review its enabled state before the next coding task.");
-  } catch (error) { showError(error); }
+  } catch (error) { text("extension-error", message(error)); hide("extension-error", false); }
   finally { button("extension-install").disabled = false; }
 }, { signal });
+let cloudWorkspaceRequest = 0;
+async function loadCloudWorkspaces() {
+  const request = ++cloudWorkspaceRequest;
+  const list = el("cloud-workspace-list"); list.replaceChildren();
+  if (!state?.auth.signedIn) { const empty = document.createElement("p"); empty.className = "workspace-empty"; empty.textContent = "Sign in to load your cloud environments."; list.append(empty); return; }
+  const loading = document.createElement("p"); loading.className = "workspace-empty"; loading.textContent = "Loading cloud workspaces…"; list.append(loading);
+  button("cloud-workspaces-refresh").disabled = true;
+  try {
+    const workspaces = await bridge.listCloudWorkspaces();
+    if (request !== cloudWorkspaceRequest || !state?.auth.signedIn) return;
+    list.replaceChildren();
+    if (!workspaces.length) { const empty = document.createElement("p"); empty.className = "workspace-empty"; empty.textContent = "No cloud workspaces yet. Import a repository in the cloud workspace."; list.append(empty); }
+    for (const workspace of workspaces) {
+      const control = document.createElement("button"); control.type = "button"; control.className = "cloud-workspace-link";
+      control.setAttribute("aria-label", `Open cloud workspace ${workspace.name} in your browser`);
+      const name = document.createElement("strong"); name.textContent = workspace.name;
+      const detail = document.createElement("small"); detail.textContent = `${workspace.repository || "Cloud project"} · ${workspace.status}`;
+      control.append(name, detail);
+      control.addEventListener("click", async () => {
+        control.disabled = true;
+        try { await bridge.openCloudWorkspace(workspace.id); notify(`${workspace.name} opened in your browser. Cloud conversations remain with that project.`); }
+        catch (error) { showError(error); }
+        finally { control.disabled = false; }
+      }, { signal });
+      list.append(control);
+    }
+  } catch (error) {
+    if (request !== cloudWorkspaceRequest) return;
+    list.replaceChildren(); const problem = document.createElement("p"); problem.className = "workspace-empty"; problem.textContent = `Could not load cloud workspaces: ${message(error)}. Use Refresh to retry.`; list.append(problem);
+  } finally { if (request === cloudWorkspaceRequest) button("cloud-workspaces-refresh").disabled = false; }
+}
+button("cloud-workspaces-refresh").addEventListener("click", () => void loadCloudWorkspaces(), { signal });
+button("account-avatar-open").addEventListener("click", openAccount, { signal });
+function renderAccountAvatar() {
+  const signedIn = state?.auth.signedIn;
+  const avatar = el("account-avatar"); avatar.replaceChildren();
+  if (signedIn && accountProfile.avatar) {
+    const image = document.createElement("img"); image.src = accountProfile.avatar; image.alt = ""; image.width = 28; image.height = 28; avatar.append(image);
+  } else avatar.textContent = signedIn ? accountProfile.name?.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase() || "U" : "○";
+  text("account-footer-label", signedIn ? accountProfile.name || "Your account" : "Sign in");
+  button("account-avatar-open").setAttribute("aria-label", signedIn ? `${accountProfile.name || "Your account"} · Account & settings` : "Sign in to Freecoda");
+}
 function renderAccount() {
   if (!state) return;
   if (profileSignedIn !== state.auth.signedIn) {
     profileSignedIn = state.auth.signedIn;
     accountProfile = {};
+    void loadCloudWorkspaces();
     if (state.auth.signedIn) void bridge.accountProfile().then(profile => {
       if (!state?.auth.signedIn) return;
       accountProfile = profile;
+      renderAccountAvatar();
       for (const avatar of document.querySelectorAll<HTMLElement>(".message-avatar.user")) {
         avatar.replaceChildren();
         if (profile.avatar) { const image = document.createElement("img"); image.src = profile.avatar; image.alt = ""; image.width = 22; image.height = 22; avatar.append(image); }
@@ -1144,6 +1507,7 @@ function renderAccount() {
       ? `Connected to ${state.auth.server}${state.auth.model ? `\nModel: ${state.auth.model}` : ""}`
       : "Connect your GitHub account to use the free hosted agent. Your local project is not uploaded to GitHub.",
   );
+  renderAccountAvatar();
   hide("login", state.auth.signedIn || loginInProgress);
   hide("logout", !state.auth.signedIn);
   hide("refresh-usage", !state.auth.signedIn);
@@ -1426,6 +1790,8 @@ async function switchAgentMode(chosen: AgentMode) {
   } catch (error) {
     mode.value = isChat() ? "chat" : "build";
     showError(error);
+  } finally {
+    updateControls();
   }
 }
 mode.addEventListener(
@@ -1485,6 +1851,8 @@ el("permissions-form").addEventListener(
 prompt.addEventListener(
   "keydown",
   (event) => {
+    if (event.isComposing) return;
+    if (handleSlashKey(event)) return;
     if (event.key === "Enter" && event.shiftKey) return;
     if (event.key === "Enter" && event.ctrlKey) {
       event.preventDefault();
@@ -1524,19 +1892,19 @@ function renderThreads() {
   text("thread-title", title);
   const history = el("thread-history");
   history.replaceChildren();
-  if (threads.length) {
-    const heading = document.createElement("div");
-    heading.className = "sidebar-section-label";
-    heading.textContent = "Conversations";
-    history.append(heading);
+  const matches = threads.filter((thread) => thread.title.toLowerCase().includes(search));
+  if (!matches.length) {
+    const empty = document.createElement("p");
+    empty.className = "workspace-empty";
+    empty.textContent = search ? "No matching conversations." : "New conversations will appear here.";
+    history.append(empty);
   }
-  for (const thread of threads.filter((t) =>
-    t.title.toLowerCase().includes(search),
-  )) {
+  for (const thread of matches) {
     const node = document.createElement("button");
     node.className = "thread-link";
     node.textContent = thread.title || "New task";
-    node.title = thread.title || "New task";
+    const updated = new Date(thread.updatedAt);
+    node.title = `${thread.title || "New task"}${Number.isNaN(updated.getTime()) ? "" : ` · Updated ${updated.toLocaleString()}`}`;
     if (thread.id === state?.activeThreadId)
       node.setAttribute("aria-current", "page");
     node.disabled = running || actionBusy;
@@ -1549,7 +1917,6 @@ function renderThreads() {
         updateControls();
         try {
           renderState(await bridge.openThread(thread.id));
-          prompt.value = "";
           updateControls();
         } catch (error) {
           showError(error);
@@ -1625,6 +1992,9 @@ button("toggle-sidebar").addEventListener(
   },
   { signal },
 );
+button("sidebar-general-chat").addEventListener("click", () => void switchAgentMode("chat"), { signal });
+button("sidebar-plugins").addEventListener("click", () => void openExtensions().catch(showError), { signal });
+button("sidebar-account").addEventListener("click", openAccount, { signal });
 button("sidebar-new-task").addEventListener(
   "click",
   () => void newConversation(),
@@ -1675,7 +2045,7 @@ async function loadSponsor() {
 }
 
 button("error-close").addEventListener("click", clearError, { signal });
-for (const id of ["open-folder", "welcome-open", "folder-picker"])
+for (const id of ["open-folder", "welcome-open"])
   button(id).addEventListener("click", () => void chooseFolder(), { signal });
 button("refresh-files").addEventListener("click", () => void refreshFiles(), {
   signal,
@@ -1717,7 +2087,7 @@ editor.addEventListener(
   },
   { signal },
 );
-prompt.addEventListener("input", updateControls, { signal });
+prompt.addEventListener("input", () => { slashDismissed = false; slashSelection = 0; renderSlashMenu(); updateControls(); }, { signal });
 el("chat-form").addEventListener("submit", (event) => void sendPrompt(event), {
   signal,
 });
@@ -1900,6 +2270,7 @@ async function renderToolChoices() {
   let list = document.getElementById("tool-choices");
   if (!list) { list = document.createElement("div"); list.id = "tool-choices"; el("extensions-list").after(list); }
   list.replaceChildren();
+  list.hidden = extensionView !== "all" && extensionView !== "tools";
   const title = document.createElement("p"); title.textContent = "Tools for the next task · session only. Mode and approval restrictions still apply. MCP tools appear after an explicit check."; list.append(title);
   for (const tool of await bridge.toolChoices()) {
     const label = document.createElement("label"); const box = document.createElement("input");

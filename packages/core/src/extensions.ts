@@ -9,6 +9,8 @@ import type { Approval } from "./workspace";
 
 import {
   extensionRegistrySchema,
+  pluginManifestSchema,
+  type PluginManifest,
   type ExtensionRegistry,
   type SkillExtension,
   type McpServerExtension,
@@ -25,6 +27,13 @@ export function parseExtensionRegistry(value: unknown): ExtensionRegistry {
   const ids = [...registry.skills, ...registry.servers].map((e) => e.id);
   if (new Set(ids).size !== ids.length)
     throw new Error("Extension IDs must be unique.");
+  const plugins = registry.plugins || [];
+  if (new Set([...ids, ...plugins.map(p => p.id)]).size !== ids.length + plugins.length) throw new Error("Plugin and extension IDs must be unique.");
+  const pluginMembers = plugins.flatMap(plugin => [...plugin.skillIds, ...plugin.serverIds]);
+  if (new Set(pluginMembers).size !== pluginMembers.length) throw new Error("Plugin member ownership must be unique.");
+  for (const plugin of plugins) {
+    if (plugin.skillIds.some(id => !registry.skills.some(skill => skill.id === id)) || plugin.serverIds.some(id => !registry.servers.some(server => server.id === id))) throw new Error("Plugin members must be installed.");
+  }
   let bytes = 0;
   for (const skill of registry.skills) {
     for (const [name, content] of Object.entries(skill.files || {})) {
@@ -46,6 +55,7 @@ export function parseExtensionRegistry(value: unknown): ExtensionRegistry {
 export function publicExtensions(registry: ExtensionRegistry) {
   return {
     version: 1 as const,
+    ...(registry.plugins ? { plugins: registry.plugins } : {}),
     skills: registry.skills.map(({ id, name, source, enabled }) => ({
       id,
       name,
@@ -250,6 +260,7 @@ export function removeExtension(
 ): ExtensionRegistry {
   return parseExtensionRegistry({
     ...registry,
+    ...(registry.plugins ? { plugins: registry.plugins.map(plugin => ({ ...plugin, skillIds: plugin.skillIds.filter(member => member !== id), serverIds: plugin.serverIds.filter(member => member !== id) })).filter(plugin => plugin.skillIds.length + plugin.serverIds.length > 0) } : {}),
     skills: registry.skills.filter((e) => e.id !== id),
     servers: registry.servers.filter((e) => e.id !== id),
   });
@@ -462,4 +473,63 @@ export async function connectExtensionTools(
       await Promise.allSettled(clients.map((c) => c.close()));
     },
   };
+}
+
+/** Download data only. Review this exact manifest before calling installPlugin. */
+export async function fetchPluginManifest(source: string, options: { allowLocal?: boolean } = {}): Promise<PluginManifest> {
+  validateExtensionUrl(source, Boolean(options.allowLocal));
+  const response = await extensionFetch(Boolean(options.allowLocal))(source, { signal: AbortSignal.timeout(20_000) });
+  if (!response.ok || !response.body) throw new Error("Could not download plugin manifest.");
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > 32_000) throw new Error("Plugin manifest exceeds 32KB.");
+      chunks.push(value);
+    }
+  } finally { await reader.cancel().catch(() => {}); }
+  return pluginManifestSchema.parse(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+}
+
+/** Transactional in-memory bundle install. Persist only its successful return value. */
+export async function installPlugin(registry: ExtensionRegistry, input: { manifest: PluginManifest; source: string; allowLocal?: boolean }): Promise<ExtensionRegistry> {
+  if (Buffer.byteLength(JSON.stringify(input.manifest)) > 32_000) throw new Error("Plugin manifest exceeds 32KB.");
+  const manifest = pluginManifestSchema.parse(input.manifest);
+  const allowLocal = Boolean(input.allowLocal);
+  validateExtensionUrl(input.source, allowLocal);
+  const id = extensionId("plugin", input.source);
+  if (registry.plugins?.some(plugin => plugin.id === id)) throw new Error("Plugin already installed. Remove it before reinstalling.");
+  for (const skill of manifest.skills) validateExtensionUrl(skill.source, allowLocal);
+  for (const server of manifest.servers) validateExtensionUrl(server.url, allowLocal);
+  let next = parseExtensionRegistry(registry);
+  const skillIds: string[] = [], serverIds: string[] = [];
+  for (const skill of manifest.skills) {
+    const candidate = await installRemoteSkill(next, { ...skill, allowLocal });
+    const added = candidate.skills.filter(item => !next.skills.some(previous => previous.id === item.id));
+    if (added.length !== 1) throw new Error("Plugin skill conflicts with an installed or duplicate skill.");
+    skillIds.push(added[0]!.id);
+    next = candidate;
+  }
+  for (const server of manifest.servers) {
+    const candidate = installMcpServer(next, server);
+    const added = candidate.servers.filter(item => !next.servers.some(previous => previous.id === item.id));
+    if (added.length !== 1) throw new Error("Plugin MCP server conflicts with an installed or duplicate connection.");
+    serverIds.push(added[0]!.id);
+    next = candidate;
+  }
+  return parseExtensionRegistry({ ...next, plugins: [...next.plugins || [], { id, name: manifest.name, source: input.source, skillIds, serverIds }] });
+}
+
+export function removePlugin(registry: ExtensionRegistry, id: string): ExtensionRegistry {
+  const plugin = registry.plugins?.find(item => item.id === id);
+  if (!plugin) throw new Error("Plugin not found.");
+  return parseExtensionRegistry({ ...registry,
+    plugins: registry.plugins?.filter(item => item.id !== id),
+    skills: registry.skills.filter(item => !plugin.skillIds.includes(item.id)),
+    servers: registry.servers.filter(item => !plugin.serverIds.includes(item.id)),
+  });
 }

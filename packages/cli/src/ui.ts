@@ -4,7 +4,6 @@ import { PassThrough } from "node:stream";
 import { StringDecoder } from "node:string_decoder";
 import c from "picocolors";
 import { TurnQueue, type QueuedTurn } from "./turn-queue";
-import { CLI_VERSION } from "./version";
 import {
   SessionPermissions,
   PERMISSION_PRESETS,
@@ -124,10 +123,15 @@ export const TERMINAL_COMMANDS = [
   { command: "/help", description: "Show commands and keyboard shortcuts" },
   { command: "/new", description: "Start a new task in this project" },
   { command: "/resume", description: "Open a saved task" },
+  { command: "/chat", description: "Continue without repository access" },
+  { command: "/build", description: "Work in the trusted checkout with approvals" },
   { command: "/model", description: "List or choose the active model" },
   { command: "/mcp", description: "List, discover, or enable MCP connections" },
   { command: "/tools", description: "Select tools for following turns" },
-  { command: "/extensions", description: "List installed tools and skills" },
+  { command: "/extensions", description: "Browse installed tools and skills" },
+  { command: "/plugins", description: "Browse plugins or install <manifest URL>" },
+  { command: "/skills", description: "Search skills or show <id> instructions" },
+  { command: "/install", description: "Install skill <source> or mcp <name> <url>", argument: true },
   { command: "/queue", description: "List, resume, or remove queued turns" },
   {
     command: "/mode",
@@ -154,9 +158,14 @@ export const TERMINAL_COMMANDS = [
     description: "Choose this session’s tool permissions",
   },
   { command: "/status", description: "Show project, model, and permissions" },
-  { command: "/clear", description: "Clear the visible conversation" },
-  { command: "/update", description: "Show update instructions" },
+  { command: "/copy", description: "Copy the latest assistant response (macOS)" },
+  { command: "/diff", description: "Show tracked diff and untracked paths in trusted workspace" },
+  { command: "/pwd", description: "Show the selected directory" },
+  { command: "/cwd", description: "Show the selected directory" },
+  { command: "/clear", description: "Start a fresh chat, preserving saved history" },
+  { command: "/update", description: "Check and install a verified CLI update" },
   { command: "/exit", description: "Close Freecoda" },
+  { command: "/quit", description: "Close Freecoda" },
 ];
 type Entry = {
   role: "you" | "freecoda" | "tool" | "approval" | "notice" | "error";
@@ -721,9 +730,9 @@ export class TerminalScreen {
       );
     };
     lines.push(palette.muted("╭" + "─".repeat(cardWidth - 2) + "╮"));
-    lines.push(card(`▰ freecoda (v${CLI_VERSION})`, true));
-    lines.push(card(`model:     ${this.model}`));
+    lines.push(card(this.mode === "chat" ? "General conversation" : "Local workspace", true));
     lines.push(card(`directory: ${this.root}`));
+    lines.push(card(this.mode === "chat" ? "Project access: none" : "Conversations saved for this directory"));
     lines.push(palette.muted("╰" + "─".repeat(cardWidth - 2) + "╯"));
     const commands = this.commandMatches();
     const menuSize = Math.min(

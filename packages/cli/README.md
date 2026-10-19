@@ -101,13 +101,14 @@ freecoda extensions add-skill /absolute/path/to/skill/SKILL.md
 freecoda extensions add-skill https://raw.githubusercontent.com/OWNER/REPO/main/skill/SKILL.md
 freecoda extensions add-mcp DeepWiki https://mcp.deepwiki.com/mcp
 freecoda extensions list
+freecoda extensions show EXTENSION_ID
 freecoda extensions disable EXTENSION_ID
 freecoda extensions enable EXTENSION_ID
 freecoda extensions remove EXTENSION_ID
 freecoda --mode build
 ```
 
-`/extensions` lists items in an active session. Explicit installs start enabled. Local skill directories include supported text references/scripts, which can be read as supporting data; no installation scripts execute. URL installs download only the skill instructions, not referenced files. Skills apply to coding modes. MCP servers connect only in Agent/build mode; Chat stays tool-free, and Plan/Review do not connect to external servers. External MCP calls require commands-category approval; a session grant or Full access includes all commands and external tools. HTTP MCP endpoints use HTTPS, with loopback HTTP allowed for local development. Stdio transport and interactive MCP OAuth are not implemented.
+`/extensions [search]` and `/skills [search]` browse installed items in an active session. `/skills show <id>` reads the full installed instructions. `/skills install <source>`, `/install skill <source>`, or the exact chat request `install this skill <source>` opens a local installation review; type `install` to confirm. `/install mcp <name> <url>` uses the same confirmation. These chat requests never install automatically, and noninteractive prompts cannot approve an installation. Explicit installs start enabled. Local skill directories include supported text references/scripts, which can be read as supporting data; no installation scripts execute. URL installs download only the skill instructions, not referenced files. Skills apply to coding modes. MCP servers connect only in Agent/build mode; Chat stays tool-free, and Plan/Review do not connect to external servers. External MCP calls require commands-category approval; a session grant or Full access includes all commands and external tools. HTTP MCP endpoints use HTTPS, with loopback HTTP allowed for local development. Stdio transport and interactive MCP OAuth are not implemented.
 
 The registry is saved privately in `~/.config/freecoda/extensions.json` (or `FREECODA_CONFIG_DIR`), independently of Desktop and cloud project extensions. Third-party servers receive tool arguments and may perform outside actions. Installing a skill adds guidance, not permission to bypass approvals.
 
@@ -149,3 +150,24 @@ Ads are fetched from the public terminal-placement endpoint without sending your
 The interface is intended for macOS, Linux, and WSL2 terminals supporting ANSI escape sequences. The plain interface remains available in other environments. CI also builds the Node bundle and checks `--help` on Windows, but this does not establish full native Windows interactive compatibility.
 
 `tests/cli-terminal.test.ts` launches the actual bundled CLI in a real pseudo-terminal against a local fixture provider. It verifies paste does not execute embedded slash commands, a denied edit preserves the file, an approved edit changes it, a house announcement is displayed without paid impressions, and the terminal is restored on exit. It makes no real model calls and does not use account credentials.
+
+## Local execution and cloud boundaries
+
+The CLI runs repository reads, edits, Git inspection and shell commands on this computer in the explicitly trusted checkout. Agent/build mode can use installed HTTP MCP tools after approval; Plan/Review stay read-only, and Chat has no repository tools. Hosted inference and account conversation sync still contact the configured Freecoda server. The CLI does not provision a local equivalent of hosted sandbox lifecycle or a preview proxy. Run your project's own development command locally through an approved shell command when needed. Connected GitHub repository preferences do not clone a checkout or grant local trust.
+
+In an interactive session, `/update` checks the installed CLI and asks for confirmation. A confirmed update saves the conversation, closes the terminal interface, then installs verified release bytes for the next launch. Queued requests must be reviewed or completed first. Source checkouts report their limitation before checking the network; update and rebuild source explicitly. `/chat` and `/build` switch the existing conversation access mode with the same repository trust checks as `/mode`.
+
+## Plugin bundles
+
+A plugin is a reviewed JSON manifest containing skill sources and HTTP MCP connections. Browse installed bundles with `/plugins` or `freecoda plugins list`. `/plugins install <manifest URL>` or `freecoda plugins add <manifest URL>` downloads and displays the manifest, then requires you to type `install`. A failed bundle does not save partial installation. Remove a bundle and its members with `freecoda plugins remove <id>`. Independently installed extensions cannot be overwritten by a plugin.
+
+```json
+{
+  "version": 1,
+  "name": "Example project helpers",
+  "skills": [{ "source": "https://example.com/SKILL.md" }],
+  "servers": [{ "name": "Example tools", "url": "https://example.com/mcp" }]
+}
+```
+
+Manifests are limited to 32KB, twenty skill sources and eight MCP servers. Use HTTPS URLs; local clients also accept loopback HTTP for development. The manifest cannot include installation scripts, executable hooks or credentials. Installation adds guidance and connections, without connecting to MCP or granting execution permissions. Remote skill URLs download instructions only; supporting files are not bundled automatically.

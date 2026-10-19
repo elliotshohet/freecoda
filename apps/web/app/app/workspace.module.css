@@ -1927,3 +1927,26 @@
   .mobilePaneToggle button { padding-top: 3px; padding-bottom: 3px; }
   :global(#workspace-panel) .composer > div { padding: 4px 10px 7px; }
 }
+
+.projectSearch { display: grid; gap: 5px; padding: 8px 12px; font-size: 12px; color: var(--muted); }
+.projectSearch input { width: 100%; min-width: 0; padding: 9px; color: inherit; border: 1px solid var(--line); border-radius: 8px; background: transparent; }
+.composer { position: relative; overflow: visible; }
+
+/* Keep each cloud conversation visibly attached to its own workspace. */
+.workspaceGroup { min-width: 0; flex-shrink: 0; }
+.workspaceButton { width: 100%; display: flex; align-items: center; gap: 9px; padding: 11px 10px; border: 0; border-radius: 7px; background: transparent; text-align: left; color: var(--ink); }
+.workspaceButton > svg { flex-shrink: 0; }
+.workspaceButton > span { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 12px; font-weight: 550; }
+.workspaceButton small { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; font-weight: 450; }
+.workspaceButton small.workspaceBranch { display: flex; align-items: center; gap: 4px; }
+.workspaceButton:hover, .workspaceButton.selected { background: light-dark(#eaeaea, #303030); }
+.workspaceButton:focus-visible, .workspaceConversation button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.workspaceConversation { margin: 3px 8px 9px 18px; padding-left: 10px; border-left: 1px solid var(--line); }
+.workspaceConversation button { width: 100%; min-height: 44px; display: flex; align-items: center; gap: 7px; padding: 7px; border: 0; border-radius: 6px; background: transparent; text-align: left; font-size: 12px; color: var(--muted); }
+.workspaceConversation button:hover { color: var(--ink); background: light-dark(#ededed, #282828); }
+.workspaceConversation button > svg { flex-shrink: 0; }
+.workspaceConversation button > span:first-of-type { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 650px) {
+  .projectList { flex-direction: column; overflow: visible; }
+  :global(#workspace-panel) .projects[data-mobile-open="true"] { max-height: min(50dvh, 420px); }
+}

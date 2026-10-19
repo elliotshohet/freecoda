@@ -34,6 +34,8 @@ import { ModelPicker, modelDisplayName } from "@/components/model-picker";
 import { useModelSelection } from "@/components/use-model-selection";
 import { ThemeControl } from "@/components/theme-control";
 import { SponsorPlacement } from "@/components/sponsor-placement";
+import { parseSkillInstallIntent, codexUnsupportedCommand } from "@freecoda/contracts";
+import { useConversationCommands } from "./conversation-commands";
 import { ProjectExtensions } from "./extensions";
 
 type Status = {
@@ -154,7 +156,7 @@ async function api<T>(
   return data as T;
 }
 
-export function CloudWorkspace({ conversationMode = "project" }: { conversationMode?: "ask" | "project" }) {
+export function CloudWorkspace({ conversationMode = "project", onOpenProject, onOpenChat }: { conversationMode?: "ask" | "project"; onOpenProject?: () => void; onOpenChat?: () => void }) {
   const [status, setStatus] = useState<Status | null>(null);
   const { model, setModel } = useModelSelection(status?.userId, status?.models ?? noWorkspaceModels);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
@@ -165,7 +167,8 @@ export function CloudWorkspace({ conversationMode = "project" }: { conversationM
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [mobilePane, setMobilePane] = useState<"chat" | "inspect">("chat");
   const [controlsOpen, setControlsOpen] = useState(false);
-  const [extensionsView, setExtensionsView] = useState<"all" | "mcp" | "tools">("all");
+  const [extensionsView, setExtensionsView] = useState<"all" | "mcp" | "tools" | "skills">("all");
+  const [skillSource, setSkillSource] = useState<string | null>(null);
   const [extensionsOpenSignal, setExtensionsOpenSignal] = useState(0);
   const [file, setFile] = useState<{
     path: string;
@@ -217,6 +220,8 @@ export function CloudWorkspace({ conversationMode = "project" }: { conversationM
   const [dialog, setDialog] = useState<
     "create" | "import" | "publish" | "delete" | null
   >(null);
+  const [projectSearch, setProjectSearch] = useState("");
+  const [repoSearch, setRepoSearch] = useState("");
   const [repos, setRepos] = useState<Repo[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<Repo | null>(null);
   const [installUrl, setInstallUrl] = useState<string | null>(null);
@@ -241,7 +246,7 @@ export function CloudWorkspace({ conversationMode = "project" }: { conversationM
       if (!project) { setNotice("Select or import a project to manage its MCP connections and tools."); return; }
       const view = (event as CustomEvent).detail?.view;
       setControlsOpen(true);
-      setExtensionsView(view === "mcp" || view === "tools" ? view : "all");
+      setExtensionsView(view === "mcp" || view === "tools" || view === "skills" ? view : "all");
       setExtensionsOpenSignal(value => value + 1);
     };
     window.addEventListener("freecoda:extensions", open);
@@ -385,6 +390,7 @@ export function CloudWorkspace({ conversationMode = "project" }: { conversationM
     if (queuedRef.current.length && !window.confirm("Discard queued messages before switching projects?")) return;
     projectRef.current = next.id;
     setProject(next);
+    if (!signal) onOpenProject?.();
     setFile(null);
     setFiles([]);
     setFileFilter("");
@@ -653,14 +659,29 @@ export function CloudWorkspace({ conversationMode = "project" }: { conversationM
     };
   }, [runId, project?.id]);
 
+  const slashRef = useRef<(value: string) => Promise<void>>(async () => {});
+  slashRef.current = slashCommand;
+  useEffect(() => {
+    const run = (event: Event) => { void slashRef.current((event as CustomEvent<{ command: string }>).detail.command); };
+    window.addEventListener("freecoda:project-command", run);
+    return () => window.removeEventListener("freecoda:project-command", run);
+  }, []);
+  const commands = useConversationCommands(prompt, command => {
+    promptInputRef.current = "";
+    setPrompt("");
+    void slashCommand(command);
+    document.getElementById("cloud-prompt")?.focus();
+  });
+
   async function sendPrompt(e: React.FormEvent) {
     e.preventDefault();
     if (!promptInputRef.current.trim()) return;
     const text = promptInputRef.current.trim();
-    if (text.startsWith("/")) {
+    const skill = parseSkillInstallIntent(text);
+    if (text.startsWith("/") || skill) {
       promptInputRef.current = "";
       setPrompt("");
-      await slashCommand(text);
+      await slashCommand(skill ? `/skills${skill.source ? ` install ${skill.source}` : ""}` : text);
       return;
     }
     enqueuePrompt();
@@ -672,16 +693,59 @@ export function CloudWorkspace({ conversationMode = "project" }: { conversationM
     const argument = args.join(" ").toLowerCase();
     setError("");
     switch (command.toLowerCase()) {
+      case "/chat":
+        onOpenChat?.();
+        break;
+      case "/project":
+        setProjectSearch(rawArgument);
+        setProjectsOpen(true);
+        setNotice("Choose a project to give this conversation project access, or import a repository from GitHub.");
+        break;
+      case "/repos":
+        await showImport();
+        break;
+      case "/build":
+      case "/plan":
+      case "/review":
+        setMode(command.slice(1).toLowerCase());
+        if (!project) { setProjectsOpen(true); setNotice("Choose or import a project before continuing. No repository access has been granted."); }
+        else setNotice(`${command.slice(1)} selected for ${project.name}. ${command === "/build" ? "Changes require the project's permissions." : "Read-only project access."}`);
+        break;
+      case "/files":
+      case "/diff":
+      case "/changes":
+      case "/preview":
+      case "/output":
+        setTab((command === "/diff" ? "changes" : command.slice(1)) as "files" | "changes" | "preview" | "output");
+        setMobilePane("inspect");
+        if (!project) setNotice("Select a project to inspect its files and output.");
+        break;
       case "/help":
-        setNotice("Commands: /new, /clear, /mode build|plan|review, /model, /permissions, /status, /usage, /extensions, /mcp, /tools, /sync status|pull, /resume, /suspend.");
+        setNotice("Type / for commands. /project selects project access; /chat returns to general conversation; /build, /plan and /review choose how to work. /files, /changes, /preview and /output inspect the project.");
         break;
       case "/new":
-        setDialog("create");
+        onOpenChat?.();
+        window.dispatchEvent(new CustomEvent("freecoda:new-chat"));
         break;
       case "/clear":
-        setMessages([]);
-        setOutput("");
-        setNotice("Cleared the visible chat and terminal output. Saved cloud history remains available.");
+        onOpenChat?.();
+        window.dispatchEvent(new CustomEvent("freecoda:new-chat"));
+        setNotice("Started a fresh general chat. This workspace’s existing run history remains saved.");
+        break;
+      case "/resume":
+        onOpenChat?.();
+        window.dispatchEvent(new CustomEvent("freecoda:chat-sidebar"));
+        break;
+      case "/copy": {
+        const answer = messages.filter(message => message.role === "assistant").at(-1)?.text;
+        if (running || !answer) setNotice("No completed assistant response to copy.");
+        else try { await navigator.clipboard.writeText(answer); setNotice("Latest response copied."); }
+        catch { setError("Clipboard access was denied. Use the response’s Copy button instead."); }
+        break;
+      }
+      case "/pwd":
+      case "/cwd":
+        setNotice(project ? `Cloud app directory: ${project.appDirectory || "."}. This is in the hosted workspace, not on your computer.` : "No cloud workspace selected.");
         break;
       case "/mode":
         if (["build", "plan", "review"].includes(argument)) {
@@ -716,18 +780,24 @@ export function CloudWorkspace({ conversationMode = "project" }: { conversationM
         } catch (error) { setError(errorMessage(error)); }
         break;
       }
+      case "/skills":
+        setSkillSource(argument.startsWith("install ") ? rawArgument.slice(8).trim() : null);
+        window.dispatchEvent(new CustomEvent("freecoda:extensions", { detail: { view: "skills" } }));
+        setNotice(project ? "Review the skill source and choose Install extension. Installation does not grant new execution permissions." : "Choose a project before installing skills.");
+        break;
+      case "/plugins":
       case "/extensions":
       case "/mcp":
       case "/tools":
         window.dispatchEvent(new CustomEvent("freecoda:extensions", { detail: { view: command === "/mcp" ? "mcp" : command === "/tools" ? "tools" : "all" } }));
-        setNotice(project ? "Manage the selection for the next run in Cloud settings. Active runs keep their existing tools." : "Select or import a project to manage its MCP connections and tools.");
+        setNotice(project ? "Manage plugins for the next run in Cloud settings. Active runs keep their existing tools." : "Select or import a project to manage its MCP connections and tools.");
         break;
       case "/sync":
         if (!argument || argument === "status") await syncRepository("status");
         else if (argument === "pull") await syncRepository("pull");
         else setNotice("Usage: /sync status|pull. Publish and merge cloud edits before pulling.");
         break;
-      case "/resume":
+      case "/start":
         if (project?.status === "suspended") await lifecycle("resume");
         else setNotice("The selected project is already active.");
         break;
@@ -736,16 +806,17 @@ export function CloudWorkspace({ conversationMode = "project" }: { conversationM
         else setNotice("Stop the active run before suspending this project.");
         break;
       default:
-        setError(`Unknown command: ${command}. Try /help.`);
+        setError(codexUnsupportedCommand(command) || `Unknown command: ${command}. Try /help.`);
     }
   }
   function enqueuePrompt() {
     const text = promptInputRef.current.trim();
     if (!text || !project || !consent || dirty || inactive) return;
-    if (text.startsWith("/")) {
+    const skill = parseSkillInstallIntent(text);
+    if (text.startsWith("/") || skill) {
       promptInputRef.current = "";
       setPrompt("");
-      void slashCommand(text);
+      void slashCommand(skill ? `/skills${skill.source ? ` install ${skill.source}` : ""}` : text);
       return;
     }
     updateQueue([...queuedRef.current, { id: crypto.randomUUID(), text, mode }]);
@@ -1078,6 +1149,10 @@ export function CloudWorkspace({ conversationMode = "project" }: { conversationM
   const inactive = ["creating", "failed", "expired", "deleted"].includes(
     project?.status || "",
   );
+  const visibleProjects = projects.filter((item) =>
+    [item.name, item.repository, item.repo && `${item.repo.owner}/${item.repo.name}`]
+      .filter(Boolean).join(" ").toLowerCase().includes(projectSearch.trim().toLowerCase()),
+  );
   const limitText = status?.limits
     ? [
         status.limits.projects && `${status.limits.projects} projects`,
@@ -1217,7 +1292,7 @@ export function CloudWorkspace({ conversationMode = "project" }: { conversationM
                 : "I agree to store this project’s files, chat, diffs, and command output in Freecoda’s cloud for up to seven days after last activity. Delete the project at any time. Avoid secrets and private customer data."}
             </span>
           </label>
-          {project && <div id="cloud-project-extensions"><ProjectExtensions key={project.id} projectId={project.id} disabled={busy || running || !consent} onToolsChanged={extensionsChanged} requestedView={extensionsView} openSignal={extensionsOpenSignal} mode={mode} /></div>}
+          {project && <div id="cloud-project-extensions"><ProjectExtensions key={project.id} projectId={project.id} disabled={busy || running || !consent} onToolsChanged={extensionsChanged} requestedView={extensionsView} openSignal={extensionsOpenSignal} skillSource={skillSource} mode={mode} /></div>}
           {project && hasExternalTools && mode === "build" && <label className={styles.consent}>
             <input type="checkbox" checked={extensionConsent} disabled={running} onChange={event => setExtensionConsent(event.target.checked)} />
             <span>Allow enabled MCP tools for this run. They may send project context to external servers and perform actions outside this workspace.</span>
@@ -1232,11 +1307,11 @@ export function CloudWorkspace({ conversationMode = "project" }: { conversationM
                 onClick={() => setProjectsOpen((open) => !open)}
               >
                 <FolderGit2 size={15} />
-                <span>{project?.name || "Projects"}</span>
+                <span>{project?.name || "Workspaces"}</span>
                 <ChevronRight size={14} />
               </button>
               <div className={styles.sectionHead}>
-                <strong>Projects</strong>
+                <strong>Workspaces</strong>
                 <button
                   aria-label="Create project"
                   disabled={!consent || busy || running}
@@ -1245,30 +1320,54 @@ export function CloudWorkspace({ conversationMode = "project" }: { conversationM
                   <Plus size={17} />
                 </button>
               </div>
+              <label className={styles.projectSearch}>Find a workspace<input type="search" value={projectSearch} onChange={event => setProjectSearch(event.target.value)} placeholder="Name or repository…" /></label>
               <div className={styles.projectList}>
-                {projects.map((p) => (
-                  <button
-                    key={p.id}
-                    className={project?.id === p.id ? styles.selected : ""}
-                    onClick={() => selectProject(p)}
-                    disabled={running || busy}
-                  >
-                    <FolderGit2 size={16} />
-                    <span>
-                      {p.name}
-                      <small>
-                        {p.status === "ready" && p.sandboxId
-                          ? "Active · uses your compute slot"
-                          : p.status}
-                      </small>
-                    </span>
-                    <ChevronRight size={13} />
-                  </button>
-                ))}
+                {visibleProjects.map((p) => {
+                  const selected = project?.id === p.id;
+                  const details = selected ? project : p;
+                  const repository = details.repo ? `${details.repo.owner}/${details.repo.name}` : details.repository;
+                  return (
+                    <div key={p.id} className={styles.workspaceGroup}>
+                      <button
+                        className={`${styles.workspaceButton} ${selected ? styles.selected : ""}`}
+                        onClick={() => selectProject(p)}
+                        disabled={running || busy}
+                        aria-current={selected ? "true" : undefined}
+                        aria-label={`Open workspace ${p.name}${repository ? `, ${repository}` : ""}`}
+                      >
+                        <FolderGit2 size={16} aria-hidden="true" />
+                        <span>
+                          {p.name}
+                          <small>{repository || "Cloud project"}</small>
+                          {details.repo?.defaultBranch && <small className={styles.workspaceBranch}><GitBranch size={11} aria-hidden="true" />{details.repo.defaultBranch}</small>}
+                          {details.appDirectory && details.appDirectory !== "." && <small>App: {details.appDirectory}</small>}
+                          <small>{details.status === "ready" && details.sandboxId ? "Active · uses your compute slot" : details.status}</small>
+                        </span>
+                        <ChevronRight size={13} aria-hidden="true" />
+                      </button>
+                      {selected && (
+                        <div className={styles.workspaceConversation}>
+                          <button
+                            aria-label={`Continue conversation in ${p.name}`}
+                            onClick={() => {
+                              onOpenProject?.();
+                              setMobilePane("chat");
+                              document.getElementById("cloud-prompt")?.focus();
+                            }}
+                          >
+                            <MessageSquare size={14} aria-hidden="true" />
+                            <span>{messages.find((message) => message.role === "user")?.text || "Workspace conversation"}</span>
+                            {running && <span className={styles.runningDot} aria-label="Running" />}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {projectSearch && !visibleProjects.length && <p className={styles.smallEmpty}>No matching workspaces.</p>}
                 {!projects.length && (
                   <p className={styles.smallEmpty}>
-                    Your next idea starts here. Create a project or import a
-                    GitHub repository.
+                    Create a cloud workspace or import a GitHub repository.
                   </p>
                 )}
               </div>
@@ -1279,23 +1378,6 @@ export function CloudWorkspace({ conversationMode = "project" }: { conversationM
               >
                 <GitBranch size={15} /> Import from GitHub
               </button>
-              {project && (
-                <div className={styles.currentThread}>
-                  <span>Current thread</span>
-                  <button
-                    onClick={() =>
-                      document.getElementById("cloud-prompt")?.focus()
-                    }
-                  >
-                    <MessageSquare size={14} />
-                    <span>
-                      {messages.find((message) => message.role === "user")
-                        ?.text || "Project conversation"}
-                    </span>
-                    {running && <span className={styles.runningDot} />}
-                  </button>
-                </div>
-              )}
               <nav
                 className={styles.railLinks}
                 aria-label="Workspace resources"
@@ -1348,7 +1430,7 @@ export function CloudWorkspace({ conversationMode = "project" }: { conversationM
               <section className={styles.projectArea}>
                 <div className={styles.projectTop}>
                   <div>
-                    <strong>{project.name}</strong>
+                    <strong>{project.name}</strong><span className={styles.projectStatus}>Cloud project · {mode === "build" ? "Build with approvals" : `${mode} · read only`}</span>
                     {project.repo && <span className={styles.projectStatus}>{project.repo.owner}/{project.repo.name} · {project.repo.defaultBranch} · {project.repo.baseSha.slice(0, 7)}</span>}
                     <span className={styles.projectStatus}>
                       {project.status}
@@ -1401,7 +1483,7 @@ export function CloudWorkspace({ conversationMode = "project" }: { conversationM
                       {!messages.length && (
                         <div className={styles.chatEmpty}>
                           <span className={styles.agentGlyph}>✳</span>
-                          <h3>What do you want to build?</h3>
+                          <h3>What can I help with?</h3>
                           <p>
                             Build something new, trace a bug, or make a plan.
                             The agent works in this cloud project. Changes are
@@ -1472,14 +1554,17 @@ export function CloudWorkspace({ conversationMode = "project" }: { conversationM
                       <div ref={endOfChat} />
                     </div>
                     <form className={styles.composer} onSubmit={sendPrompt}>
+                      {commands.list}
                       <label className="sr-only" htmlFor="cloud-prompt">
                         Message the coding agent
                       </label>
                       <textarea
+                        {...commands.attributes}
                         id="cloud-prompt"
                         value={prompt}
                         onChange={(e) => { promptInputRef.current = e.target.value; setPrompt(e.target.value); }}
                         onKeyDown={(event) => {
+                          if (commands.keyDown(event)) return;
                           if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
                           event.preventDefault();
                           if (event.ctrlKey) enqueuePrompt();
@@ -1487,22 +1572,13 @@ export function CloudWorkspace({ conversationMode = "project" }: { conversationM
                         }}
                         rows={2}
                         maxLength={12000}
-                        placeholder="What would you like to build?"
+                        placeholder="Ask Coda about this project, or / for commands"
                         disabled={!consent || inactive}
                       />
                       <div>
-                        <label>
-                          Mode{" "}
-                          <select
-                            value={mode}
-                            onChange={(e) => setMode(e.target.value)}
-                            disabled={running}
-                          >
-                            <option value="build">Build</option>
-                            <option value="plan">Plan · read only</option>
-                            <option value="review">Review · read only</option>
-                          </select>
-                        </label>
+                        <button type="button" onClick={() => { promptInputRef.current = "/"; setPrompt("/"); document.getElementById("cloud-prompt")?.focus(); }}>Commands</button>
+                        <button type="button" title="Use /build, /plan or /review" onClick={() => { promptInputRef.current = "/"; setPrompt("/"); document.getElementById("cloud-prompt")?.focus(); }}>{mode === "build" ? "Build" : mode === "plan" ? "Plan · read only" : "Review · read only"}</button>
+                        <button type="button" onClick={() => onOpenChat?.()} title="Continue without repository context · /chat">Leave project</button>
                         <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("freecoda:extensions", { detail: { view: "tools" } }))}>Tools</button>
                         <span>
                           {dirty
@@ -1986,7 +2062,10 @@ export function CloudWorkspace({ conversationMode = "project" }: { conversationM
                 <h3 className={styles.repoSectionTitle}>Repositories granted by GitHub</h3>
                 {repos.length ? (
                   <div className={styles.repoList}>
-                    {repos.map((repo) => (
+                    <label className={styles.projectSearch}>Find a repository<input type="search" value={repoSearch} onChange={event => setRepoSearch(event.target.value)} placeholder="owner/repository" /></label>
+                    {repoSearch && !repos.some(repo => `${repo.owner}/${repo.name}`.toLowerCase().includes(repoSearch.toLowerCase())) && <p className={styles.smallEmpty}>No matching repositories.</p>}
+                    {repos.length > 8 && <p className={styles.smallEmpty}>{repos.length} repositories · search to narrow the list.</p>}
+                    {repos.filter(repo => `${repo.owner}/${repo.name}`.toLowerCase().includes(repoSearch.toLowerCase())).slice(0, 8).map((repo) => (
                       <button
                         key={`${repo.installationId}/${repo.owner}/${repo.name}`}
                         type="button"

@@ -14,6 +14,13 @@ function renderTheme() {
   document.documentElement.dataset.theme =
     preference === "system" ? (media.matches ? "dark" : "light") : preference;
   document.documentElement.dataset.themePreference = preference;
+  const dark = document.documentElement.dataset.theme === "dark";
+  const label = `Switch to ${dark ? "light" : "dark"} mode`;
+  const button = document.getElementById("theme-toggle");
+  button?.setAttribute("aria-label", label);
+  button?.setAttribute("title", label);
+  document.getElementById("theme-dark-icon")?.toggleAttribute("hidden", dark);
+  document.getElementById("theme-light-icon")?.toggleAttribute("hidden", !dark);
 }
 function apply() {
   renderTheme();
@@ -32,21 +39,16 @@ window.addEventListener("storage", (event) => {
   if (event.key !== key && event.key !== null) return;
   preference = valid(event.newValue);
   apply();
-  const select = document.getElementById(
-    "theme-select",
-  ) as HTMLSelectElement | null;
-  if (select) select.value = preference;
+
 });
 window.addEventListener(
   "DOMContentLoaded",
   () => {
-    const select = document.getElementById(
-      "theme-select",
-    ) as HTMLSelectElement | null;
-    if (!select) return;
-    select.value = preference;
-    select.addEventListener("change", () => {
-      preference = valid(select.value);
+    const button = document.getElementById("theme-toggle");
+    if (!button) return;
+    renderTheme();
+    button.addEventListener("click", () => {
+      preference = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
       apply();
       try {
         localStorage.setItem(key, preference);

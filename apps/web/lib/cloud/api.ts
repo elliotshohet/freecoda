@@ -11,7 +11,7 @@ import * as service from "./service";
 import * as vm from "./sandbox";
 import { cloudAgentWorkflow, cloudImportWorkflow } from "./workflow";
 import { scheduleProjectLifecycle, deleteCloudProject } from "./lifecycle";
-import { projectExtensions, configureProjectExtensions, extensionActionSchema } from "./extensions";
+import { projectExtensions, projectSkill, previewProjectPlugin, configureProjectExtensions, extensionActionSchema } from "./extensions";
 import { configuredGithubRepositories } from "../github-repositories";
 const idSchema = z.uuid();
 const identifier = z.string().regex(/^[A-Za-z0-9_.-]{1,100}$/);
@@ -343,8 +343,19 @@ export async function cloudRoute(req: Request) {
         return json({ project: await service.pullRepository(user.id, id, body.expectedBaseSha) });
       }
     }
+    if (path[2] === "plugins" && path[3] === "preview" && path.length === 4 && method === "POST") {
+      const body = await jsonBody(req, z.object({ source: z.string().url().max(2000) }).strict());
+      return json(await previewProjectPlugin(user.id, id, body.source));
+    }
     if (path[2] === "extensions") {
-      if (method === "GET") return json(await projectExtensions(user.id, id));
+      if (method === "GET") {
+        const skillId = new URL(req.url).searchParams.get("skill");
+        if (skillId !== null) {
+          if (!skillId || skillId.length > 64) throw new ApiError(400, "Choose an installed skill.");
+          return json({ skill: await projectSkill(user.id, id, skillId) });
+        }
+        return json(await projectExtensions(user.id, id));
+      }
       if (method === "POST") return json(await configureProjectExtensions(user.id, id, await jsonBody(req, extensionActionSchema, 100_000)));
     }
     if (path.length === 2 && method === "GET")

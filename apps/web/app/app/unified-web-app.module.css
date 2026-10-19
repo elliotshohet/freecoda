@@ -99,9 +99,6 @@
     padding: 0 12px;
     gap: 7px;
   }
-  .brand > span:last-child {
-    display: none;
-  }
   .views button {
     min-width: 78px;
     padding: 0 9px;
@@ -112,9 +109,6 @@
   .headerActions { gap: 6px; }
   .headerButton { padding: 7px; }
   .headerButton span, .accountLabel { display: none; }
-  .headerActions :global(.theme-control) { gap: 2px; padding: 0; }
-  .headerActions :global(.theme-control) > span:first-child { display: none; }
-  .headerActions :global(.theme-control) select { width: 59px; min-width: 0; padding: 5px 1px; font-size: 10px; }
   .views button { min-width: 64px; padding: 0 6px; font-size: 12px; }
 }
 .roomTitle { color: var(--muted); font-size: 12px; }
@@ -128,12 +122,34 @@
 .chatSurface > main { grid-template-columns: minmax(0, 1fr); }
 .chatSurface > main > aside { display: none; }
 .chatSurface > main > aside[data-open="true"] { display: flex; position: absolute; inset: 0 auto 0 0; z-index: 8; width: min(260px, 85%); }
-.panels :global([data-conversation-slot]) { padding-top: 48px; }
+.panels :global([data-conversation-slot]) { padding-top: 0; }
 .panels :global([data-conversation-mode="ask"] [data-conversation-slot]) > * { visibility: hidden; }
 @media (max-width: 560px) { .roomTitle { display: none; } .conversationModes { padding: 7px 12px; } }
 @media (max-width: 900px) {
   .panels :global([data-conversation-mode] [data-conversation-slot]) { display: flex; grid-row: 1 / -1; min-height: 0; }
   .panels :global([data-conversation-mode="project"] [data-conversation-slot]) { display: contents; }
-  .panels :global([data-conversation-mode="project"] [data-conversation-slot]) > :first-child { padding-top: 60px; }
+  .panels :global([data-conversation-mode="project"] [data-conversation-slot]) > :first-child { padding-top: 8px; }
   .shell:has([data-mobile-pane="inspect"]) .conversationSurface { display: none; }
 }
+
+/* Every header action uses the same centered icon target at every width. */
+.brand, .headerButton, .account, .githubControl > a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  padding: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+.headerActions { margin-left: auto; gap: 8px; }
+.githubControl { display: flex; }
+.githubControl > a > span { display: none; }
+.brand:hover, .headerButton:hover, .account:hover, .githubControl > a:hover, .themeControl:hover { background: var(--pale); }
+.brand:focus-visible, .themeControl:focus-within { outline: 2px solid var(--purple); outline-offset: 2px; }
+@media (max-width: 560px) { .headerActions { gap: 6px; } }
+
+.githubControl > a { min-height: 36px; }

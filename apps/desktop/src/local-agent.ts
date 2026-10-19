@@ -16,6 +16,7 @@ import path from "node:path";
 import { platform, arch } from "node:os";
 import {
   loadExtensionRegistry, saveExtensionRegistry, installSkill, installMcpServer,
+  fetchPluginManifest, installPlugin, removePlugin,
   setExtensionEnabled, removeExtension, connectExtensionTools,
   Workspace,
   repositorySyncStatus,
@@ -28,8 +29,9 @@ import {
   type Approval,
 } from "../../../packages/core/src";
 import type { ModelMessage } from "ai";
+import type { PluginManifest } from "../../../packages/contracts/src/extensions";
 import type {
-  DesktopGitHubState, DesktopGitHubPreference,
+  DesktopGitHubState, DesktopGitHubPreference, DesktopCloudWorkspace,
   DesktopExtension,
   DesktopState,
   DesktopPermissionPreset,
@@ -356,6 +358,46 @@ export class LocalAgentService {
       ...registry.servers.map(({ id, name, enabled }) => ({ id, name, enabled, kind: "mcp" as const })),
     ];
   }
+  private pluginPreview: { source: string; manifest: PluginManifest } | null = null;
+  async listPlugins() {
+    await this.initialize(); this.check();
+    const registry = await loadExtensionRegistry(this.extensionFile());
+    return (registry.plugins || []).map(({ id, name, skillIds, serverIds }) => ({ id, name, skillCount: skillIds.length, serverCount: serverIds.length }));
+  }
+  async previewPlugin(value: string) {
+    await this.initialize(); this.check();
+    if (this.activeController || this.extensionMutation) throw Error("Finish the current task before reviewing plugins.");
+    const source = text(value, "Plugin manifest URL", 2000);
+    const parsed = new URL(source);
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.search || parsed.hash) throw Error("Use an HTTPS manifest URL without credentials, query strings, or fragments.");
+    this.pluginPreview = null;
+    const manifest = await fetchPluginManifest(source, { allowLocal: true });
+    this.pluginPreview = { source, manifest };
+    return structuredClone(manifest);
+  }
+  async installReviewedPlugin(input: { source: string; manifest: PluginManifest }) {
+    const preview = this.pluginPreview;
+    if (!preview || !input || input.source !== preview.source || JSON.stringify(input.manifest) !== JSON.stringify(preview.manifest)) throw Error("Review this plugin manifest before installing.");
+    await this.changeExtensions(registry => installPlugin(registry, { ...preview, allowLocal: true }));
+    this.pluginPreview = null;
+    return this.listPlugins();
+  }
+  async removeInstalledPlugin(value: string) {
+    const id = text(value, "Plugin ID", 64);
+    await this.changeExtensions(registry => removePlugin(registry, id));
+    return this.listPlugins();
+  }
+  async readSkill(value: string): Promise<{ id: string; name: string; instructions: string }> {
+    await this.initialize(); this.check();
+    const id = text(value, "Skill ID", 64);
+    if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(id)) throw Error("Invalid skill ID.");
+    const registry = await loadExtensionRegistry(this.extensionFile());
+    const skill = registry.skills.find(item => item.id === id);
+    if (!skill) throw Error("Installed skill not found.");
+    // Return one stored instruction document, never the registry or MCP secrets.
+    if (Buffer.byteLength(skill.instructions) > 48_000) throw Error("Skill instructions exceed the reading limit.");
+    return { id: skill.id, name: skill.name, instructions: skill.instructions };
+  }
   private async changeExtensions(change: (registry: Awaited<ReturnType<typeof loadExtensionRegistry>>) => Promise<Awaited<ReturnType<typeof loadExtensionRegistry>>> | Awaited<ReturnType<typeof loadExtensionRegistry>>) {
     await this.initialize(); this.check();
     if (this.activeController || this.extensionMutation) throw Error("Finish the current task before changing extensions.");
@@ -416,6 +458,40 @@ export class LocalAgentService {
       result.avatar = `data:${type};base64,${Buffer.concat(chunks).toString("base64")}`;
       return result;
     } catch { return {}; }
+  }
+  async listCloudWorkspaces(): Promise<DesktopCloudWorkspace[]> {
+    await this.initialize();
+    this.check();
+    if (this.authChanging) throw Error("Wait for the account change before loading cloud workspaces.");
+    const token = this.config.token;
+    if (!token) throw Error("Connect your account to load cloud workspaces.");
+    const data = await this.api("cloud/workspaces") as { workspaces?: unknown };
+    if (token !== this.config.token || this.authChanging)
+      throw Error("Your account changed while loading cloud workspaces. Refresh to try again.");
+    if (!Array.isArray(data.workspaces)) throw Error("The server returned an invalid cloud workspace list.");
+    return data.workspaces.map((value: unknown) => {
+      if (!value || typeof value !== "object") throw Error("The server returned an invalid cloud workspace.");
+      const item = value as Record<string, unknown>;
+      const result: DesktopCloudWorkspace = {
+        id: text(item.id, "Cloud workspace ID", 100),
+        name: this.clean(text(item.name, "Cloud workspace name", 500)),
+        status: text(item.status, "Cloud workspace status", 50),
+        repository: item.repository === null ? null : this.clean(text(item.repository, "Cloud repository", 500)),
+      };
+      if (item.appDirectory !== undefined) result.appDirectory = this.clean(text(item.appDirectory, "Cloud app directory", 4096));
+      if (item.branch !== undefined) result.branch = this.clean(text(item.branch, "Cloud repository branch", 500));
+      return result;
+    });
+  }
+  async openCloudWorkspace(value: string): Promise<void> {
+    const id = text(value, "Cloud workspace ID", 100);
+    const workspaces = await this.listCloudWorkspaces();
+    if (!workspaces.some(workspace => workspace.id === id))
+      throw Error("This cloud workspace is not available to your account. Refresh the list.");
+    const target = new URL("/app", this.server);
+    target.searchParams.set("project", id);
+    target.searchParams.set("view", "workspace");
+    await this.options.openExternal(target.toString());
   }
   async listModels(): Promise<{ id: string; name: string }[]> {
     await this.initialize();
@@ -482,8 +558,17 @@ export class LocalAgentService {
         .slice(-40),
     };
   }
-  /** Called only after main's native folder picker or a trusted native menu action. */
-  async selectWorkspace(directory: string) {
+  /** A renderer may reopen only a root already approved by the native folder picker. */
+  async openRecentFolder(directory: string) {
+    await this.initialize();
+    this.check();
+    const root = text(directory, "Recent folder", 4096);
+    if (!this.config.recentRoots.includes(root))
+      throw new Error("Choose this folder with the native folder picker first.");
+    return this.selectWorkspace(root, true);
+  }
+  /** Called only after native selection, or after validating an exact saved recent root. */
+  async selectWorkspace(directory: string, recentOnly = false) {
     await this.initialize();
     this.check();
     if (this.activeController || this.workspaceChanging || this.authChanging)
@@ -497,6 +582,9 @@ export class LocalAgentService {
       );
       if (!(await stat(root)).isDirectory())
         throw new Error("Choose a repository folder.");
+      if (recentOnly && (root !== directory || !this.config.recentRoots.includes(root)))
+        throw new Error("This recent folder has changed. Choose it again with the native folder picker.");
+      if (this.activeThreadId) await this.saveHistory();
       this.root = root;
       this.conversationMode = "coding";
       this.messages = [];
