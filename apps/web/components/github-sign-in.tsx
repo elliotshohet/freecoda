@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { KeyRound } from "lucide-react";
+import { startGitHubSignIn } from "@/lib/start-github-sign-in";
+import { GitHubIcon } from "./github-icon";
 
 /** Account entry must not depend on chat availability or its status request. */
 export function GitHubSignIn({
@@ -17,12 +18,7 @@ export function GitHubSignIn({
     setBusy(true);
     setError("");
     try {
-      const { createAuthClient } = await import("better-auth/react");
-      const result = await createAuthClient().signIn.social({
-        provider: "github",
-        callbackURL,
-      });
-      if (result.error) throw new Error(result.error.message || "Sign-in failed.");
+      await startGitHubSignIn(callbackURL);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Sign-in failed.");
       setBusy(false);
@@ -31,7 +27,7 @@ export function GitHubSignIn({
   return (
     <div className="entry-sign-in">
       <button className="button purple" disabled={busy} onClick={signIn}>
-        <KeyRound size={16} aria-hidden="true" />
+        <GitHubIcon size={16} />
         {busy ? "Opening GitHub…" : label}
       </button>
       {error && <p role="alert">{error}</p>}

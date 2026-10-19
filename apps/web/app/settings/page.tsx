@@ -13,7 +13,7 @@ import styles from "./settings.module.css";
 
 export const metadata = { title: "Account & settings", robots: { index: false, follow: false } };
 export default async function Settings() {
-  const user = await requireBrowserSession();
+  const user = await requireBrowserSession("/settings");
   let admin = false;
   try { await requireAdmin(new Request(`${appUrl()}/admin`, { headers: await headers() })); admin = true; } catch { /* Private metrics remain absent for other accounts. */ }
   return <SessionBoundary userId={user.id}>

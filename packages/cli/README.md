@@ -55,14 +55,16 @@ An interactive terminal opens the full-screen interface automatically. `--theme 
 
 Bracketed paste is inserted as text, including embedded newlines and slash commands; it does not submit automatically. The terminal's normal screen and cursor are restored on exit. `--plain` selects a traditional scrolling transcript. Small terminals and noninteractive output use the plain interface automatically.
 
+## Terminal workspace
+
+The full-screen interface keeps a compact Freecoda session header, the actual workspace and access mode, a scrolling conversation with tool activity, and a bordered message field. Sponsor placements remain labeled above the composer. Type `/` to discover supported commands; keyboard history, queued turns, and approval prompts keep their existing behavior. Provider names and model selectors are absent from the normal interface.
+
 ## Commands
 
 - `/help`: show commands and keyboard controls.
 - `/plan <task>`: make a read-only plan for one turn.
 - `/review <task>`: review project code using read-only tools.
 - `/mode chat|build|plan|review`: choose the default mode for following turns. Chat is the default and has no project access or tools.
-- `/model`: list approved hosted models, or show the direct provider model.
-- `/model <id>`: select a model for this session.
 - `/mcp`: list installed connections. `/mcp enable|disable <server-id>` changes the next turn’s connections; `/mcp discover <server-id>` explicitly connects to one enabled server, lists its actual tools, then closes without executing tools.
 - `/tools`: show session tool selections. `/tools enable|disable <name>` selects native or discovered MCP tools for following turns. Mode and permission restrictions still apply; selecting a tool never grants approval.
 - `/extensions`: list installed MCP connections and skills.
@@ -71,12 +73,12 @@ Bracketed paste is inserted as text, including embedded newlines and slash comma
 - `/update`: show instructions to check and install an update after leaving the session.
 - `/usage`: show hosted allowance and reset information.
 - `/permissions`: choose Read only, Default, or Full access with Up/Down and Enter. Escape cancels. `/permissions read-only|default|full-access` and numeric arguments `1|2|3` also work.
-- `/status`: show the current directory, provider, model, permissions/category grants, effective mode, and conversation size.
-- `/new`: reset the model conversation without changing project files.
-- `/clear`: clear the visible transcript while retaining model context.
+- `/status`: show the current directory, connection policy, permissions/category grants, effective mode, and conversation size.
+- `/new`: start a new conversation without changing project files.
+- `/clear`: start a fresh chat while preserving saved history.
 - `/exit`: leave the application.
 
-Start with `--resume` to reopen the latest conversation in the current directory and mode scope. General chat and coding histories are separate; crossing between them starts a new conversation. Signed-in history syncs across web, Desktop and CLI, and `/resume` lists account conversations in the selected mode. Offline turns remain in a local outbox and retry after reconnection; concurrent updates keep a separate local copy. Existing local histories migrate once to the first verified signed-in account, and account changes use separate caches. A resumed coding conversation operates only in the current trusted folder. Use `/resume` to reopen an older conversation in the selected scope. `--mode build` starts coding directly. `--model <id>` chooses an approved hosted model or a model offered by your configured direct provider. Switching models retains the current conversation; use `/new` when you want fresh context.
+Start with `--resume` to reopen the latest conversation in the current directory and mode scope. General chat and coding histories are separate; crossing between them starts a new conversation. Signed-in history syncs across web, Desktop and CLI, and `/resume` lists account conversations in the selected mode. Offline turns remain in a local outbox and retry after reconnection; concurrent updates keep a separate local copy. Existing local histories migrate once to the first verified signed-in account, and account changes use separate caches. A resumed coding conversation operates only in the current trusted folder. Use `/resume` to reopen an older conversation in the selected scope. `--mode build` starts coding directly. Use `/new` when you want fresh context.
 
 For a single task and plain output:
 

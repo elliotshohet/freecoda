@@ -1,0 +1,21 @@
+.page { width: min(100%, 780px); min-height: calc(100svh - 180px); margin: 0 auto; padding: 28px 24px 70px; }
+.back { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; color: var(--muted); font-size: 12px; }
+.card { max-width: 480px; margin: clamp(35px, 8vh, 90px) auto 0; text-align: center; }
+.brand { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 28px; }
+.brand img { display: block; width: 52px; height: 52px; border-radius: 13px; }
+.brand span { color: var(--ink); font-size: 23px; font-weight: 600; letter-spacing: -.7px; }
+.card h1 { margin: 0; color: var(--ink); font-size: clamp(28px, 4vw, 38px); font-weight: 500; letter-spacing: -1.2px; line-height: 1.2; text-wrap: balance; }
+.card > p { color: var(--muted); margin: 16px auto 0; font-size: 14px; line-height: 1.8; text-wrap: pretty; }
+.card :global(.entry-sign-in) { margin: 30px 0 0; }
+.card :global(.entry-sign-in .button) { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 46px; width: min(100%, 320px); padding: 12px 18px; border: 1px solid var(--ink); border-radius: 10px; background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 550; transition: opacity 160ms ease, transform 120ms ease; }
+.card :global(.entry-sign-in .button > svg) { width: 17px; height: 17px; flex: 0 0 17px; }
+.card :global(.entry-sign-in .button:hover:not(:disabled)) { opacity: .85; }
+.card :global(.entry-sign-in .button:active:not(:disabled)) { transform: translateY(1px); }
+.card .access { max-width: 390px; margin-top: 24px; font-size: 12px; }
+.problem { margin-top: 20px; padding: 12px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.problem a { text-decoration: underline; text-underline-offset: 3px; }
+.links { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px 23px; margin-top: 27px; color: var(--muted); font-size: 11px; }
+.links a { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; }
+.page :is(a, button):focus-visible { outline: 2px solid var(--purple); outline-offset: 4px; }
+@media (max-width: 600px) { .page { padding: 18px 20px 40px; } .card { margin-top: 35px; } }
+@media (prefers-reduced-motion: reduce) { .card :global(.entry-sign-in .button) { transition: none; } .card :global(.entry-sign-in .button:active:not(:disabled)) { transform: none; } }

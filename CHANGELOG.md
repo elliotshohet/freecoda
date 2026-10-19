@@ -7,7 +7,34 @@ remain under Unreleased until publication and artifact verification are complete
 
 ## Unreleased
 
-No pending versioned client changes.
+### Desktop 0.1.8 (pending validation and publication)
+
+- Align desktop and web presentation with the inspected public Freebuff interfaces using original Freecoda branding: compact navigation, project and conversation hierarchy, neutral transcripts, focused composers, and clearer welcome actions. Preserve existing account, permission, and repository boundaries.
+
+- Show the actual runtime version prominently at bottom left, labeling source runs as local development; offer GitHub sign-in there when signed out and retain the account avatar at bottom right.
+- Expand desktop account settings with authenticated repository access, cloud workspaces, local integrations, allowance, and connected devices, with explicit loading and failure states.
+- Refine native typography, conversation spacing, and accessible circular send/stop controls.
+- Keep the desktop workspace running from the system tray or macOS menu bar when its window closes; provide Show and explicit Quit actions. Tray behavior is pending live verification.
+
+- Remove the `/model` command and model selection controls from normal client flows, keeping hosted inference configured in the background.
+- Remove underlying model branding from desktop, CLI, and web interface readouts and help.
+- Existing routing, permissions, and provider configuration remain intact. Release artifacts and installed automatic updates are not yet verified.
+
+### CLI 0.1.8 (pending validation and publication)
+
+- Refine the terminal session header and bordered composer, keep sponsor messages separate above the input, and retain existing commands and approval behavior.
+- Remove `/model` and underlying model branding from interactive help, suggestions, and status output while preserving inference configuration.
+- Publication, artifact verification, and installed automatic updates remain pending.
+
+### Web and local development (pending validation and publication)
+
+- Rebuild the public welcome page around the reference page frame, product headline, actual desktop-source preview, desktop downloads, web entry, copyable CLI command, and source banner.
+- Add useful responsive Source, Download, CLI, Web, Pricing, Docs, and Advertise navigation, with persistent theme switching and real account state.
+- Add a dedicated GitHub sign-in screen and preserve safe local app/chat destinations. Canonicalize loopback hosts before OAuth state creation to prevent localhost/127.0.0.1 state-cookie mismatches.
+- Align pricing and advertiser pages while retaining the free beta, real allowances, and reviewed sponsorship inquiries; no subscription or self-service advertising billing is introduced.
+- Add a verified-checksum shell installer for published CLI 0.1.7. The loopback preview is available locally; the public installer endpoint is not deployed.
+- Support source Fast Refresh in Docker using narrow read-only mounts and separate generated-route caches. Limit web development to two CPU cores and poll every three seconds to reduce contention on the Mini.
+- Run the web development server natively on the Mini when preferred, retaining the existing local PostgreSQL container and data.
 
 ## Desktop 0.1.7 — 2026-10-19
 

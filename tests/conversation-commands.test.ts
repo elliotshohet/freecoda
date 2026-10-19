@@ -11,7 +11,7 @@ describe("conversation command discovery", () => {
     expect(new Set(conversationCommandsFor("web").map(command => command.name)).size).toBe(conversationCommandsFor("web").length);
   });
   test("filters names and descriptions with bounded suggestion lists", () => {
-    expect(filterConversationCommands("/mod", "web")[0]?.name).toBe("/model");
+    expect(filterConversationCommands("/perm", "web")[0]?.name).toBe("/permissions");
     expect(filterConversationCommands("repository", "desktop").some(command => command.name === "/project")).toBe(true);
     expect(filterConversationCommands("/skills install", "web")).toEqual([]);
     expect(filterConversationCommands("/", "web", 3)).toHaveLength(3);

@@ -6,7 +6,7 @@ import { Mark } from "@/components/chrome";
 import { GitHubStars } from "@/components/github-stars";
 import { ThemeControl } from "@/components/theme-control";
 import { UserAvatar } from "@/components/user-avatar";
-import { PanelLeft, SlidersHorizontal } from "lucide-react";
+import { PanelLeft } from "lucide-react";
 import Chat from "../chat/chat";
 import { CloudWorkspace } from "./workspace";
 import styles from "./unified-web-app.module.css";
@@ -82,10 +82,13 @@ export function UnifiedWebApp({ initialView, initialThreadId, user }: { initialV
         <Link href="/" className={styles.brand} aria-label="Freecoda home">
           <Mark />
         </Link>
+        <nav className={styles.views} aria-label="Workspace views">
+          <button type="button" className={view === "chat" ? styles.selected : undefined} aria-pressed={view === "chat"} onClick={() => selectView("chat")}>Chat</button>
+          <button type="button" className={view === "workspace" ? styles.selected : undefined} aria-pressed={view === "workspace"} onClick={() => selectView("workspace")}>Workspace</button>
+        </nav>
         <div className={styles.headerActions}>
           <div className={styles.githubControl}><GitHubStars /></div>
           {view === "chat" && <button type="button" className={styles.headerButton} aria-label="Open chat history" title="Chat history" onClick={() => window.dispatchEvent(new CustomEvent("freecoda:chat-sidebar"))}><PanelLeft size={18} aria-hidden="true" /></button>}
-          <button type="button" className={styles.headerButton} aria-label="Choose model" title="Choose model · /model" onClick={() => window.dispatchEvent(new CustomEvent("freecoda:show-model", { detail: { view } }))}><SlidersHorizontal size={18} aria-hidden="true" /></button>
           <ThemeControl />
           <Link className={styles.account} href="/settings" aria-label="Account & settings" title="Account & settings"><UserAvatar image={user.image} name={user.name} /></Link>
         </div>

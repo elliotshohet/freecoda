@@ -88,15 +88,15 @@ export default function Privacy() {
         <p>
           AI inference requires sending your prompt and the relevant source
           excerpts, repository instructions, and tool output to a model
-          provider. Hosted requests pass through Freecoda and Vercel AI Gateway
-          to Reflection’s Beam Free model using server-side Gateway
+          provider. Hosted requests pass through Freecoda and our AI gateway
+          to our hosted inference provider using server-side
           authentication. This is not an offline
           product. Review your repository trust and tool approval prompts before
           sharing context.
         </p>
-        <h2>Hosted model training and retention</h2>
+        <h2>Hosted AI training and retention</h2>
         <p>
-          Hosted inference uses Reflection Beam Free through Vercel AI Gateway.
+          Hosted inference uses our configured AI provider through an AI gateway.
           This route permits provider prompt training and does not provide a
           no-training or zero-data-retention guarantee. The provider may retain
           and use your submitted prompts, conversation context, source excerpts,
@@ -157,8 +157,8 @@ export default function Privacy() {
         <h2>Preview status</h2>
         <p>
           Hosted access is limited to invited beta accounts and available daily
-          capacity. The model and provider shown in the CLI are the ones
-          configured for your session. Privacy changes will be reflected here
+          capacity. Hosted requests use the approved free AI service.
+          Privacy changes will be reflected here
           before new data uses begin.
         </p>
       </article>

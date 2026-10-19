@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { codexUnsupportedCommand } from "@freecoda/contracts";
 import path from "node:path";
 import { realpath } from "node:fs/promises";
@@ -320,10 +320,7 @@ program
     "--plain",
     "Use a scrolling transcript instead of the full-screen interface",
   )
-  .option(
-    "--model <id>",
-    "Select an approved hosted model or a direct provider model",
-  )
+  .addOption(new Option("--model <id>").hideHelp())
   .option("-p, --prompt <text>", "Run one task with a plain transcript")
   .action(async (opts) => {
     const root = await realpath(opts.cwd || process.cwd());
@@ -380,7 +377,7 @@ program
           modelId,
           process.env.FREECODA_PROVIDER_KEY || p.apiKey || "",
         );
-        modelLabel = `${modelId} · direct ${new URL(p.baseURL).host}`;
+        modelLabel = "Direct connection";
         modelPolicy =
           "Direct provider: requests bypass Freecoda. Your provider’s policies and charges apply.";
         return;
@@ -393,18 +390,18 @@ program
       catalog.models = approvedFreeModels(catalog.models ?? []);
       if (!catalog.models?.length)
         throw new Error(
-          "Hosted models are unavailable. Your account can remain connected; try again later or configure your own provider.",
+          "The hosted AI service is unavailable. Your account can remain connected; try again later or configure your own provider.",
         );
       const chosen = requested
         ? catalog.models.find((item: { id: string }) => item.id === requested)
         : catalog.models[0];
       if (!chosen)
         throw new Error(
-          "That hosted model is unavailable. Use /model to see the approved catalog.",
+          "The configured AI service is unavailable. Check your connection configuration or try again later.",
         );
       modelId = chosen.id;
       model = hostedModel(config.server, chosen.id, config.token);
-      modelLabel = `${chosen.id} · hosted via ${chosen.provider}`;
+      modelLabel = "Hosted connection";
       modelPolicy = chosen.allowPromptTraining
         ? "Hosted provider may retain prompts, source excerpts and responses and use them for training. Avoid sensitive material. Free fair-use limits apply."
         : "Hosted prompt training is disallowed. Provider retention may apply. Free fair-use limits apply.";
@@ -428,15 +425,17 @@ program
       screen
         ? screen.append("notice", text)
         : console.log(c.dim(safeTerminalText(text)));
-    const error = (text: string) =>
-      screen
-        ? screen.append("error", text)
-        : console.error(c.red(safeTerminalText(text)));
+    const error = (text: string) => {
+      const detail = (modelId ? text.split(modelId).join("the AI service") : text)
+        .replace(/reflection\/beam(?:-free|-2)?|beam free|reflection/gi, "the AI service");
+      if (screen) screen.append("error", detail);
+      else console.error(c.red(safeTerminalText(detail)));
+    };
     if (!screen) {
       console.log(
         c.bold(c.magenta("\n  freecoda")) + c.dim("  Your next big thing.\n"),
       );
-      notice(modelLabel + "\n" + modelPolicy);
+      notice(modelPolicy);
     } else screen.append("notice", modelPolicy);
     if (accountSync)
       notice(
@@ -523,7 +522,7 @@ program
               if (args[0] === "resume" && args.length === 1) screen.queue.paused = false;
               else if (args[0] === "remove" && args.length === 2) screen.queue.remove(args[1]!);
               else if (args.length) throw Error("Use /queue, /queue resume, or /queue remove <id>.");
-              notice(`${screen.queue.paused ? "Paused" : "Ready"} · ${screen.queue.items.length} queued\n` + screen.queue.items.map((item) => { const context = item.context as ReturnType<typeof captureTurn> | undefined; return `${item.id.slice(0, 8)} · ${context?.modelLabel ?? modelLabel} · ${context?.mode ?? defaultMode} · ${item.input.slice(0, 160)}`; }).join("\n") + "\n/queue resume retries queued turns; /queue remove <id> discards one. Nothing runs while paused.");
+              notice(`${screen.queue.paused ? "Paused" : "Ready"} · ${screen.queue.items.length} queued\n` + screen.queue.items.map((item) => { const context = item.context as ReturnType<typeof captureTurn> | undefined; return `${item.id.slice(0, 8)} · ${context?.mode ?? defaultMode} · ${item.input.slice(0, 160)}`; }).join("\n") + "\n/queue resume retries queued turns; /queue remove <id> discards one. Nothing runs while paused.");
             } catch (e) { error(e instanceof Error ? e.message : "Could not change queue."); }
           }
           if (opts.prompt) break;
@@ -656,7 +655,7 @@ program
         }
         if (input === "/help") {
           notice(
-            "/plan <task>  Read-only plan\n/review <task>  Read-only code review\n/mode chat|build|plan|review  Set the default mode\n/model [id]  List or select models\n/mcp [enable|disable|discover <id>]  Manage connections\n/tools [enable|disable <name>]  Select next-turn tools\n/extensions [search]  Browse installed tools and skills\n/skills show <id>  Read installed skill instructions\n/install skill <source> | mcp <name> <url>  Review a local installation\n/queue [resume|remove <id>]  Review paused or queued turns\n/permissions [read-only|default|full-access]  Session tool permissions\n/theme auto|dark|light  Save the terminal palette\n/update  Check and install after saving and closing this session\n/usage  Hosted allowance and reset time\n/status  Current workspace and provider\n/new  Start a new saved task\n/resume [number or id]  List or reopen saved tasks\n/clear  Start a fresh chat; preserve saved history\n/copy  Copy the latest assistant response (macOS)\n/diff  Show tracked diff and untracked paths (trusted workspace)\n/pwd or /cwd  Show selected directory\n/exit  Exit Freecoda\n\nEnter sends. Ctrl+J adds a newline. Paste never submits automatically. Up/Down recalls input. PageUp/PageDown scrolls. Escape or Ctrl+C cancels a running request. Approval: y once, s category for this session, n decline.",
+            "/plan <task>  Read-only plan\n/review <task>  Read-only code review\n/mode chat|build|plan|review  Set the default mode\n/mcp [enable|disable|discover <id>]  Manage connections\n/tools [enable|disable <name>]  Select next-turn tools\n/extensions [search]  Browse installed tools and skills\n/skills show <id>  Read installed skill instructions\n/install skill <source> | mcp <name> <url>  Review a local installation\n/queue [resume|remove <id>]  Review paused or queued turns\n/permissions [read-only|default|full-access]  Session tool permissions\n/theme auto|dark|light  Save the terminal palette\n/update  Check and install after saving and closing this session\n/usage  Hosted allowance and reset time\n/status  Current workspace and provider\n/new  Start a new saved task\n/resume [number or id]  List or reopen saved tasks\n/clear  Start a fresh chat; preserve saved history\n/copy  Copy the latest assistant response (macOS)\n/diff  Show tracked diff and untracked paths (trusted workspace)\n/pwd or /cwd  Show selected directory\n/exit  Exit Freecoda\n\nEnter sends. Ctrl+J adds a newline. Paste never submits automatically. Up/Down recalls input. PageUp/PageDown scrolls. Escape or Ctrl+C cancels a running request. Approval: y once, s category for this session, n decline.",
           );
           if (opts.prompt) break;
           continue;
@@ -766,7 +765,7 @@ program
         }
         if (input === "/status") {
           notice(
-            `Workspace: ${root}\nModel: ${modelLabel}\nData policy: ${modelPolicy}\nMode: ${defaultMode} (effective: ${permissions.effectiveMode(defaultMode)})\nAccess: ${defaultMode === "chat" ? "Chat has no project access or tools. Coding preset: " : "Coding preset: "}${permissions.describe()}\nTheme: ${config.theme}\nConversation: ${messages.length} messages saved locally\nPlan: free forever, supported by sponsors. Hosted fair-use limits apply.`,
+            `Workspace: ${root}\nData policy: ${modelPolicy}\nMode: ${defaultMode} (effective: ${permissions.effectiveMode(defaultMode)})\nAccess: ${defaultMode === "chat" ? "Chat has no project access or tools. Coding preset: " : "Coding preset: "}${permissions.describe()}\nTheme: ${config.theme}\nConversation: ${messages.length} messages saved locally\nPlan: free forever, supported by sponsors. Hosted fair-use limits apply.`,
           );
           if (opts.prompt) break;
           continue;
@@ -782,39 +781,6 @@ program
             error(
               redactSecrets(
                 e instanceof Error ? e.message : "Usage is unavailable.",
-              ),
-            );
-          }
-          if (opts.prompt) break;
-          continue;
-        }
-        if (input === "/model" || input.startsWith("/model ")) {
-          const requested = input.slice(6).trim();
-          try {
-            if (requested) {
-              await selectModel(requested);
-              screen?.setModel(modelLabel);
-              notice("Selected " + modelLabel + "\n" + modelPolicy);
-            } else if (config.provider)
-              notice(
-                `Current model: ${modelId}. Use /model <exact-provider-model-id> to switch.`,
-              );
-            else {
-              const catalog = await api("models");
-      catalog.models = approvedFreeModels(catalog.models ?? []);
-              notice(
-                catalog.models
-                  .map(
-                    (item: { id: string; provider: string }) =>
-                      `${item.id} · ${item.provider}`,
-                  )
-                  .join("\n") + "\nUse /model <id> to select.",
-              );
-            }
-          } catch (e) {
-            error(
-              redactSecrets(
-                e instanceof Error ? e.message : "Could not select model.",
               ),
             );
           }

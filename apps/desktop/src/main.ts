@@ -12,6 +12,7 @@ import {
   protocol,
   session,
   shell,
+  Tray,
   type IpcMainInvokeEvent,
 } from "electron";
 import path from "node:path";
@@ -43,13 +44,68 @@ let service: LocalAgentService;
 let quitting = false;
 let closing = false;
 let updates: DesktopUpdates | undefined;
+let tray: Tray | null = null;
 const hasLock = app.requestSingleInstanceLock();
 if (!hasLock) app.quit();
-app.on("second-instance", () => {
-  if (window?.isMinimized()) window.restore();
-  window?.show();
-  window?.focus();
-});
+function showWindow() {
+  if (quitting) return;
+  if (!window || window.isDestroyed()) {
+    if (app.isReady() && service) createWindow();
+    return;
+  }
+  if (window.isMinimized()) window.restore();
+  window.show();
+  window.focus();
+}
+app.on("second-instance", showWindow);
+app.on("activate", showWindow);
+function installTray() {
+  if (tray && !tray.isDestroyed()) return;
+  try {
+    const icon = nativeImage.createFromPath(path.join(assetsDirectory, "icon.png"))
+      .resize({ width: process.platform === "darwin" ? 18 : 24, height: process.platform === "darwin" ? 18 : 24 });
+    if (icon.isEmpty()) throw Error("The Freecoda tray icon could not be loaded.");
+    tray = new Tray(icon);
+    tray.setToolTip("Freecoda");
+    tray.setContextMenu(Menu.buildFromTemplate([
+      { label: "Show Freecoda", click: showWindow },
+      { type: "separator" },
+      { label: "Quit Freecoda", click: () => app.quit() },
+    ]));
+    tray.on("click", showWindow);
+  } catch (error) {
+    tray?.destroy();
+    tray = null;
+    console.warn("Freecoda tray unavailable:", error instanceof Error ? error.message : "Unknown error");
+  }
+}
+async function confirmQuit() {
+  if (closing || quitting) return;
+  closing = true;
+  try {
+    const options: Electron.MessageBoxOptions = {
+      type: "question",
+      buttons: ["Keep working", "Quit Freecoda"],
+      defaultId: 0,
+      cancelId: 0,
+      title: "Quit Freecoda?",
+      message: "Quit Freecoda?",
+      detail: "Save any unsaved editor changes first. Active agent work and commands will be cancelled. Closing the window instead keeps your workspace available from the Freecoda tray icon.",
+    };
+    const result = window && !window.isDestroyed() && window.isVisible()
+      ? await dialog.showMessageBox(window, options)
+      : await dialog.showMessageBox(options);
+    if (result.response !== 1) return;
+    await service.dispose();
+    updates?.dispose();
+    quitting = true;
+    app.quit();
+  } catch (error) {
+    dialog.showErrorBox("Could not quit Freecoda", error instanceof Error ? error.message : "Try again.");
+  } finally {
+    closing = false;
+  }
+}
 const openExternal = async (value: string) => {
   await shell.openExternal(externalURL(value));
 };
@@ -113,6 +169,7 @@ async function openRecentFolder(root: string) {
 }
 function installIPC() {
   const methods = {
+    appInfo: () => ({ version: app.getVersion(), packaged: app.isPackaged }),
     listPlugins: () => service.listPlugins(),
     previewPlugin: (source: string) => service.previewPlugin(source),
     installReviewedPlugin: (input: Parameters<LocalAgentService["installReviewedPlugin"]>[0]) => service.installReviewedPlugin(input),
@@ -188,6 +245,7 @@ function installIPC() {
     },
     clearHistory: () => service.clearHistory(),
     openCloud: () => openExternal("https://freecoda.com/app"),
+    openAccountSettings: () => openExternal("https://freecoda.com/settings"),
     listCloudWorkspaces: () => service.listCloudWorkspaces(),
     openCloudWorkspace: (id: string) => service.openCloudWorkspace(id),
   };
@@ -232,32 +290,10 @@ function createWindow() {
   window.on("close", (event) => {
     if (quitting) return;
     event.preventDefault();
-    if (closing) return;
-    closing = true;
-    void dialog
-      .showMessageBox(window!, {
-        type: "question",
-        buttons: ["Keep working", "Close workspace"],
-        defaultId: 0,
-        cancelId: 0,
-        title: "Close Freecoda?",
-        message: "Close this workspace?",
-        detail:
-          "Save any unsaved editor changes first. Active agent work and commands will be cancelled.",
-      })
-      .then(async ({ response }) => {
-        if (response !== 1) return;
-        await service.dispose();
-        quitting = true;
-        updates?.dispose();
-        window?.destroy();
-        window = null;
-        app.quit();
-      })
-      .finally(() => {
-        closing = false;
-      });
+    if (tray && !tray.isDestroyed()) window?.hide();
+    else app.quit();
   });
+  window.on("closed", () => { window = null; });
   window.once("ready-to-show", () => window?.show());
   void window.loadURL(APP_URL);
 }
@@ -338,13 +374,13 @@ app
           title: "Freecoda updates",
           message,
           buttons: downloaded
-            ? ["Keep working", "Close app to install"]
+            ? ["Keep working", "Quit app to install"]
             : ["OK"],
           defaultId: 0,
           cancelId: 0,
         });
-        // Normal close always presents the existing unsaved-work/task warning.
-        if (downloaded && response === 1) window?.close();
+        // Installation requires an explicit quit, with the unsaved-work/task warning.
+        if (downloaded && response === 1) app.quit();
         else if (unsignedMac && response === 1)
           await openExternal("https://freecoda.com/download");
       },
@@ -364,7 +400,7 @@ app
             click: () => void openExternal("https://freecoda.com/app"),
           },
           { type: "separator" },
-          { role: "quit" },
+          { role: "quit", accelerator: "CmdOrCtrl+Q" },
         ],
       },
       { role: "editMenu" },
@@ -407,6 +443,7 @@ app
     ];
     Menu.setApplicationMenu(Menu.buildFromTemplate(menu));
     createWindow();
+    installTray();
     updates.start();
   })
   .catch((error) => {
@@ -414,21 +451,19 @@ app
       "Desktop startup failed:",
       error instanceof Error ? error.message : "Unknown error",
     );
+    quitting = true;
+    updates?.dispose();
     app.quit();
   });
 app.on("before-quit", (event) => {
   if (!service || quitting) return;
   event.preventDefault();
-  if (window && !window.isDestroyed()) {
-    window.close();
-    return;
-  }
-  void service.dispose().finally(() => {
-    quitting = true;
-    updates?.dispose();
-    app.quit();
-  });
+  void confirmQuit();
+});
+app.on("will-quit", () => {
+  tray?.destroy();
+  tray = null;
 });
 app.on("window-all-closed", () => {
-  app.quit();
+  if (!quitting && (!tray || tray.isDestroyed())) app.quit();
 });

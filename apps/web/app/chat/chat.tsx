@@ -11,16 +11,16 @@ import {
   Plus,
   Search,
   Square,
-  SlidersHorizontal,
   LogIn,
   Trash2,
   X,
 } from "lucide-react";
-import { createAuthClient } from "better-auth/react";
+import { startGitHubSignIn } from "@/lib/start-github-sign-in";
 import { Mark } from "@/components/chrome";
 import { UserAvatar } from "@/components/user-avatar";
+import { WelcomeSurface } from "@/components/welcome-surface";
 import { MarkdownMessage } from "@/components/markdown-message";
-import { ModelPicker, modelDisplayName } from "@/components/model-picker";
+import { aiServiceText } from "@/components/ai-service-text";
 import { useModelSelection } from "@/components/use-model-selection";
 import { ThemeControl } from "@/components/theme-control";
 import { SponsorPlacement } from "@/components/sponsor-placement";
@@ -44,12 +44,6 @@ type Status = {
   models: { id: string; name: string }[];
 };
 const noModels: Status["models"] = [];
-const suggestions = [
-  "Explain a tricky idea",
-  "Help me write something",
-  "Make a plan for my week",
-  "Work through a coding problem",
-];
 function CopyButton({
   text,
   label = "Copy",
@@ -90,13 +84,12 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
     [queue, setQueue] = useState<{ id: string; text: string; sent?: boolean; status: "queued" | "sending" | "accepted" | "failed"; messageIndex?: number; model?: string }[]>([]),
     [pendingSend, setPendingSend] = useState<{ id: string; text: string; status: "sending" | "accepted" | "failed"; inHistory?: boolean; messageIndex?: number; model?: string } | null>(null),
     [query, setQuery] = useState(""),
-    [modelPickerOpen, setModelPickerOpen] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [sidebar, setSidebar] = useState(false),
     [signingIn, setSigningIn] = useState(false),
     [commandNotice, setCommandNotice] = useState("");
-  const { model, setModel } = useModelSelection(status?.userId, status?.models ?? noModels);
+  const { model } = useModelSelection(status?.userId, status?.models ?? noModels);
   const { chats, setChats, historyReady, storageError, syncError, removeConversation, openConversation, opening } = useCloudHistory(status?.userId, busy);
   const abort = useRef<AbortController | null>(null),
     sending = useRef(false),
@@ -154,15 +147,9 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
     return () => window.removeEventListener("focus", refresh);
   }, [status?.userId]);
   useEffect(() => {
-    const showModel = (event: Event) => {
-      const detail = (event as CustomEvent<{ view?: string }>).detail;
-      if (detail?.view === "chat") setModelPickerOpen(true);
-    };
     const showHistory = () => setSidebar(true);
-    window.addEventListener("freecoda:show-model", showModel);
     window.addEventListener("freecoda:chat-sidebar", showHistory);
     return () => {
-      window.removeEventListener("freecoda:show-model", showModel);
       window.removeEventListener("freecoda:chat-sidebar", showHistory);
     };
   }, []);
@@ -231,17 +218,6 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
       case "/cwd":
         setCommandNotice("General chat has no attached working directory. Select a cloud workspace to inspect its app directory.");
         break;
-      case "/model":
-        if (!argument) {
-          setModelPickerOpen(true);
-          setCommandNotice(`Current model: ${status?.models.find((item) => item.id === model) ? modelDisplayName(status.models.find((item) => item.id === model)!) : model || "Loading"}.`);
-        } else if (!status?.models.some((item) => item.id === argument)) {
-          setCommandNotice(`Unknown model “${argument}”. Available: ${status?.models.map((item) => item.id).join(", ") || "none"}.`);
-        } else {
-          setModel(argument);
-          setCommandNotice(`Model set to ${argument}.`);
-        }
-        break;
       case "/mode":
         if (!argument || argument === "chat") setCommandNotice("Mode: Chat. Use Workspace for build, plan, and review modes.");
         else if (["build", "plan", "review"].includes(argument)) {
@@ -250,7 +226,7 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
         } else setCommandNotice("Use /mode chat, build, plan, or review. Coding modes run in Workspace.");
         break;
       case "/status":
-        setCommandNotice(`${status?.signedIn ? "Signed in" : "Not signed in"} · ${selected?.title || "New chat"} · ${model || "No model selected"} · ${status?.available ? "Chat available" : status?.reason || "Chat unavailable"}`);
+        setCommandNotice(`${status?.signedIn ? "Signed in" : "Not signed in"} · ${selected?.title || "New chat"} · ${status?.available ? "Chat available" : status?.reason || "Chat unavailable"}`);
         break;
       case "/usage":
         try {
@@ -280,11 +256,7 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
   async function signIn() {
     setSigningIn(true);
     try {
-      const result = await createAuthClient().signIn.social({
-        provider: "github",
-        callbackURL: "/app?view=chat",
-      });
-      if (result.error) throw Error(result.error.message || "Sign-in failed.");
+      await startGitHubSignIn("/app?view=chat");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Sign-in failed.");
       setSigningIn(false);
@@ -449,7 +421,7 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
           "The response ended early. You can retry when the service is ready.",
         );
       if (!answer)
-        throw Error("The model returned no text. You can retry this message.");
+        throw Error("No response text was returned. You can retry this message.");
       updateMessages(id, [
         ...displayedContext,
         { role: "assistant", content: answer, status: "complete" },
@@ -554,7 +526,7 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
           onClick={() => setSidebar(false)}
         />
       )}
-      <aside id="chat-sidebar" data-open={sidebar} className={`${s.sidebar} ${sidebar ? s.open : ""}`}>
+      <aside id="chat-sidebar" data-open={sidebar} className={`${s.sidebar} ${sidebar ? s.open : ""}`} aria-label="Chats">
         {!embedded && <div className={s.brand}>
           <Link href="/" aria-label="Freecoda home">
             <Mark />
@@ -577,7 +549,7 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
             ref={search}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search chats"
+            placeholder="Search your conversations"
             aria-label="Search chats"
           />
         </label>
@@ -591,6 +563,8 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
               >
                 <button
                   disabled={busy}
+                  aria-current={c.id === active ? "page" : undefined}
+                  title={c.title}
                   onClick={() => {
                     setActive(c.id);
                     setSidebar(false);
@@ -627,12 +601,12 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
         {onOpenWorkspace ? (
           <button className={s.workspace} type="button" onClick={() => onOpenWorkspace("/project")}>
             <Code2 size={18} />
-            <span>Choose a project · /project</span>
+            <span>Open a workspace</span>
           </button>
         ) : (
           <Link className={s.workspace} href="/app">
             <Code2 size={18} />
-            <span>Choose a project · /project</span>
+            <span>Open a workspace</span>
           </Link>
         )}
         {!embedded && <div className={s.account}>
@@ -641,26 +615,32 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
         </div>}
       </aside>
       <section className={s.conversation}>
-        {!embedded && <header className={s.topbar}>
+        <header className={s.topbar}>
           <button
             className={s.menu}
-            aria-label="Open sidebar"
+            aria-label={sidebar ? "Close chat sidebar" : "Open chat sidebar"}
             aria-controls="chat-sidebar"
             aria-expanded={sidebar}
-            onClick={() => setSidebar(true)}
+            onClick={() => setSidebar(open => !open)}
           >
             <Menu size={21} />
           </button>
+          <div className={s.threadHeading}>
+            <span>{selected?.title || "New chat"}</span>
+            <small>{selected?.mode === "coding" ? "Saved coding conversation" : "Chat · no repository access"}</small>
+          </div>
           <div className={s.headerRight}>
-            {status?.models?.length ? (
-              <button type="button" className={s.modelPickerTrigger} aria-haspopup="dialog" aria-label="Choose model" title="Choose model" onClick={() => setModelPickerOpen(true)}>
-                <SlidersHorizontal size={18} aria-hidden="true" />
-              </button>
-            ) : (
-              <span className={s.modelState}>
-                {status ? "Chat" : "Connecting…"}
-              </span>
-            )}
+            <button
+              type="button"
+              className={s.headerNewChat}
+              onClick={newChat}
+              disabled={busy}
+              aria-label="Start a new chat"
+              title="New chat"
+            >
+              <Plus size={18} />
+            </button>
+            {!status && <span className={s.modelState}>Connecting…</span>}
             {!status?.signedIn && status && (
               <button
                 className={s.signIn}
@@ -673,7 +653,7 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
               </button>
             )}
           </div>
-        </header>}
+        </header>
         <div className={s.scroll}>
           {messages.length || pendingSend || queue.some((item) => !item.sent) ? (
             <div className={s.messages} aria-label="Conversation">
@@ -737,34 +717,21 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
               <div ref={end} />
             </div>
           ) : (
-            <div className={s.welcome}>
-              <div className={s.welcomeMark}>
-                <Mark />
-              </div>
-              <h1>What can I help with?</h1>
-              <p>A little room to think, write, and build.</p>
-              <div className={s.suggestions}>
-                {suggestions.map((q, i) => (
-                  <button
-                    key={q}
-                    onClick={() => {
-                      setDraft(q);
-                      input.current?.focus();
-                    }}
-                  >
-                    <span>{["✦", "✎", "◇", "⌘"][i]}</span>
-                    {q}
-                  </button>
-                ))}
-              </div>
+            <div className={s.welcomeContainer}>
+              <WelcomeSurface heading="h1" actions={[
+                { label: "Understand something", description: "Find a clear way through a tricky idea", onClick: () => { setDraft("Explain a tricky idea in simple terms. Ask me what I want to understand first."); input.current?.focus(); } },
+                { label: "Find the right words", description: "Shape a thought into a useful first draft", onClick: () => { setDraft("Help me write something. Ask what I need first."); input.current?.focus(); } },
+                { label: "Explore a project", description: "Choose a repository to get to know its code", ...(onOpenWorkspace ? { onClick: () => onOpenWorkspace("/plan") } : { href: "/app?view=workspace" }) },
+                { label: "Review a project", description: "Look for a concrete bug before making changes", ...(onOpenWorkspace ? { onClick: () => onOpenWorkspace("/review") } : { href: "/app?view=workspace" }) },
+              ]} />
             </div>
           )}
         </div>
         <div className={s.composerArea}>
-          {commandNotice && <div className={s.availability} role="status">{commandNotice}</div>}
+          {commandNotice && <div className={s.availability} role="status">{aiServiceText(commandNotice, status?.models)}</div>}
           {error && (
             <div className={s.error} role="alert">
-              {error}
+              {aiServiceText(error, status?.models)}
               {!busy && messages.length > 0 && !pendingSend && queue.length === 0 && (
                 <button
                   onClick={() => void send(true)}
@@ -777,7 +744,7 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
           )}
           {status && !status.available && (
             <div className={s.availability} role="status">
-              {status.reason || "Chat is currently unavailable."}
+              {aiServiceText(status.reason || "Chat is currently unavailable.", status.models)}
               {!status.signedIn && (
                 <button onClick={signIn} disabled={signingIn}>
                   Continue with GitHub
@@ -865,7 +832,6 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
       <div className={s.adDock}>
         <SponsorPlacement />
       </div>
-      <ModelPicker open={modelPickerOpen} models={status?.models ?? noModels} selected={model} onSelect={setModel} onClose={() => setModelPickerOpen(false)} />
     </main>
   );
 }

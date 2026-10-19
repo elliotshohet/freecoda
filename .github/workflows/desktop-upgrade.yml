@@ -52,7 +52,7 @@ jobs:
       - run: node --test apps/desktop/scripts/upgrade-version.test.mjs
       - name: Install Linux native display and FUSE dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libfuse2 xvfb openbox xdotool scrot
+        run: sudo apt-get update && sudo apt-get install -y libfuse2 xvfb openbox xdotool x11-utils scrot
       - name: Qualify Windows installed update
         if: runner.os == 'Windows'
         run: node apps/desktop/scripts/qualify-upgrade.mjs

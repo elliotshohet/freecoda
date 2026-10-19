@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import type { DesktopBridge, DesktopEvent } from "./shared";
 // Expose individual operations, never raw IPC or Node APIs.
 const api: DesktopBridge = {
+  appInfo: () => ipcRenderer.invoke("desktop:appInfo"),
   listPlugins: () => ipcRenderer.invoke("desktop:listPlugins"),
   previewPlugin: (source) => ipcRenderer.invoke("desktop:previewPlugin", source),
   installReviewedPlugin: (input) => ipcRenderer.invoke("desktop:installReviewedPlugin", input),
@@ -55,6 +56,7 @@ const api: DesktopBridge = {
   copyText: (value) => ipcRenderer.invoke("desktop:copyText", value),
   clearHistory: () => ipcRenderer.invoke("desktop:clearHistory"),
   openCloud: () => ipcRenderer.invoke("desktop:openCloud"),
+  openAccountSettings: () => ipcRenderer.invoke("desktop:openAccountSettings"),
   listCloudWorkspaces: () => ipcRenderer.invoke("desktop:listCloudWorkspaces"),
   openCloudWorkspace: (id) => ipcRenderer.invoke("desktop:openCloudWorkspace", id),
   onEvent: (listener) => {

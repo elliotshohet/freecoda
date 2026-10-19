@@ -34,9 +34,9 @@ describe("unified web conversation routing", () => {
     const project: string[] = [];
     const conversation: string[] = [];
     const handlers = { project: (value: string) => project.push(value), conversation: (value: string) => conversation.push(value) };
-    for (const value of ["/chat", "/new", "/unknown", "/UPDATE", "/", "/model reflection/beam-2"]) expect(interceptWebConversationInput(value, handlers)).toBe(true);
+    for (const value of ["/chat", "/new", "/unknown", "/UPDATE", "/", "/removed-command example"]) expect(interceptWebConversationInput(value, handlers)).toBe(true);
     expect(project).toEqual([]);
-    expect(conversation).toEqual(["/chat", "/new", "/unknown", "/UPDATE", "/", "/model reflection/beam-2"]);
+    expect(conversation).toEqual(["/chat", "/new", "/unknown", "/UPDATE", "/", "/removed-command example"]);
     expect(interceptWebConversationInput("Explain my repository", handlers)).toBe(false);
     expect(project).toEqual([]);
   });

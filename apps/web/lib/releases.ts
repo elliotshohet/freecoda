@@ -5,6 +5,10 @@ export const CLI_RELEASE_URL = `https://github.com/elliotshohet/freecoda/release
 export const CLI_CHECKSUMS_URL = `https://github.com/elliotshohet/freecoda/releases/download/cli-v${CLI_RELEASE_VERSION}/SHA256SUMS.txt`;
 export const CLI_INSTALL_COMMAND = `npm install --global https://github.com/elliotshohet/freecoda/releases/download/cli-v${CLI_RELEASE_VERSION}/freecoda-${CLI_RELEASE_VERSION}.tgz --ignore-scripts`;
 
+// Enable only after the public shell endpoint has been deployed and verified.
+export const CLI_SHELL_INSTALLER_PUBLISHED = false;
+export const CLI_SHELL_INSTALL_COMMAND = "curl -fsSL https://freecoda.com/install.sh | sh";
+
 // Public release assets and checksums verified before exposing downloads.
 export const DESKTOP_PUBLISHED = true;
 export const DESKTOP_RELEASE_VERSION = "0.1.7";

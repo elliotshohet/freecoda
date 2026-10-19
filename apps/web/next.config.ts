@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import { withWorkflow } from "workflow/next";
 const config: NextConfig = {
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   transpilePackages: ["@freecoda/contracts"],
   poweredByHeader: false,
   async redirects() {

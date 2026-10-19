@@ -125,7 +125,6 @@ export const TERMINAL_COMMANDS = [
   { command: "/resume", description: "Open a saved task" },
   { command: "/chat", description: "Continue without repository access" },
   { command: "/build", description: "Work in the trusted checkout with approvals" },
-  { command: "/model", description: "List or choose the active model" },
   { command: "/mcp", description: "List, discover, or enable MCP connections" },
   { command: "/tools", description: "Select tools for following turns" },
   { command: "/extensions", description: "Browse installed tools and skills" },
@@ -157,7 +156,7 @@ export const TERMINAL_COMMANDS = [
     command: "/permissions",
     description: "Choose this session’s tool permissions",
   },
-  { command: "/status", description: "Show project, model, and permissions" },
+  { command: "/status", description: "Show project, connection, and permissions" },
   { command: "/copy", description: "Copy the latest assistant response (macOS)" },
   { command: "/diff", description: "Show tracked diff and untracked paths in trusted workspace" },
   { command: "/pwd", description: "Show the selected directory" },
@@ -729,10 +728,10 @@ export class TerminalScreen {
         palette.muted("│")
       );
     };
+    lines.push("  " + c.bold(palette.accent("freecoda")) + palette.muted("  /help for commands"));
     lines.push(palette.muted("╭" + "─".repeat(cardWidth - 2) + "╮"));
-    lines.push(card(this.mode === "chat" ? "General conversation" : "Local workspace", true));
-    lines.push(card(`directory: ${this.root}`));
-    lines.push(card(this.mode === "chat" ? "Project access: none" : "Conversations saved for this directory"));
+    lines.push(card(this.mode === "chat" ? "General chat · no repository tools" : `${this.mode === "build" ? "Build" : this.mode === "plan" ? "Plan" : "Review"} · ${this.permissions}`, true));
+    lines.push(card(`Workspace: ${this.root}`));
     lines.push(palette.muted("╰" + "─".repeat(cardWidth - 2) + "╯"));
     const commands = this.commandMatches();
     const menuSize = Math.min(
@@ -866,6 +865,17 @@ export class TerminalScreen {
         );
       }
     }
+    lines.push(
+      palette.muted(
+        "  " + clip(this.sponsor.label + " · " + this.sponsor.headline, inner),
+      ),
+    );
+    lines.push(palette.muted("  " + clip(this.sponsor.description, inner)));
+    lines.push(
+      palette.muted(
+        "  " + clip("Ctrl+O sponsor · " + this.sponsor.href, inner),
+      ),
+    );
     lines.push(palette.muted("─".repeat(columns)));
     lines.push(
       "  " +
@@ -907,8 +917,13 @@ export class TerminalScreen {
     const inputScreenRow = lines.length + 1;
     for (let i = 0; i < inputRowCount; i++) {
       const line = inputLines[inputStart + i] || "";
-      lines.push((inputStart + i === 0 ? palette.accent("› ") : "  ") + line);
+      const placeholder = !this.value && i === 0 && this.question?.kind === "composer"
+        ? this.busy ? "Add to the current task…" : "Ask Coda… / for commands"
+        : "";
+      const content = line || placeholder;
+      lines.push(palette.muted("│ ") + (placeholder ? palette.muted(content) : content) + " ".repeat(Math.max(0, columns - 3 - textWidth(content))) + palette.muted("│"));
     }
+    lines.push(palette.muted("─".repeat(columns)));
     lines.push(
       palette.muted(
         "  " +
@@ -922,18 +937,6 @@ export class TerminalScreen {
                 : `Enter send · Ctrl+J newline · ↑ history · PgUp scroll · /help · ${this.mode === "chat" ? "Chat · no tools" : this.permissions}`,
             inner,
           ),
-      ),
-    );
-    lines.push(palette.muted("─".repeat(columns)));
-    lines.push(
-      palette.muted(
-        "  " + clip(this.sponsor.label + " · " + this.sponsor.headline, inner),
-      ),
-    );
-    lines.push(palette.muted("  " + clip(this.sponsor.description, inner)));
-    lines.push(
-      palette.muted(
-        "  " + clip("Ctrl+O sponsor · " + this.sponsor.href, inner),
       ),
     );
     process.stdout.write(

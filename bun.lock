@@ -19,7 +19,7 @@
     },
     "apps/desktop": {
       "name": "@freecoda/desktop",
-      "version": "0.1.7",
+      "version": "0.1.8",
       "dependencies": {
         "electron-updater": "6.8.10",
       },
@@ -58,7 +58,7 @@
     },
     "packages/cli": {
       "name": "freecoda",
-      "version": "0.1.7",
+      "version": "0.1.8",
       "bin": {
         "freecoda": "bin/freecoda.js",
       },

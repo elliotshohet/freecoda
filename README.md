@@ -4,7 +4,7 @@ A conversational assistant and coding agent for the browser, desktop, and termin
 
 ## Browser chat
 
-The public home page introduces Freecoda and provides GitHub sign-in independently of chat availability. Verified signed-in visitors go straight to `/app`. `/app` combines conversations and project work in one screen: choose **Ask Coda** for a general conversation or **Work on project** to run the project agent, while keeping the project rail and file/output inspector available. Each mode retains its own conversation and draft when switching. `/chat` redirects to `/app?view=chat`. Both require a verified browser session, as does `/settings`. Background session checks preserve drafts and workspace state; an account change hides private content until you explicitly reload. `/dashboard` redirects to `/settings` for profile, appearance, usage/devices, and GitHub repository access. Repository connections require the configured GitHub App and cloud access; unavailable integrations report their actual state. Use `/model` to choose an approved, configured free model for future messages; the selection is shared across both conversation modes. Use `/mcp` to inspect configured MCP connections and explicitly discover their tools, or `/tools` to select which available tools the next project run may use. Installing or selecting tools does not execute them, and external tools still require run approval.
+The public home page introduces Freecoda and provides GitHub sign-in independently of chat availability. Verified signed-in visitors go straight to `/app`. `/app` combines conversations and project work in one screen: choose **Ask Coda** for a general conversation or **Work on project** to run the project agent, while keeping the project rail and file/output inspector available. Each mode retains its own conversation and draft when switching. `/chat` redirects to `/app?view=chat`. Both require a verified browser session, as does `/settings`. Background session checks preserve drafts and workspace state; an account change hides private content until you explicitly reload. `/dashboard` redirects to `/settings` for profile, appearance, usage/devices, and GitHub repository access. Repository connections require the configured GitHub App and cloud access; unavailable integrations report their actual state. Use `/mcp` to inspect configured MCP connections and explicitly discover their tools, or `/tools` to select which available tools the next project run may use. Installing or selecting tools does not execute them, and external tools still require run approval.
 
 Chat includes encrypted account conversations with offline local copies, a message composer, streamed answers, and a separately labeled sponsor placement. An approved hosted invitation is required for inference. It shares the existing Gateway routing, usage reservations, rate limits, and free allowance; it does not bypass service capacity limits.
 
@@ -71,6 +71,85 @@ The web app opens at http://127.0.0.1:3010. `bun run build` builds all three app
 cp .env.example apps/web/.env.local
 # Create a private root .env with FREECODA_DB_PASSWORD=<your-local-password>.
 docker compose up -d --wait
+```
+
+On the Mini, running web natively avoids VM file-sharing and polling overhead.
+Keep the existing PostgreSQL container running and preserve the local
+`DATABASE_URL` in `apps/web/.env.local` (`127.0.0.1:5439/freecoda`). Stop the Docker
+web service first so only one server owns port 3010, then run:
+
+```sh
+bun run dev
+```
+
+Native Next.js watches source directly. Do not enable `WATCHPACK_POLLING` for this
+mode. The database still uses Colima; do not stop the VM while that database is
+needed. This does not configure launch at login.
+
+For a detached local web/API service, use the optional Docker app profile after preparing
+`apps/web/.env.local` as described below:
+
+```sh
+docker --context freecoda-mini compose --profile app build web
+docker --context freecoda-mini compose up -d --wait db
+docker --context freecoda-mini compose --profile app run --rm web bun scripts/docker-web.ts migrate
+docker --context freecoda-mini compose --profile app up -d --wait web
+```
+
+The web/API container binds only to `127.0.0.1:3010` and uses the existing local
+PostgreSQL volume on the Compose network. Runtime database credentials come from
+`FREECODA_DB_PASSWORD`; environment files and credentials are excluded from the
+image. The `app` profile is a development service: narrow read-only bind mounts
+load web routes, components, libraries, public assets, and shared workspace source
+directly from this checkout. Next.js runs with webpack polling so Colima source
+edits trigger Fast Refresh without an image rebuild. The web service is limited
+to two CPU cores, with a three-second polling interval, so compilation and file
+watching leave capacity for the Mini's other apps.
+Linux `node_modules` stays inside the frozen-lockfile image; `.next` and generated Workflow routes use
+separate named caches. The repository root, home directory, credentials, and
+private `.data` evidence are not source mounts. Runtime secrets still come from
+`env_file` and Compose environment configuration.
+
+After changing only source, save the file and keep the service running. After
+changing dependencies, workspace package metadata, the lockfile, or Dockerfile,
+rebuild the dependency image and recreate **only** web:
+
+```sh
+docker --context freecoda-mini compose --profile app build web
+docker --context freecoda-mini compose --profile app up -d --no-deps --wait web
+```
+
+Changes to environment files, Compose settings, or the container entry script
+also require recreating web. Next configuration edits automatically restart the
+dev server. This development profile
+is not a production deployment. Production publication retains the reviewed
+source, build, and release workflow; source bind mounts are local development
+only. Stop the local web service with
+`docker --context freecoda-mini compose --profile app stop web`; do not use `down -v` when
+preserving accounts and history. Electron remains native on macOS. The optional CLI profile uses the same image, with an isolated named
+configuration volume and no host home or repository mounts:
+`docker --context freecoda-mini compose --profile cli run --rm cli --help`. Run
+`docker --context freecoda-mini compose --profile cli run --rm cli login` to sign in
+inside that isolated client. No idle agent or visible terminal is started.
+Local browser sign-in belongs to the local database. An existing desktop token
+for the hosted server cannot authenticate to it; keep the desktop's configured
+server and account unless explicitly changing accounts.
+
+On the Mini, `freecoda-mini` uses a dedicated SSH Unix-socket forward to the
+existing Colima Docker daemon, leaving the default context unchanged. The
+forward survives this shell session but must be reopened after a host/VM restart;
+there is no background supervisor. The Mini's former native `com.freecoda.web`
+login service is disabled so it cannot shadow the Docker service on port 3010.
+If automatic Colima TCP forwarding is unavailable, a loopback-only fallback is
+`ssh -F "$HOME/.colima/_lima/colima/ssh.config" -o ControlMaster=no -o ControlPath=none -o ExitOnForwardFailure=yes -f -N -L 127.0.0.1:3010:127.0.0.1:3010 lima-colima`.
+Use this only when port 3010 has no listener. `bun scripts/docker-web.ts migrate` is the
+container migration entry point and uses the same local database credentials as
+the web service. To reopen the Mini's forward if its task-owned socket is stale:
+
+```sh
+# Only after docker --context freecoda-mini info reports it unavailable:
+rm -f "$HOME/.colima/freecoda-runtime.sock"
+ssh -F "$HOME/.colima/_lima/colima/ssh.config" -o ControlMaster=no -o ControlPath=none -o ConnectTimeout=5 -o ExitOnForwardFailure=yes -f -N -L "$HOME/.colima/freecoda-runtime.sock:/var/run/docker.sock" lima-colima
 ```
 
 Edit `apps/web/.env.local`: set `DATABASE_URL` to `postgresql://freecoda:YOUR_URL_ENCODED_PASSWORD@127.0.0.1:5439/freecoda`, generate separate `BETTER_AUTH_SECRET`, `AD_SIGNING_SECRET`, and `CRON_SECRET` values, and configure `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`. Keep `BETTER_AUTH_URL=http://127.0.0.1:3010`. Register `http://127.0.0.1:3010/api/auth/callback/github` as the local GitHub OAuth callback; use a separate OAuth app for production. If a private SSH tunnel forwards Air browser traffic to the Mini at `127.0.0.1:13010`, add the exact callback `http://127.0.0.1:13010/api/auth/callback/github` to the local GitHub OAuth app too. Keep the tunnel bound to loopback; production auth stays on its canonical URL.

@@ -6,7 +6,6 @@ import {
   ArrowUpRight,
   Check,
   ChevronRight,
-  Code2,
   Copy,
   ExternalLink,
   FileCode2,
@@ -29,8 +28,9 @@ import {
 import styles from "./workspace.module.css";
 import { Mark } from "@/components/chrome";
 import { UserAvatar } from "@/components/user-avatar";
+import { WelcomeIdentity, WelcomeSurface } from "@/components/welcome-surface";
 import { MarkdownMessage } from "@/components/markdown-message";
-import { ModelPicker, modelDisplayName } from "@/components/model-picker";
+import { aiServiceText } from "@/components/ai-service-text";
 import { useModelSelection } from "@/components/use-model-selection";
 import { ThemeControl } from "@/components/theme-control";
 import { SponsorPlacement } from "@/components/sponsor-placement";
@@ -158,8 +158,7 @@ async function api<T>(
 
 export function CloudWorkspace({ conversationMode = "project", onOpenProject, onOpenChat }: { conversationMode?: "ask" | "project"; onOpenProject?: () => void; onOpenChat?: () => void }) {
   const [status, setStatus] = useState<Status | null>(null);
-  const { model, setModel } = useModelSelection(status?.userId, status?.models ?? noWorkspaceModels);
-  const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const { model } = useModelSelection(status?.userId, status?.models ?? noWorkspaceModels);
   const [projects, setProjects] = useState<Project[]>([]);
   const [project, setProject] = useState<Project | null>(null);
   const [files, setFiles] = useState<FileEntry[]>([]);
@@ -296,14 +295,6 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
     void load(abort.signal);
     return () => abort.abort();
   }, [load]);
-  useEffect(() => {
-    const showModel = (event: Event) => {
-      const detail = (event as CustomEvent<{ view?: string }>).detail;
-      if (detail?.view === "workspace") setModelPickerOpen(true);
-    };
-    window.addEventListener("freecoda:show-model", showModel);
-    return () => window.removeEventListener("freecoda:show-model", showModel);
-  }, []);
   useEffect(() => {
     if (!dialog) return;
     const previous = document.activeElement as HTMLElement | null;
@@ -753,18 +744,6 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
           setNotice(`Mode set to ${argument}.`);
         } else setNotice("Usage: /mode build|plan|review");
         break;
-      case "/model":
-        if (!rawArgument) {
-          const currentModel = status?.models?.find((entry) => entry.id === model);
-          setNotice(`Current model: ${currentModel ? modelDisplayName(currentModel) : model || "Loading"}.`);
-          setModelPickerOpen(true);
-        } else if (!status?.models?.some((entry) => entry.id === rawArgument)) {
-          setError(`Unknown model “${rawArgument}”. Available: ${status?.models?.map((entry) => entry.id).join(", ") || "none"}.`);
-        } else if (setModel(rawArgument)) {
-          const chosenModel = status?.models?.find((entry) => entry.id === rawArgument);
-          setNotice(`Model set to ${chosenModel ? modelDisplayName(chosenModel) : rawArgument}.`);
-        }
-        break;
       case "/permissions":
         setNotice(`Cloud storage consent: ${consent ? "saved for this account" : "not yet accepted"}. External MCP tools: ${hasExternalTools ? extensionConsent ? "allowed for the next run" : "require per-run approval" : "not enabled"}.`);
         break;
@@ -776,7 +755,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
           const response = await fetch("/api/v1/usage", { cache: "no-store" });
           const usage = await response.json();
           if (!response.ok) throw new Error(usage.error || "Usage is unavailable.");
-          setNotice(`AI free allowance remaining today: $${(usage.freeRemainingMicros / 1_000_000).toFixed(4)}. Beam Free inference has $0 model cost.`);
+          setNotice(`AI free allowance remaining today: $${(usage.freeRemainingMicros / 1_000_000).toFixed(4)}. Hosted inference is free.`);
         } catch (error) { setError(errorMessage(error)); }
         break;
       }
@@ -834,7 +813,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
     const approvedItem = { ...item, model: item.model || model, extensionConsent: item.extensionConsent ?? extensionConsent, failed: false };
     if (!approvedItem.model) {
       pauseQueue(true);
-      setError("No approved free model is available for this account. Your message is retained in the queue.");
+      setError("The AI service is unavailable for this account. Your message is retained in the queue.");
       return;
     }
     updateQueue(queuedRef.current.map((entry) => entry.id === item.id ? approvedItem : entry));
@@ -1175,7 +1154,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
       <h1 className="sr-only">Freecoda coding workspace</h1>
       {error && (
         <div className={styles.error} role="alert">
-          <span>{error}</span>
+          <span>{aiServiceText(error, status?.models)}</span>
           {error.includes("Cloud compute is busy") && activeWorkspace && (
             <button className={styles.errorAction} type="button" onClick={() => void selectProject(activeWorkspace)}>
               Open active workspace: {activeWorkspace.name}
@@ -1189,7 +1168,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
       {notice && (
         <p className={styles.notice} role="status">
           <Check size={15} />
-          {notice}
+          {aiServiceText(notice, status?.models)}
           {prUrl && (
             <a href={prUrl} target="_blank" rel="noopener noreferrer">
               View draft pull request <ArrowUpRight size={13} />
@@ -1225,9 +1204,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
             </div>
           </aside>
           <section className={styles.setup} data-conversation-slot>
-            <div className={styles.setupIcon}>
-              <Code2 size={34} />
-            </div>
+            <WelcomeIdentity />
             <h2>
               {!status
                 ? "Could not load your workspace."
@@ -1238,11 +1215,11 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                     : "Your cloud workspace is getting ready."}
             </h2>
             <p>
-              {status?.reason ||
+              {aiServiceText(status?.reason ||
                 status?.message ||
                 (!status
                   ? "Refresh to check cloud availability. You can also open your account or use the local CLI."
-                  : "Cloud execution is not enabled on this instance yet. You can keep building with the local CLI while the cloud service is configured.")}
+                  : "Cloud execution is not enabled on this instance yet. You can keep building with the local CLI while the cloud service is configured."), status?.models)}
             </p>
             <div className={styles.actions}>
               <Link className="button purple" href="/dashboard">
@@ -1300,7 +1277,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
             </div>
           </div>
           <div className={styles.workbench}>
-            <aside className={styles.projects} data-mobile-open={projectsOpen}>
+            <aside className={styles.projects} data-mobile-open={projectsOpen} aria-label="Cloud workspaces">
               <button
                 className={styles.mobileProjectsToggle}
                 aria-expanded={projectsOpen}
@@ -1311,7 +1288,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                 <ChevronRight size={14} />
               </button>
               <div className={styles.sectionHead}>
-                <strong>Workspaces</strong>
+                <strong>Your workspaces</strong>
                 <button
                   aria-label="Create project"
                   disabled={!consent || busy || running}
@@ -1385,8 +1362,11 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                 <Link href="/docs">
                   Documentation <ArrowUpRight size={13} />
                 </Link>
-                <Link href="/docs#desktop">
-                  Desktop & CLI <ArrowUpRight size={13} />
+                <Link href="/download">
+                  Download desktop <ArrowUpRight size={13} />
+                </Link>
+                <Link href="/#install">
+                  Install the CLI <ArrowUpRight size={13} />
                 </Link>
               </nav>
               <div className={styles.railSponsor}>
@@ -1399,32 +1379,14 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
               </p>
             </aside>
             {!project ? (
-              <section className={styles.start} data-conversation-slot>
-                <div className={styles.startGlyph}>
-                  <Code2 size={46} strokeWidth={1.3} />
-                </div>
-                <h2>What do you want to build?</h2>
-                <p>
-                  Start with a blank project or bring a repository. Ask the
-                  agent to build, fix, or help you understand it.
-                </p>
-                <div className={styles.actions}>
-                  <button
-                    className="button purple"
-                    disabled={!consent || busy}
-                    onClick={() => setDialog("create")}
-                  >
-                    <Plus size={15} /> New project
-                  </button>
-                  <button
-                    className="button secondary"
-                    disabled={!consent || busy}
-                    onClick={showImport}
-                  >
-                    <GitBranch size={15} /> Import repository
-                  </button>
-                </div>
-                <span>Review every change before sharing it.</span>
+              <section className={styles.welcomeStart} data-conversation-slot aria-label="Start a workspace">
+                <WelcomeSurface title="What do you want to build?" description="Start with a cloud project or bring a repository. You choose what the agent can access." hint={null} actions={[
+                  { label: "Start a project", description: "Create a blank Next.js or Vite workspace", disabled: !consent || busy || running, onClick: () => setDialog("create") },
+                  { label: "Bring a repository", description: "Choose a GitHub repository to work on", disabled: !consent || busy || running, onClick: () => { void showImport(); } },
+                  { label: "Talk it through", description: "Think or write without repository access", ...(onOpenChat ? { onClick: onOpenChat } : { href: "/app?view=chat" }) },
+                  { label: "Work in your own folder", description: "Get the desktop app or terminal client", href: "/docs#desktop" },
+                ]} />
+                <p className={styles.welcomeNote}>{!consent ? "Accept cloud storage consent above to create or import a workspace." : "Review every change before sharing it."}</p>
               </section>
             ) : (
               <section className={styles.projectArea}>
@@ -1481,35 +1443,18 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                       aria-relevant="additions text"
                     >
                       {!messages.length && (
-                        <div className={styles.chatEmpty}>
-                          <span className={styles.agentGlyph}>✳</span>
-                          <h3>What can I help with?</h3>
-                          <p>
-                            Build something new, trace a bug, or make a plan.
-                            The agent works in this cloud project. Changes are
-                            yours to review.
-                          </p>
-                          <div className={styles.suggestions}>
-                            {[
-                              "Explain this project",
-                              "Plan a new feature",
-                              "Find a bug",
-                            ].map((suggestion) => (
-                              <button
-                                key={suggestion}
-                                type="button"
-                                onClick={() => {
-                                  promptInputRef.current = suggestion;
-                                  setPrompt(suggestion);
-                                  document
-                                    .getElementById("cloud-prompt")
-                                    ?.focus();
-                                }}
-                              >
-                                {suggestion}
-                              </button>
-                            ))}
-                          </div>
+                        <div className={styles.workspaceWelcome}>
+                          <WelcomeSurface heading="h3" description={`A plan, a question, or a change for ${project.name}. You review the work before sharing it.`} actions={[
+                            { label: "Explore this project", description: "Understand the code and where to start", prompt: "Explain how this project is organized and where I should start.", mode: "plan" },
+                            { label: "Plan a feature", description: "Work out the next steps before editing", prompt: "Help me plan a new feature. Ask what I want to build first.", mode: "plan" },
+                            { label: "Review this project", description: "Look for a concrete bug before making changes", prompt: "Review this project for a concrete bug. Explain your findings before making changes.", mode: "review" },
+                            { label: "Build something", description: "Make a change with the usual approvals", prompt: "Help me make a change to this project. Ask what I need first.", mode: "build" },
+                          ].map(action => ({ label: action.label, description: action.description, disabled: busy || running || inactive || !consent, onClick: () => {
+                            setMode(action.mode);
+                            promptInputRef.current = action.prompt;
+                            setPrompt(action.prompt);
+                            document.getElementById("cloud-prompt")?.focus();
+                          } }))} />
                         </div>
                       )}
                       {messages.map((m, i) => (
@@ -2197,7 +2142,6 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
           </section>
         </div>
       )}
-      <ModelPicker open={modelPickerOpen} models={status?.models ?? noWorkspaceModels} selected={model} onSelect={setModel} onClose={() => setModelPickerOpen(false)} />
     </div>
   );
 }

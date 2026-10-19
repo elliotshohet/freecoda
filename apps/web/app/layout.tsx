@@ -20,7 +20,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(()=>{let p='system';try{const s=localStorage.getItem('freecoda-theme');if(s==='light'||s==='dark')p=s}catch{}const t=p==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):p;document.documentElement.dataset.theme=t;document.documentElement.dataset.themePreference=p})()`,
+            __html: `(()=>{let p='system';try{const s=localStorage.getItem('freecoda-theme');if(s==='light'||s==='dark')p=s}catch{}const t=p==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):p;document.documentElement.dataset.theme=t;document.documentElement.dataset.themePreference=p;document.documentElement.style.colorScheme=t})()`,
           }}
         />
       </head>

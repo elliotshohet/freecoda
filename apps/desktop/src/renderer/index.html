@@ -56,8 +56,15 @@
         aria-label="Projects and conversations"
         id="project-sidebar"
       >
+        <nav class="desktop-rail" aria-label="Quick navigation">
+          <button id="rail-chat" type="button" title="General chat" aria-label="General chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3V10Z"/><path d="M9 20v-7h6v7"/></svg></button>
+          <button id="rail-repositories" type="button" title="GitHub repositories" aria-label="GitHub repositories"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 10v10"/></svg></button>
+          <button id="rail-plugins" type="button" title="Plugins & MCP" aria-label="Plugins & MCP"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M8 3v5m8-5v5M6 8h12v4a6 6 0 0 1-12 0V8Zm6 10v4"/></svg></button>
+          <button id="rail-account" type="button" title="Account & settings" aria-label="Account & settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg></button>
+        </nav>
         <div class="sidebar-brand"><img src="./logo.svg" alt="" width="26" height="26" /><span>Freecoda</span></div>
         <nav class="sidebar-primary" aria-label="Conversation navigation">
+          <button id="sidebar-start-chat" type="button" class="sidebar-action"><span aria-hidden="true">＋</span> New chat</button>
           <button id="sidebar-general-chat" class="sidebar-action"><span aria-hidden="true">◌</span> General chat</button>
           <button id="open-folder" class="sidebar-action" title="Open a local folder"><span aria-hidden="true">＋</span> Open folder…</button>
         </nav>
@@ -276,54 +283,46 @@ Command output will appear here. Your permission preset controls local command e
           aria-live="polite"
           aria-relevant="additions text"
         >
-          <div id="chat-welcome" class="chat-welcome">
-            <img class="welcome-brand" src="./logo.svg" alt="Freecoda" width="42" height="42" />
-            <h2 id="chat-welcome-title">What can I help with?</h2>
-            <p id="chat-welcome-description">
-              Ask anything, or type / to work with a project.
-            </p>
-            <div class="prompt-suggestions">
-              <button
-                data-prompt="Explain a tricky idea in simple terms."
-                data-mode="chat"
-                data-conversation="chat"
-              >
-                Explain a tricky idea
+          <section id="chat-welcome" class="chat-welcome" aria-labelledby="chat-welcome-title">
+            <div class="welcome-identity">
+              <img class="welcome-brand" src="./logo.svg" alt="" width="56" height="56" />
+              <span>Freecoda</span>
+            </div>
+            <h2 id="chat-welcome-title">What’s on your mind?</h2>
+            <p id="chat-welcome-description">A question, a first draft, or something you want to build.</p>
+            <div class="prompt-suggestions" aria-label="Conversation starting points">
+              <button data-prompt="Explain a tricky idea in simple terms. Ask me what I want to understand first." data-mode="chat" data-conversation="chat">
+                <strong>Understand something</strong><span>Find a clear way through a tricky idea</span>
               </button>
-              <button
-                data-prompt="Help me write something. Ask what I need first."
-                data-mode="chat"
-                data-conversation="chat"
-              >
-                Help me write something
+              <button data-prompt="Help me write something. Ask what I need first." data-mode="chat" data-conversation="chat">
+                <strong>Find the right words</strong><span>Shape a thought into a useful first draft</span>
               </button>
-              <button
-                data-prompt="Help me make a realistic plan for my week."
-                data-mode="chat"
-                data-conversation="chat"
-              >
-                Make a plan for my week
+              <button data-prompt="Explain how this project is organized and where I should start." data-mode="plan" data-conversation="coding">
+                <strong>Explore a project</strong><span>Get to know the code in a folder you choose</span>
               </button>
-              <button
-                data-prompt="Explain how this project is organized and where I should start."
-                data-mode="plan"
-                data-conversation="coding"
-              >
-                Understand this project</button
-              ><button
-                data-prompt="Review this project for a concrete bug. Explain your findings before making changes."
-                data-mode="review"
-                data-conversation="coding"
-              >
-                Find something to improve
+              <button data-prompt="Review this project for a concrete bug. Explain your findings before making changes." data-mode="review" data-conversation="coding">
+                <strong>Review a project</strong><span>Look for a concrete bug before making changes</span>
               </button>
             </div>
-          </div>
+            <p class="welcome-command-hint">Start typing below, or use <kbd>/</kbd> for commands.</p>
+          </section>
         </div>
         <div id="working" class="working" role="status" hidden>
           <span class="spinner" aria-hidden="true"></span
           ><span id="working-text">Working in your project…</span>
         </div>
+        <aside
+          class="house-ad"
+          id="sponsor-placement"
+          aria-label="Freecoda announcement"
+        >
+          <span id="sponsor-label">Freecoda announcement</span
+          ><strong id="sponsor-headline">Help keep Freecoda free.</strong>
+          <p id="sponsor-description">
+            Sponsor a placement without access to code or conversations.
+          </p>
+          <button id="sponsor-info" class="quiet-button">Learn more ↗</button>
+        </aside>
         <form id="chat-form" class="composer">
           <div id="slash-menu" class="slash-menu" role="listbox" aria-label="Conversation commands" hidden></div>
           <label class="sr-only" for="prompt">Message Freecoda</label
@@ -357,10 +356,10 @@ Command output will appear here. Your permission preset controls local command e
               Default permissions</button
             ><span id="model-label" class="model-label" hidden></span
             ><span class="composer-hint">Enter to send · Ctrl+Enter to queue · Shift+Enter for a new line</span
-            ><button id="send" type="submit" class="send" disabled>
-              Send <span aria-hidden="true">↑</span></button
-            ><button id="stop" type="button" class="stop" hidden>
-              Stop <span aria-hidden="true">■</span>
+            ><button id="send" type="submit" class="send" aria-label="Send message" title="Send message" disabled>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button
+            ><button id="stop" type="button" class="stop" aria-label="Stop response" title="Stop response" hidden>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
             </button>
           </div>
         </form>
@@ -370,21 +369,10 @@ Command output will appear here. Your permission preset controls local command e
           shell command.
         </p>
         <p class="model-privacy-note" id="model-privacy-note" hidden></p>
-        <aside
-          class="house-ad"
-          id="sponsor-placement"
-          aria-label="Freecoda announcement"
-        >
-          <span id="sponsor-label">Freecoda announcement</span
-          ><strong id="sponsor-headline">Help keep Freecoda free.</strong>
-          <p id="sponsor-description">
-            Sponsor a placement without access to code or conversations.
-          </p>
-          <button id="sponsor-info" class="quiet-button">Learn more ↗</button>
-        </aside>
-        <footer class="account-footer"><button id="account-avatar-open" type="button" aria-label="Account & settings"><span id="account-avatar" class="account-avatar" aria-hidden="true">U</span><span id="account-footer-label">Sign in</span></button></footer>
+
       </section>
     </main>
+    <footer class="account-footer"><div class="app-footer-left"><span id="app-version" class="app-version" aria-label="Running app version">Version unavailable</span><button id="footer-github-login" class="footer-github-login" type="button" hidden>Sign in with GitHub</button></div><button id="account-avatar-open" type="button" aria-label="Account & settings"><span id="account-avatar" class="account-avatar" aria-hidden="true">U</span><span id="account-footer-label">Sign in</span></button></footer>
     <dialog
       id="permissions-dialog"
       aria-labelledby="permissions-title"
@@ -587,6 +575,13 @@ Command output will appear here. Your permission preset controls local command e
       <h2 id="account-title">Your account</h2>
       <p>One free plan. Sponsor supported. No card required.</p>
       <div id="account-state" class="account-state">Loading your account…</div>
+      <div id="account-details" class="account-details" hidden>
+        <div class="dialog-actions"><button id="account-refresh-details" class="button secondary" type="button">Refresh details</button><button id="account-browser-settings" class="button secondary" type="button">Open web account settings ↗</button></div>
+        <section class="settings-section account-section" aria-labelledby="account-profile-heading"><h3 id="account-profile-heading">Profile &amp; workspace</h3><div id="account-profile-details" aria-live="polite"></div><p>Email, privacy controls, and device revocation are available in web account settings.</p></section>
+        <section class="settings-section account-section" aria-labelledby="account-repositories-heading"><h3 id="account-repositories-heading">Connected repositories</h3><div id="account-repositories" aria-live="polite"></div><button id="account-manage-repositories" class="button secondary" type="button">Manage repositories</button></section>
+        <section class="settings-section account-section" aria-labelledby="account-cloud-heading"><h3 id="account-cloud-heading">Cloud workspaces</h3><div id="account-cloud-workspaces" aria-live="polite"></div><p>Cloud projects open in your browser; compute is managed there.</p></section>
+      </div>
+      <section class="settings-section account-section" aria-labelledby="account-integrations-heading"><h3 id="account-integrations-heading">Local integrations</h3><div id="account-integrations" aria-live="polite"></div><button id="account-manage-integrations" class="button secondary" type="button">Manage plugins &amp; tools</button><p>Installed on this computer. Configuration and enabled state do not imply an active MCP connection.</p></section>
       <div id="usage-view" hidden>
         <div class="usage-heading">
           <span>Daily AI allowance</span><strong id="usage-percent"></strong>
@@ -598,6 +593,7 @@ Command output will appear here. Your permission preset controls local command e
           aria-label="Daily AI allowance remaining"
         ></progress>
         <p id="usage-reset" class="muted"></p>
+        <section class="settings-section account-section" aria-labelledby="account-devices-heading"><h3 id="account-devices-heading">Connected devices</h3><div id="account-devices" aria-live="polite"></div><p>Manage device access in web account settings.</p></section>
       </div>
       <div id="login-view" hidden>
         <p id="login-instructions"></p>
@@ -618,12 +614,6 @@ Command output will appear here. Your permission preset controls local command e
         Signed-in conversations sync to your account, with a local offline copy; AI requests send the context
         needed for your task.
       </p>
-    </dialog>
-    <dialog id="model-dialog" class="settings-dialog" aria-labelledby="model-title">
-      <h2 id="model-title">Free model</h2>
-      <p>Changes apply to your next request. Only configured free models are available.</p>
-      <div id="model-options"></div>
-      <button id="model-close" class="button secondary">Close</button>
     </dialog>
     <script type="module" src="./renderer.js"></script>
   </body>

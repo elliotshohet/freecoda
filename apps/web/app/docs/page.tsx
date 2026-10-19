@@ -68,15 +68,14 @@ export default function Docs() {
           copy. See the <Link href="/privacy">privacy policy</Link> for provider
           retention and backup details.
         </p>
-        <h2>Hosted model and privacy</h2>
+        <h2>Hosted AI and privacy</h2>
         <p>
-          Hosted chat and coding use Reflection Beam Free through Vercel AI
-          Gateway. The provider may retain submitted conversations, source
+          Hosted chat and coding use our hosted AI service. The provider may retain submitted conversations, source
           excerpts, and tool output and use them for training. This route has no
           no-training or zero-data-retention guarantee. Do not submit secrets or
           private customer data. Read the <Link href="/privacy">privacy policy</Link>
-          {" "}before sending content. If Beam is unavailable or no longer free,
-          hosted requests stop rather than switch to another model.
+          {" "}before sending content. If the approved free service is unavailable,
+          hosted requests stop rather than switch to a paid service.
         </p>
         <h2 id="browser">Build in your browser</h2>
         <p>
@@ -140,12 +139,12 @@ export default function Docs() {
           <summary>Advanced settings: optional API key</summary>
           <p>
             You do not need an API key for the free sponsored plan. Configure a
-            direct provider only if you want to use your own model and account.
+            direct provider only if you want to use your own AI service and account.
             Your provider bills you directly; this does not add sponsored
             credits or increase your Freecoda allowance.
           </p>
           <p>
-            Your CLI can connect directly to an OpenAI-compatible provider.
+            Your CLI can connect directly to a compatible AI provider.
             Supply the provider’s HTTPS API base URL and exact model ID, and
             enter the key through the hidden prompt. You can also provide it
             through <code>FREECODA_PROVIDER_KEY</code>.

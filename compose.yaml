@@ -15,5 +15,61 @@ services:
       interval: 3s
       timeout: 3s
       retries: 20
+  web:
+    profiles: ["app"]
+    # Leave CPU capacity for the desktop and browser during development builds.
+    cpus: 2
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    restart: unless-stopped
+    env_file:
+      - apps/web/.env.local
+    environment:
+      FREECODA_DB_PASSWORD: ${FREECODA_DB_PASSWORD:?Set FREECODA_DB_PASSWORD in .env}
+      NEXT_TELEMETRY_DISABLED: "1"
+      FREECODA_DOCKER_DEV: "1"
+      WATCHPACK_POLLING: "3000"
+    ports:
+      - "127.0.0.1:3010:3010"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # Source only: image-owned Linux dependencies remain untouched.
+      - ./apps/web/app:/app/apps/web/app:ro
+      - ./apps/web/components:/app/apps/web/components:ro
+      - ./apps/web/lib:/app/apps/web/lib:ro
+      - ./apps/web/public:/app/apps/web/public:ro
+      - ./apps/web/next.config.ts:/app/apps/web/next.config.ts:ro
+      - ./apps/web/tsconfig.json:/app/apps/web/tsconfig.json:ro
+      - ./packages/contracts/src:/app/packages/contracts/src:ro
+      - ./packages/core/src:/app/packages/core/src:ro
+      - ./packages/cli/src:/app/packages/cli/src:ro
+      - ./scripts/docker-web.ts:/app/scripts/docker-web.ts:ro
+      - freecoda_next:/app/apps/web/.next
+      # Workflow generates routes here; keep them off the host source tree.
+      - freecoda_workflow_routes:/app/apps/web/app/.well-known
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3010/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 10s
+      start_period: 120s
+      retries: 10
+  cli:
+    profiles: ["cli"]
+    image: freecoda-web
+    entrypoint: ["bun", "packages/cli/src/index.ts"]
+    command: ["--help"]
+    stdin_open: true
+    tty: true
+    environment:
+      FREECODA_CONFIG_DIR: /home/node/.config/freecoda
+    volumes:
+      - freecoda_cli:/home/node/.config/freecoda
 volumes:
   freecoda_postgres:
+  freecoda_next:
+  freecoda_workflow_routes:
+  freecoda_cli:

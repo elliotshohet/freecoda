@@ -1,3 +1,4 @@
+import { browserEntryPath } from "@/lib/sign-in-return";
 import { requireBrowserSession } from "@/lib/browser-session";
 import { SessionBoundary } from "@/components/session-boundary";
 import { UnifiedWebApp } from "./unified-web-app";
@@ -14,8 +15,8 @@ export default async function AppPage({
 }: {
   searchParams: SearchParams;
 }) {
-  const user = await requireBrowserSession();
   const params = await searchParams;
+  const user = await requireBrowserSession(browserEntryPath("/app", params));
   const thread = params.thread;
   return (
     <SessionBoundary userId={user.id}>

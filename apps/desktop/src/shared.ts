@@ -82,6 +82,7 @@ export type DesktopGitHubState = { repos: DesktopGitHubRepo[]; repositories: Des
 export type DesktopExtension = { id: string; name: string; kind: "skill" | "mcp"; enabled: boolean };
 export type DesktopPlugin = { id: string; name: string; skillCount: number; serverCount: number };
 export interface DesktopBridge {
+  appInfo(): Promise<{ version: string; packaged: boolean }>;
   listPlugins(): Promise<DesktopPlugin[]>;
   previewPlugin(source: string): Promise<import("../../../packages/contracts/src/extensions").PluginManifest>;
   installReviewedPlugin(input: { source: string; manifest: import("../../../packages/contracts/src/extensions").PluginManifest }): Promise<DesktopPlugin[]>;
@@ -135,6 +136,7 @@ export interface DesktopBridge {
   deleteThread(id: string): Promise<DesktopState>;
   copyText(value: string): Promise<void>;
   openCloud(): Promise<void>;
+  openAccountSettings(): Promise<void>;
   listCloudWorkspaces(): Promise<DesktopCloudWorkspace[]>;
   openCloudWorkspace(id: string): Promise<void>;
   onEvent(listener: (event: DesktopEvent) => void): () => void;

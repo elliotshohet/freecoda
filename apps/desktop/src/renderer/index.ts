@@ -43,6 +43,8 @@ const mode = el<HTMLSelectElement>("mode");
 let state: DesktopState | null = null;
 let accountProfile: { name?: string; avatar?: string } = {};
 let profileSignedIn: boolean | undefined;
+let accountDetailsRequest = 0;
+let accountAuthGeneration = 0;
 let file: DesktopFile | null = null;
 let pendingFolder: DesktopWorkspace | null = null;
 let filesRequest = 0;
@@ -76,12 +78,12 @@ document.querySelector<HTMLElement>(".composer-hint")!.textContent =
   "Enter to send · Ctrl+Enter to queue · Shift+Enter for a new line";
 
 function message(error: unknown) {
-  return error instanceof Error
-    ? error.message.replace(
-        /^Error invoking remote method '[^']+': (?:Error: )?/,
-        "",
-      )
+  let detail = error instanceof Error
+    ? error.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, "")
     : "This action could not be completed. Please try again.";
+  const routingId = state?.auth.model;
+  if (routingId) detail = detail.split(routingId).join("the AI service");
+  return detail.replace(/reflection\/beam(?:-free|-2)?|beam free|reflection/gi, "the AI service");
 }
 function showError(error: unknown) {
   text("error-text", message(error));
@@ -127,6 +129,7 @@ function renderWorkspaceNavigation() {
   list.replaceChildren();
   hide("selected-workspace", chat || !workspace);
   button("sidebar-general-chat").setAttribute("aria-current", chat ? "page" : "false");
+  button("rail-chat").setAttribute("aria-current", chat ? "page" : "false");
   text("folder-name", workspace?.name || "");
   text("folder-path", workspace?.root || "");
   text("workspace-details", workspace?.trusted ? `Trusted folder · ${workspace.files.length} files in explorer` : "Trust this folder before accessing its files.");
@@ -201,6 +204,7 @@ function updateControls() {
   hide("stop", !running);
   button("stop").disabled = actionBusy;
   button("new-chat").disabled = !ready;
+  button("sidebar-start-chat").disabled = !ready;
   button("sidebar-new-task").disabled = !ready;
   el("thread-history")
     .querySelectorAll<HTMLButtonElement>("button")
@@ -280,6 +284,7 @@ function updateControls() {
 const conversationDrafts = new Map<string, string>();
 function draftScope(value: DesktopState | null | undefined) { return `${value?.conversationMode === "coding" ? value.workspace?.root || "none" : "chat"}:${value?.activeThreadId || "new"}`; }
 function renderState(next: DesktopState) {
+  document.querySelector(".agent-pane")?.classList.toggle("general-chat", next.conversationMode === "chat");
   const previousScope = draftScope(state);
   const nextScope = draftScope(next);
   if (state && previousScope !== nextScope) conversationDrafts.set(previousScope, prompt.value.trim().startsWith("/") ? "" : prompt.value);
@@ -306,11 +311,15 @@ function renderState(next: DesktopState) {
   else if (mode.value === "chat") mode.value = "build";
   text(
     "chat-welcome-title",
-    "What can I help with?",
+    next.conversationMode === "coding" ? "What are we building?" : "What’s on your mind?",
   );
   text(
     "chat-welcome-description",
-    "Ask anything, or type / to work with a project.",
+    next.conversationMode === "coding" && next.workspace
+      ? next.workspace.trusted
+        ? `Work with ${next.workspace.name}. You stay in control of edits and commands.`
+        : `Trust ${next.workspace.name} to work with its files, or return to general chat.`
+      : "A question, a first draft, or something you want to build.",
   );
   prompt.placeholder =
     "Ask Coda… Type / for commands";
@@ -376,7 +385,7 @@ function renderState(next: DesktopState) {
   renderFiles();
   renderThreads();
   text("model-privacy-note", next.auth.allowPromptTraining === false
-    ? "Provider prompt training is disallowed for this hosted model. Provider operational retention may still apply."
+    ? "Provider prompt training is disallowed for hosted requests. Provider operational retention may still apply."
     : next.auth.allowPromptTraining === true || !next.auth.model
       ? "The hosted provider may retain prompts and code and use them for training. Do not send sensitive content."
       : "Provider training and retention policy is unavailable. Do not send sensitive content.");
@@ -979,7 +988,7 @@ async function runSlashCommand(value: string): Promise<boolean> {
   const [command, ...args] = value.trim().split(/\s+/);
   switch (command.toLowerCase()) {
     case "/help":
-      appendMessage("assistant", "Commands: /project to choose a folder, /build to work on it, /plan and /review for read-only project tasks, /chat to return to general chat, /files, /terminal, /repos, /model, /permissions, /usage, /status, /sync status|pull, /mcp, /skills, /tools, /new, /clear, /resume, /copy, /diff, /pwd. Project access requires folder trust; changes and commands follow your permissions.");
+      appendMessage("assistant", "Commands: /project to choose a folder, /build to work on it, /plan and /review for read-only project tasks, /chat to return to general chat, /files, /terminal, /repos, /permissions, /usage, /status, /sync status|pull, /mcp, /skills, /tools, /new, /clear, /resume, /copy, /diff, /pwd. Project access requires folder trust; changes and commands follow your permissions.");
       return true;
     case "/new":
       await newConversation();
@@ -1051,9 +1060,6 @@ async function runSlashCommand(value: string): Promise<boolean> {
     }
     case "/update":
       await bridge.checkForUpdates();
-      return true;
-    case "/model":
-      await openModels();
       return true;
     case "/permissions":
       if (args.length) notify("Use /permissions to choose a permission preset.");
@@ -1475,6 +1481,7 @@ async function loadCloudWorkspaces() {
 }
 button("cloud-workspaces-refresh").addEventListener("click", () => void loadCloudWorkspaces(), { signal });
 button("account-avatar-open").addEventListener("click", openAccount, { signal });
+button("footer-github-login").addEventListener("click", () => { openAccount(); void login(); }, { signal });
 function renderAccountAvatar() {
   const signedIn = state?.auth.signedIn;
   const avatar = el("account-avatar"); avatar.replaceChildren();
@@ -1487,6 +1494,8 @@ function renderAccountAvatar() {
 function renderAccount() {
   if (!state) return;
   if (profileSignedIn !== state.auth.signedIn) {
+    accountDetailsRequest++;
+    accountAuthGeneration++;
     profileSignedIn = state.auth.signedIn;
     accountProfile = {};
     void loadCloudWorkspaces();
@@ -1504,26 +1513,97 @@ function renderAccount() {
   text(
     "account-state",
     state.auth.signedIn
-      ? `Connected to ${state.auth.server}${state.auth.model ? `\nModel: ${state.auth.model}` : ""}`
+      ? `Connected to ${state.auth.server}`
       : "Connect your GitHub account to use the free hosted agent. Your local project is not uploaded to GitHub.",
   );
   renderAccountAvatar();
   hide("login", state.auth.signedIn || loginInProgress);
+  hide("footer-github-login", state.auth.signedIn || loginInProgress);
   hide("logout", !state.auth.signedIn);
   hide("refresh-usage", !state.auth.signedIn);
-  if (!state.auth.signedIn) hide("usage-view");
+  hide("account-details", !state.auth.signedIn);
+  if (!state.auth.signedIn) {
+    hide("usage-view");
+    for (const id of ["account-profile-details", "account-repositories", "account-cloud-workspaces", "account-devices"]) el(id).replaceChildren();
+  }
 }
 function openAccount() {
   const dialog = el<HTMLDialogElement>("account-dialog");
   if (!dialog.open) dialog.showModal();
+  void refreshAccountDetails();
   if (state?.auth.signedIn) void refreshUsage();
 }
+function accountRow(container: HTMLElement, title: string, detail: string) {
+  const row = document.createElement("div"); row.className = "account-detail-row";
+  const name = document.createElement("strong"); name.textContent = title;
+  const description = document.createElement("p"); description.textContent = detail;
+  row.append(name, description); container.append(row);
+  return row;
+}
+async function refreshAccountDetails() {
+  const request = ++accountDetailsRequest;
+  const signedIn = !!state?.auth.signedIn;
+  button("account-refresh-details").disabled = true;
+  const load = async <T>(id: string, task: () => Promise<T>, render: (target: HTMLElement, value: T) => void) => {
+    text(id, "Loading…");
+    try {
+      const value = await task();
+      if (request !== accountDetailsRequest || signedIn !== !!state?.auth.signedIn) return;
+      const target = el(id); target.replaceChildren(); render(target, value);
+    } catch (error) {
+      if (request === accountDetailsRequest) text(id, `Could not load this section. ${message(error)}`);
+    }
+  };
+  const tasks: Promise<void>[] = [load("account-integrations", async () => {
+    const [extensions, plugins] = await Promise.all([bridge.listExtensions(), bridge.listPlugins()]);
+    return { extensions, plugins };
+  }, (target, data) => {
+    if (!data.extensions.length && !data.plugins.length) { target.textContent = "No plugins, skills, or MCP servers installed on this computer."; return; }
+    for (const plugin of data.plugins) accountRow(target, plugin.name, `Plugin bundle · ${plugin.skillCount} skills · ${plugin.serverCount} MCP servers`);
+    for (const item of data.extensions) accountRow(target, item.name, `${item.kind === "skill" ? "Skill" : "MCP server"} · ${item.enabled ? "Enabled" : "Disabled"}${item.kind === "mcp" ? " · Connection status is checked in Plugins & tools" : ""}`);
+  })];
+  if (signedIn) {
+    tasks.push(load("account-profile-details", () => bridge.accountProfile(), (target, profile) => {
+      accountRow(target, profile.name || "Profile name unavailable", "GitHub account · One free plan, supported by sponsors");
+      accountRow(target, "Connection", state?.auth.server || "Unavailable");
+      accountRow(target, "Current workspace", state?.workspace ? `${state.workspace.name} · ${state.workspace.root} · ${state.workspace.trusted ? "Trusted" : "Trust required"}` : "General chat · no local repository access");
+    }));
+    tasks.push(load("account-repositories", () => bridge.githubRepositories(), (target, data) => {
+      if (!data.repos.length && !data.repositories.length) { target.textContent = "No GitHub repositories available. Manage repositories to connect GitHub App access."; return; }
+      for (const repo of data.repos) {
+        const saved = data.repositories.find(item => item.owner === repo.owner && item.name === repo.name);
+        accountRow(target, `${repo.owner}/${repo.name}`, `${repo.private ? "Private" : "Public"} · ${saved ? saved.enabled ? "Enabled" : "Disabled" : "Available · not configured"} · Branch: ${saved?.branch || repo.defaultBranch || "Not specified"}${saved?.appDirectory ? ` · App folder: ${saved.appDirectory}` : ""}`);
+      }
+      for (const saved of data.repositories.filter(item => !data.repos.some(repo => repo.owner === item.owner && repo.name === item.name))) accountRow(target, `${saved.owner}/${saved.name}`, "Saved preference · repository is not in current GitHub App access");
+    }));
+    tasks.push(load("account-cloud-workspaces", () => bridge.listCloudWorkspaces(), (target, workspaces) => {
+      if (!workspaces.length) { target.textContent = "No cloud workspaces in this account."; return; }
+      for (const workspace of workspaces) {
+        const row = accountRow(target, workspace.name, `${workspace.status}${workspace.repository ? ` · ${workspace.repository}` : ""}${workspace.branch ? ` · ${workspace.branch}` : ""}${workspace.appDirectory ? ` · ${workspace.appDirectory}` : ""}`);
+        const open = document.createElement("button"); open.type = "button"; open.className = "button secondary"; open.textContent = "Open in browser ↗"; open.setAttribute("aria-label", `Open ${workspace.name} in browser`);
+        open.addEventListener("click", () => { open.disabled = true; void bridge.openCloudWorkspace(workspace.id).catch(showError).finally(() => { open.disabled = false; }); }, { signal }); row.append(open);
+      }
+    }));
+  }
+  await Promise.all(tasks);
+  if (request === accountDetailsRequest) button("account-refresh-details").disabled = false;
+}
+button("account-refresh-details").addEventListener("click", () => { void refreshAccountDetails(); void refreshUsage(); }, { signal });
+button("account-browser-settings").addEventListener("click", () => void bridge.openAccountSettings().catch(showError), { signal });
+button("account-manage-repositories").addEventListener("click", () => { el<HTMLDialogElement>("account-dialog").close(); button("github-repos-open").click(); }, { signal });
+button("account-manage-integrations").addEventListener("click", () => { el<HTMLDialogElement>("account-dialog").close(); void openExtensions().catch(showError); }, { signal });
 async function refreshUsage() {
   if (accountBusy || !state?.auth.signedIn) return;
   accountBusy = true;
+  const authGeneration = accountAuthGeneration;
+  text("account-devices", "Loading connected devices…");
+  text("usage-percent", "Loading…");
+  el("usage-progress").hidden = true;
+  hide("usage-view", false);
   button("refresh-usage").disabled = true;
   try {
     const result = await bridge.usage();
+    if (authGeneration !== accountAuthGeneration || !state?.auth.signedIn) return;
     const data =
       result && typeof result === "object"
         ? "usage" in result
@@ -1537,6 +1617,7 @@ async function refreshUsage() {
       dailyLimitMicros?: number;
       resetAt?: string;
       invited?: boolean;
+      devices?: { name?: unknown; createdAt?: unknown }[];
     };
     if (
       typeof value.freeRemainingMicros !== "number" ||
@@ -1555,6 +1636,7 @@ async function refreshUsage() {
     );
     text("usage-percent", `${remaining}% remaining`);
     el<HTMLProgressElement>("usage-progress").value = remaining;
+    el("usage-progress").hidden = false;
     text(
       "usage-reset",
       value.invited === false
@@ -1563,9 +1645,20 @@ async function refreshUsage() {
           ? `Resets ${new Date(value.resetAt).toLocaleString()}. Shared free capacity may apply.`
           : "Fair-use limits apply. No paid upgrades.",
     );
+    const devices = el("account-devices"); devices.replaceChildren();
+    if (!Array.isArray(value.devices)) devices.textContent = "Device details are unavailable from this server.";
+    else if (!value.devices.length) devices.textContent = "No active connected devices.";
+    else for (const device of value.devices) {
+      const date = typeof device.createdAt === "string" ? new Date(device.createdAt) : null;
+      accountRow(devices, typeof device.name === "string" ? device.name : "Connected device", date && Number.isFinite(date.getTime()) ? `Connected ${date.toLocaleString()}` : "Active device");
+    }
     hide("usage-view", false);
   } catch (error) {
-    showError(error);
+    if (authGeneration === accountAuthGeneration && state?.auth.signedIn) {
+      text("usage-percent", "Unavailable");
+      text("usage-reset", message(error));
+      text("account-devices", "Could not load connected devices. Refresh details to try again.");
+    }
   } finally {
     accountBusy = false;
     button("refresh-usage").disabled = false;
@@ -1992,6 +2085,10 @@ button("toggle-sidebar").addEventListener(
   },
   { signal },
 );
+button("sidebar-start-chat").addEventListener("click", () => button("new-chat").click(), { signal });
+for (const [rail, target] of [["rail-chat", "sidebar-general-chat"], ["rail-repositories", "github-repos-open"], ["rail-plugins", "extensions-open"], ["rail-account", "account-avatar-open"]]) {
+  button(rail!).addEventListener("click", () => button(target!).click(), { signal });
+}
 button("sidebar-general-chat").addEventListener("click", () => void switchAgentMode("chat"), { signal });
 button("sidebar-plugins").addEventListener("click", () => void openExtensions().catch(showError), { signal });
 button("sidebar-account").addEventListener("click", openAccount, { signal });
@@ -2242,29 +2339,12 @@ if (!bridge) {
   );
   updateControls();
 } else {
+  void bridge.appInfo().then(({ version, packaged }) => {
+    text("app-version", `v${version}${packaged ? "" : " · Local development"}`);
+  }).catch(showError);
   void bridge.getState().then(renderState).catch(showError);
   void loadSponsor();
 }
-
-async function openModels() {
-  if (running || actionBusy || promptQueue.length) { notify("Finish or remove queued messages before changing models."); return; }
-  const models = await bridge.listModels();
-  const list = el("model-options"); list.replaceChildren();
-  if (!models.length) list.textContent = "No configured free models are available. Check your account connection.";
-  for (const model of models) {
-    const option = document.createElement("button"); option.type = "button";
-    option.className = "button secondary";
-    option.textContent = `${model.name}${state?.auth.model === model.id ? " · Selected" : ""}`;
-    option.addEventListener("click", async () => {
-      option.disabled = true;
-      try { if (running || promptQueue.length) throw Error("Finish or remove queued messages before changing models."); renderState(await bridge.selectModel(model.id)); el<HTMLDialogElement>("model-dialog").close(); }
-      catch (error) { showError(error); option.disabled = false; }
-    }, { signal });
-    list.append(option);
-  }
-  el<HTMLDialogElement>("model-dialog").showModal();
-}
-button("model-close").addEventListener("click", () => el<HTMLDialogElement>("model-dialog").close(), { signal });
 
 async function renderToolChoices() {
   let list = document.getElementById("tool-choices");

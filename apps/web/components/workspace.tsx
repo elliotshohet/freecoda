@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { startGitHubSignIn } from "@/lib/start-github-sign-in";
 import {
   ArrowUpRight,
   KeyRound,
@@ -61,18 +62,9 @@ export function Workspace({ settings = false }: { settings?: boolean } = {}) {
     setBusy(true);
     setError("");
     try {
-      const { createAuthClient } = await import("better-auth/react");
-      await createAuthClient().signIn.social(
-        { provider: "github", callbackURL: "/dashboard" },
-        {
-          onError: (ctx) => {
-            setError(ctx.error.message);
-            setBusy(false);
-          },
-        },
-      );
-    } catch {
-      setError("GitHub sign-in is not available yet.");
+      await startGitHubSignIn("/app?view=workspace");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "GitHub sign-in is not available yet.");
       setBusy(false);
     }
   }

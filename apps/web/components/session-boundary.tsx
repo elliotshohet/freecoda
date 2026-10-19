@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { signInPath } from "@/lib/sign-in-return";
 
 /** Recheck restored tabs and expired sessions before exposing private UI. */
 export function SessionBoundary({ userId, children }: {
@@ -28,7 +29,7 @@ export function SessionBoundary({ userId, children }: {
         const session = await response.json();
         if (!alive) return;
         if (!session?.user?.id) {
-          window.location.replace("/?signin=required");
+          window.location.replace(signInPath(`${window.location.pathname}${window.location.search}${window.location.hash}`));
           return;
         }
         if (session.user.id !== userId) {
@@ -75,7 +76,7 @@ export function SessionBoundary({ userId, children }: {
         <h1>{accountChanged ? "Your signed-in account changed." : error ? "We couldn’t verify your session." : "Opening your account…"}</h1>
         {(error || accountChanged) && <><p>{accountChanged ? "Reload once to open the current account’s workspace." : "Your workspace stays private until your session is verified."}</p>
           <button className="button secondary" onClick={() => window.location.reload()}>Try again</button>{" "}
-          <Link className="button purple" href="/">Back to sign in</Link></>}
+          <Link className="button purple" href="/sign-in">Back to sign in</Link></>}
       </section>
     </main>
   );

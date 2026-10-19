@@ -2325,3 +2325,224 @@ button.theme-control {
 }
 button.theme-control:hover { background: light-dark(#f2f2f2, #303030); }
 button.theme-control:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+
+/* The public entry uses the same welcome rhythm as the signed-in clients. */
+.entry-welcome { padding-top: clamp(28px, 5vh, 60px); padding-bottom: 36px; }
+.entry-welcome > :is(button, a.button) { margin-top: 24px; }
+.entry-welcome > .entry-caption { max-width: 460px; margin: 20px auto 0; font-size: 11px; line-height: 1.7; }
+@media (max-width: 680px) { .entry-welcome { padding: 28px 18px; } }
+
+/* Public welcome is a real entry canvas, without a simulated app window. */
+.welcome-entry { display: flex; flex-direction: column; justify-content: center; min-height: min(860px, calc(100svh - 100px)); padding: clamp(36px, 6vh, 76px) 24px 0; }
+.welcome-entry-content { width: min(100%, 720px); margin: auto; padding-bottom: clamp(38px, 5vh, 70px); text-align: center; }
+.welcome-entry-eyebrow { margin: 0 0 38px; font-size: 12px; font-weight: 450; line-height: 1.6; letter-spacing: .1px; color: var(--muted); }
+.welcome-entry-account { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px 24px; margin-top: 32px; }
+.welcome-entry .entry-sign-in { margin: 0; }
+.welcome-entry .entry-sign-in .button { min-height: 44px; border: 1px solid var(--ink); border-radius: 10px; padding: 11px 18px; background: var(--ink); color: var(--paper); box-shadow: none; font-size: 13px; font-weight: 550; transition: opacity 160ms ease, transform 120ms ease; }
+.welcome-entry .entry-sign-in .button:hover:not(:disabled) { opacity: .85; }
+.welcome-entry .entry-sign-in .button:active:not(:disabled) { transform: translateY(1px); }
+.welcome-entry .entry-sign-in > p { max-width: 320px; font-size: 12px; text-align: left; }
+.welcome-entry-open { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 5px; font-size: 13px; color: var(--muted); }
+.welcome-entry-open:hover { color: var(--ink); }
+.welcome-entry-consent { max-width: 440px; margin: 18px auto 0; color: var(--muted); font-size: 11px; line-height: 1.8; }
+.welcome-entry-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px 30px; padding: 20px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; line-height: 1.7; }
+.welcome-entry-footer p { margin: 0; }
+.welcome-entry-footer p a { margin-left: 8px; text-decoration: underline; text-underline-offset: 3px; }
+.welcome-entry-footer nav { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 22px; }
+.welcome-entry-footer nav a { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; }
+.welcome-entry :is(a, button):focus-visible { outline: 2px solid var(--purple); outline-offset: 4px; }
+.welcome-entry-sponsor { max-width: 720px; margin: 20px auto 0; padding: 0 24px; }
+@media (max-width: 680px) {
+  .welcome-entry { min-height: calc(100svh - 76px); padding: 24px 0 0; }
+  .welcome-entry-content { padding-bottom: 32px; }
+  .welcome-entry-eyebrow { margin-bottom: 28px; font-size: 11px; }
+  .welcome-entry-account { margin-top: 22px; gap: 6px 18px; }
+  .welcome-entry-footer { flex-direction: column; align-items: flex-start; gap: 10px; padding: 18px 4px; }
+  .welcome-entry-footer nav { gap: 6px 20px; }
+  .welcome-entry-sponsor { padding: 0; }
+}
+@media (max-width: 380px) { .welcome-entry-footer p a { display: block; margin-left: 0; } }
+@media (prefers-reduced-motion: reduce) { .welcome-entry .entry-sign-in .button { transition: none; } .welcome-entry .entry-sign-in .button:active:not(:disabled) { transform: none; } }
+
+/* Three real ways into Freecoda, with installation available in the welcome. */
+.welcome-entry { min-height: 0; padding-top: 28px; }
+.welcome-paths-heading { text-align: center; margin: 0 auto 32px; }
+.welcome-paths-brand { display: flex; align-items: center; justify-content: center; gap: 13px; margin-bottom: 22px; }
+.welcome-paths-brand img { display: block; width: 56px; height: 56px; border-radius: 14px; }
+.welcome-paths-brand > span { font-size: 24px; font-weight: 600; letter-spacing: -.75px; }
+.welcome-paths-heading h1 { margin: 0; font-size: clamp(30px, 3.4vw, 44px); font-weight: 500; letter-spacing: -1.65px; line-height: 1.2; text-wrap: balance; }
+.welcome-paths-heading > p { margin: 13px 0 0; font-size: 14px; line-height: 1.7; color: var(--muted); text-wrap: pretty; }
+.welcome-paths { display: grid; grid-template-columns: 1.05fr 1fr; grid-template-areas: "desktop terminal" "desktop browser"; gap: 16px; width: min(100%, 1060px); margin: 0 auto; }
+.welcome-path { min-width: 0; padding: 26px; border: 1px solid var(--line); border-radius: 16px; background: light-dark(#fafafa, #252525); }
+.welcome-desktop { grid-area: desktop; background: light-dark(#f6f6f6, #272727); }
+.welcome-terminal { grid-area: terminal; }
+.welcome-browser { grid-area: browser; }
+.welcome-path-label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.welcome-path-label > svg { flex: 0 0 19px; width: 19px; height: 19px; }
+.welcome-path h2 { margin: 17px 0 10px; font-size: 23px; font-weight: 550; letter-spacing: -.7px; line-height: 1.25; text-wrap: balance; }
+.welcome-path > p { margin: 0 0 18px; color: var(--muted); font-size: 13px; line-height: 1.7; max-width: 55ch; }
+.welcome-download-options { display: grid; gap: 6px; }
+.welcome-download-options > a { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 52px; padding: 10px 13px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: var(--paper); transition: background-color 160ms ease, transform 120ms ease; }
+.welcome-download-options > a > span { min-width: 0; }
+.welcome-download-options strong { display: block; font-size: 12px; font-weight: 550; }
+.welcome-download-options small { display: block; margin-top: 3px; font-size: 11px; color: var(--muted); }
+.welcome-download-options svg { flex: 0 0 18px; width: 18px; height: 18px; }
+.welcome-download-options > a:hover { background: light-dark(#ededed, #333333); }
+.welcome-download-options > a:active { transform: translateY(1px); }
+.welcome-path .client-release-links, .client-release-links { margin: 17px 0 0; font-size: 11px; color: var(--muted); line-height: 1.8; }
+.client-release-links a, .welcome-path-fine a, .client-install-note a { text-decoration: underline; text-underline-offset: 3px; }
+.welcome-path .welcome-path-fine { font-size: 11px; margin: 12px 0 0; line-height: 1.7; }
+.welcome-path .install, .welcome-cli-install .install { width: 100%; max-width: none; }
+.welcome-path .install-command, .welcome-cli-install .install-command { background: light-dark(#ededed, #191919); color: var(--ink); border: 1px solid var(--line); border-radius: 9px; gap: 9px; padding: 9px 10px; }
+.welcome-path .install-command > svg, .welcome-cli-install .install-command > svg { flex: 0 0 16px; width: 16px; height: 16px; color: var(--muted); }
+.welcome-path .install-command code, .welcome-cli-install .install-command code { white-space: normal; overflow-wrap: anywhere; font-size: 11px; line-height: 1.7; }
+.welcome-path .install-command button, .welcome-cli-install .install-command button { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 40px; width: 40px; height: 44px; padding: 0; border-radius: 7px; color: var(--ink); }
+.welcome-path .install-command button:hover, .welcome-cli-install .install-command button:hover { background: light-dark(#dedede, #333333); }
+.welcome-path-guide { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; margin-top: 10px; font-size: 11px; color: var(--muted); }
+.welcome-web-button { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; padding: 10px 17px; border-radius: 9px; background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 550; }
+.welcome-web-button:hover { opacity: .85; }
+.open-source-banner { display: flex; align-items: center; gap: 14px; width: min(100%, 1060px); margin: 20px auto 28px; padding: 19px 23px; border: 1px solid var(--line); border-radius: 12px; background: light-dark(#f7f6fa, #27252c); color: var(--ink); transition: background-color 160ms ease; }
+.open-source-banner:hover { background: light-dark(#efedf5, #302c38); }
+.open-source-icon { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 34px; width: 34px; height: 34px; }
+.open-source-icon svg { width: 22px; height: 22px; flex-shrink: 0; }
+.open-source-banner > span:nth-child(2) { flex: 1; min-width: 0; }
+.open-source-banner strong { display: block; font-size: 14px; font-weight: 550; }
+.open-source-banner small { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.open-source-license { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.open-source-banner > svg { flex: 0 0 19px; width: 19px; height: 19px; }
+.get-desktop-section, .get-cli-section { max-width: 1060px; margin: 0 auto; padding: 64px 0 0; scroll-margin-top: 30px; }
+.client-section-label { display: block; margin-bottom: 12px; font-size: 12px; color: var(--muted); }
+.client-section-heading h2 { margin: 0 0 13px; font-size: clamp(25px, 2.7vw, 32px); font-weight: 500; letter-spacing: -.9px; line-height: 1.25; text-wrap: balance; }
+.client-section-heading > p { max-width: 58ch; font-size: 14px; color: var(--muted); line-height: 1.8; }
+.get-desktop-section > .welcome-download-options { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 24px; }
+.client-install-note { max-width: 76ch; margin-top: 18px; font-size: 12px; line-height: 1.8; color: var(--muted); }
+.get-cli-section { display: grid; grid-template-columns: 1fr 1fr; gap: 38px; padding-bottom: 15px; }
+.welcome-cli-install { min-width: 0; }
+.cli-next-steps { margin-top: 20px; font-size: 12px; color: var(--muted); }
+.cli-next-steps pre { padding: 16px; margin-top: 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: light-dark(#fafafa, #252525); font-size: 12px; line-height: 1.8; overflow-x: auto; }
+.header-actions > .entry-sign-in { margin: 0; }
+.header-actions > .entry-sign-in .button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; background: var(--ink); color: var(--paper); font-size: 12px; line-height: 1.4; white-space: nowrap; }
+.header-actions > .entry-sign-in .button > svg { width: 16px; height: 16px; flex: 0 0 16px; }
+.header-actions .entry-sign-in [role="alert"] { position: absolute; right: 20px; max-width: 300px; padding: 12px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; font-size: 12px; z-index: 5; }
+.github-stars-control > svg { width: 17px; height: 17px; flex: 0 0 17px; }
+.github-stars-control svg { flex-shrink: 0; }
+.header-account { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 12px; white-space: nowrap; }
+.header-user-avatar { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; flex: 0 0 28px; border-radius: 50%; overflow: hidden; background: var(--pale); font-size: 11px; }
+.header-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.site-footer .brand > img { display: block; width: 28px; height: 28px; flex: 0 0 28px; border-radius: 7px; }
+@media (max-width: 1000px) { .site-header { flex-wrap: wrap; height: auto; min-height: 96px; padding-top: 16px; padding-bottom: 12px; gap: 10px; } .site-header nav { display: flex; order: 3; flex: 1 0 100%; justify-content: center; gap: 24px; font-size: 12px; } .header-actions { margin-left: auto; } }
+@media (max-width: 680px) {
+  .welcome-entry { padding-top: 24px; }
+  .welcome-paths-heading { margin-bottom: 26px; }
+  .welcome-paths-brand { margin-bottom: 18px; }
+  .welcome-paths-brand img { width: 48px; height: 48px; }
+  .welcome-paths-brand > span { font-size: 22px; }
+  .welcome-paths-heading > p { font-size: 13px; }
+  .welcome-paths { grid-template-columns: minmax(0, 1fr); grid-template-areas: "desktop" "terminal" "browser"; gap: 12px; }
+  .welcome-path { padding: 22px 18px; }
+  .welcome-path h2 { font-size: 23px; }
+  .open-source-banner { padding: 17px 12px; gap: 9px; margin-top: 16px; }
+  .open-source-license { display: none; }
+  .open-source-banner small { font-size: 11px; }
+  .get-desktop-section, .get-cli-section { padding-top: 42px; }
+  .get-cli-section { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .get-desktop-section > .welcome-download-options { grid-template-columns: minmax(0, 1fr); }
+  .site-header .brand { font-size: 20px; gap: 6px; }
+  .site-header .brand .beta { display: none; }
+  .header-actions { gap: 6px; }
+  .site-header nav { justify-content: flex-start; overflow-x: auto; white-space: nowrap; gap: 22px; font-size: 12px; }
+  .site-header nav > a { display: inline-flex; align-items: center; min-height: 36px; }
+}
+@media (max-width: 400px) { .header-actions > .github-stars-control { display: none; } .header-actions > .entry-sign-in .button { padding-inline: 10px; font-size: 11px; } }
+@media (prefers-reduced-motion: reduce) { .welcome-download-options > a, .open-source-banner { transition: none; } .welcome-download-options > a:active { transform: none; } }
+
+.welcome-path:is(#download, #install) { scroll-margin-top: 22px; }
+.welcome-workflow-guide { max-width: 480px; padding: 24px; border-left: 1px solid var(--line); }
+.welcome-workflow-guide h3 { margin: 0 0 15px; font-size: 17px; font-weight: 550; letter-spacing: -.3px; }
+.welcome-workflow-guide ol { padding-left: 20px; margin: 0 0 18px; color: var(--muted); font-size: 13px; line-height: 1.9; }
+.welcome-workflow-guide li { padding-left: 3px; margin-bottom: 9px; }
+.welcome-workflow-guide > a { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; font-size: 12px; }
+@media (max-width: 680px) { .welcome-workflow-guide { padding: 18px 0 0; border-left: 0; border-top: 1px solid var(--line); } }
+
+/* Theme switching stays available in the public header at every viewport. */
+.header-actions > button.theme-control { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 44px; width: 44px; height: 44px; padding: 0; }
+.header-actions > button.theme-control > svg { width: 18px; height: 18px; flex-shrink: 0; }
+@media (max-width: 480px) { .header-actions > .github-stars-control { display: none; } }
+
+.install-preview-label { margin: 0 0 8px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.install-alternatives { margin-top: 11px; color: var(--muted); font-size: 11px; }
+.install-alternatives summary { cursor: pointer; width: fit-content; padding: 6px 0; min-height: 30px; }
+.install-alternatives summary:focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
+.install-alternatives[open] summary { margin-bottom: 8px; }
+.install-alternatives p { line-height: 1.7; }
+.pending-shell-command { display: block; overflow-wrap: anywhere; font-size: 11px; line-height: 1.8; }
+.install-copy-status { display: block; margin-top: 8px; font-size: 12px; line-height: 1.6; }
+
+/* A product introduction, with installation details kept in their own places. */
+body:has(.marketing-home) { --paper: light-dark(#fafafa, #1d1d1d); --line: light-dark(#e7e7e7, #ffffff12); }
+.marketing-home { max-width: 1120px; padding: 0; border-inline: 1px solid var(--line); }
+.marketing-welcome { padding: 60px 40px 48px; }
+.marketing-hero { position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); align-items: end; gap: 52px; }
+.marketing-hero::after { content: ""; position: absolute; z-index: -1; right: -25px; top: -10px; width: 300px; aspect-ratio: 1; border-radius: 50%; background-image: radial-gradient(var(--purple) 1px, transparent 1px); background-size: 10px 10px; mask-image: radial-gradient(circle, #000, transparent 70%); opacity: .18; pointer-events: none; }
+.marketing-intro { min-width: 0; text-align: left; }
+.marketing-intro h1 { margin: 0; font-size: 60px; font-weight: 500; letter-spacing: -2.7px; line-height: 1.08; }
+.marketing-intro h1 span { color: var(--purple); }
+.marketing-subtitle { max-width: 390px; margin: 20px 0 0; color: var(--muted); font-size: 16px; font-weight: 400; line-height: 1.6; }
+.marketing-primary-actions { display: flex; flex-wrap: wrap; gap: 11px; margin-top: 29px; }
+.marketing-primary-actions a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 11px 16px; border: 1px solid var(--line); border-radius: 7px; font-size: 13px; font-weight: 500; transition: background-color 160ms ease, transform 120ms ease; }
+.marketing-primary-actions svg { flex-shrink: 0; }
+.marketing-download-button { background: light-dark(#6853d8, #b7a2ed); color: light-dark(#fff, #231b34); border-color: transparent !important; }
+.marketing-download-button:hover { opacity: .88; }
+.marketing-web-button { background: transparent; color: var(--ink); }
+.marketing-web-button:hover { background: light-dark(#f3f3f3, #2b2b2b); }
+.marketing-primary-actions a:active { transform: translateY(1px); }
+.marketing-availability { max-width: 390px; margin: 17px 0 0; color: var(--muted); font-size: 11px; line-height: 1.7; }
+.marketing-cli { width: 100%; min-width: 0; margin: 0 0 3px; padding: 0; scroll-margin-top: 24px; }
+.marketing-cli-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: var(--muted); }
+.marketing-cli-heading > svg { width: 16px; height: 16px; flex: 0 0 16px; }
+.marketing-cli-heading h2 { margin: 0; font-size: 12px; font-weight: 500; line-height: 1.6; letter-spacing: normal; }
+.marketing-cli-heading > a { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; padding: 5px 0 5px 8px; font-size: 11px; }
+.marketing-cli .install { max-width: none; }
+.marketing-cli .install-command { background: light-dark(#f4f4f4, #292929); color: var(--ink); border-radius: 8px; padding: 8px 10px; gap: 9px; }
+.marketing-cli .install-command > svg { width: 16px; height: 16px; flex: 0 0 16px; color: var(--muted); }
+.marketing-cli .install-command code { white-space: normal; overflow-wrap: anywhere; font-size: 11px; line-height: 1.8; }
+.marketing-cli .install-command button { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 40px; width: 40px; height: 44px; padding: 0; border-radius: 6px; color: var(--ink); }
+.marketing-cli .install-command button:hover { background: light-dark(#e9e9e9, #363636); }
+.marketing-cli-requirements { margin: 11px 0 0; color: var(--muted); font-size: 10px; line-height: 1.7; }
+.marketing-product { min-width: 0; margin: 40px 0 0; }
+.marketing-product-frame { padding: 7px; border: 1px solid light-dark(#d7d5df, #ffffff1a); border-radius: 13px; background: light-dark(#eeeef0, #292929); box-shadow: 0 24px 64px #00000025; }
+.marketing-product-frame img { display: block; width: 100%; height: auto; border-radius: 7px; }
+.marketing-product figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; margin: 16px 5px 0; color: var(--muted); font-size: 11px; line-height: 1.7; }
+.marketing-welcome > .open-source-banner { width: 100%; margin-top: 44px; margin-bottom: 0; border-radius: 7px; background: transparent; }
+.site-footer { max-width: 1120px; border: 1px solid var(--line); border-bottom: 0; padding: 32px 40px; flex-wrap: wrap; }
+.marketing-welcome :is(a, button):focus-visible { outline: 2px solid var(--purple); outline-offset: 4px; }
+.download-page { padding-top: 40px; }
+.download-back { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; margin-bottom: 38px; color: var(--muted); font-size: 12px; }
+.download-eyebrow { display: block; color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+.download-page h1 { max-width: 680px; font-size: clamp(33px, 4.5vw, 55px); letter-spacing: -1.7px; font-weight: 500; line-height: 1.15; text-wrap: balance; }
+.download-page .download-intro { max-width: 57ch; font-size: 16px; line-height: 1.8; margin-bottom: 35px; }
+.download-other-clients { display: flex; flex-wrap: wrap; gap: 12px 28px; margin-top: 34px; padding-top: 22px; border-top: 1px solid var(--line); }
+.download-other-clients a { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; font-size: 13px; }
+@media (max-width: 960px) {
+  .marketing-hero { grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 28px; }
+  .marketing-intro h1 { font-size: 52px; }
+}
+@media (max-width: 680px) {
+  .marketing-welcome { padding: 40px 20px 28px; }
+  .marketing-hero { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  .marketing-hero::after { display: none; }
+  .marketing-intro h1 { font-size: clamp(42px, 10vw, 54px); letter-spacing: -1.9px; }
+  .marketing-subtitle { margin-top: 18px; }
+  .marketing-primary-actions { margin-top: 25px; gap: 9px; }
+  .marketing-primary-actions a { padding-inline: 14px; font-size: 12px; }
+  .marketing-availability { max-width: 330px; margin-left: 0; }
+  .marketing-cli { margin-top: 0; }
+  .marketing-cli-heading { flex-wrap: wrap; gap: 5px 7px; }
+  .marketing-cli-heading h2 { font-size: 11px; }
+  .marketing-product-frame { padding: 6px; border-radius: 12px; }
+  .marketing-product-frame img { border-radius: 7px; }
+  .download-page { padding-top: 24px; }
+  .download-back { margin-bottom: 28px; }
+  .site-footer { padding: 28px 20px; }
+}
+@media (prefers-reduced-motion: reduce) { .marketing-primary-actions a { transition: none; } .marketing-primary-actions a:active { transform: none; } }

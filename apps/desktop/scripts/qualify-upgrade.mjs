@@ -28,6 +28,7 @@ const pause = ms => new Promise(r => setTimeout(r, ms));
 const sha = data => createHash('sha256').update(data).digest('hex');
 const events = [];
 let child, ws, client;
+let launchedExecutable;
 let spawnError;
 let diagnostics = '';
 function record(message) { events.push({ time: new Date().toISOString(), message }); console.log(message); }
@@ -81,7 +82,7 @@ async function connect() {
 async function rendererProof(label) {
   await waitFor('complete desktop document and preload bridge', async () => {
     const readiness = await client('Runtime.evaluate', {
-      expression: `document.readyState === 'complete' && typeof window.freecoda === 'object' && !!document.querySelector('#theme-select')`,
+      expression: `document.readyState === 'complete' && typeof window.freecoda?.getState === 'function' && !!document.querySelector('#theme-toggle, #theme-select')`,
       returnByValue: true,
     });
     assert(!readiness.exceptionDetails, JSON.stringify(readiness.exceptionDetails));
@@ -100,6 +101,7 @@ async function rendererProof(label) {
   await writeFile(path.join(evidence, `${label}.png`), Buffer.from(screenshot.data, 'base64'));
 }
 async function launch(executable) {
+  launchedExecutable = executable;
   await mkdir(profile, { recursive: true });
   // Remove stale port file before attaching to a new process.
   const { rm } = await import('node:fs/promises'); await rm(path.join(profile, 'DevToolsActivePort'), { force: true });
@@ -110,17 +112,64 @@ async function launch(executable) {
   for (const s of [child.stdout, child.stderr]) s.on('data', b => { diagnostics = (diagnostics + b).slice(-24_000); });
   await connect();
 }
-async function normalClose() {
+function hasTrayLifecycle(version) {
+  const [major, minor, patch] = version.split('.').map(Number);
+  return major > 0 || minor > 1 || (minor === 1 && patch >= 8);
+}
+async function proveTrayRestore(version) {
+  if (!hasTrayLifecycle(version)) return;
+  if (platform() === 'win32') {
+    await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `
+      Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class FreecodaVisibility { [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hwnd); }';
+      $p=Get-Process -Id ${child.pid}; $handle=$p.MainWindowHandle;
+      if($handle -eq [IntPtr]::Zero){throw 'Visible Freecoda window required'};
+      $w=New-Object -ComObject WScript.Shell;
+      if(-not $w.AppActivate(${child.pid})){throw 'Cannot focus Freecoda'};
+      $w.SendKeys('%{F4}'); Start-Sleep -Milliseconds 800;
+      if([FreecodaVisibility]::IsWindowVisible($handle)){throw 'Close did not hide window to tray'};
+      if((Get-Process -Id ${child.pid}).HasExited){throw 'Closing window terminated Freecoda'};
+    `]);
+  } else {
+    const { stdout } = await run('xdotool', ['search', '--onlyvisible', '--pid', String(child.pid), '--name', '^Freecoda$']);
+    const id = stdout.trim().split(/\s+/)[0]; assert(id);
+    await run('xdotool', ['windowactivate', '--sync', id, 'key', 'alt+F4']);
+    await waitFor('window hidden to tray', async () => {
+      const { stdout: state } = await run('xwininfo', ['-id', id]);
+      return state.includes('Map State: IsUnMapped');
+    }, 10_000);
+  }
+  assert(child.exitCode === null && !child.signalCode, 'Close-to-tray must preserve the process.');
+  // A real second launch exercises the production single-instance Show path.
+  // No renderer IPC, injected Electron APIs, or test-only hooks are used.
+  await run(launchedExecutable, [`--user-data-dir=${profile}`], { timeout: 15_000 });
+  if (platform() === 'win32') {
+    await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `
+      $deadline=(Get-Date).AddSeconds(10);
+      do { $p=Get-Process -Id ${child.pid}; $p.Refresh(); if($p.MainWindowHandle -ne [IntPtr]::Zero){exit 0}; Start-Sleep -Milliseconds 200 } while((Get-Date) -lt $deadline);
+      throw 'Second launch did not restore visible Freecoda window';
+    `]);
+  } else {
+    await waitFor('second instance restored window', async () => {
+      try { const { stdout } = await run('xdotool', ['search', '--onlyvisible', '--pid', String(child.pid), '--name', '^Freecoda$']); return !!stdout.trim(); }
+      catch (error) { if (error.code === 1) return false; throw error; }
+    }, 10_000);
+  }
+  await rendererProof('tray-restored');
+  record('Close hid the window without terminating Freecoda; real second launch restored its existing renderer. Tray menu click itself is not qualified.');
+}
+async function normalClose(version) {
+  const trayLifecycle = hasTrayLifecycle(version);
+  const title = trayLifecycle ? 'Quit Freecoda?' : 'Close Freecoda?';
   if (platform() === 'win32') {
     // Exercise the actual native close confirmation. No IPC/test hooks.
     const script = `
       Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class FreecodaNativeClose { [DllImport("user32.dll",EntryPoint="FindWindowW",ExactSpelling=true,CharSet=CharSet.Unicode)] public static extern IntPtr FindWindow(IntPtr cls,string title); [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd,out uint pid); [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr hwnd,uint command); [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd); }';
       $w=New-Object -ComObject WScript.Shell;
       if(-not $w.AppActivate(${child.pid})){throw 'Cannot focus Freecoda'};
-      Start-Sleep -Milliseconds 400; $w.SendKeys('%{F4}');
+      Start-Sleep -Milliseconds 400; ${trayLifecycle ? "$w.SendKeys('^q');" : "$w.SendKeys('%{F4}');"}
       $deadline=(Get-Date).AddSeconds(10); $dialog=[IntPtr]::Zero; $loggedCandidate=[IntPtr]::Zero;
       while((Get-Date) -lt $deadline){
-        $candidate=[FreecodaNativeClose]::FindWindow([IntPtr]::Zero,'Close Freecoda?');
+        $candidate=[FreecodaNativeClose]::FindWindow([IntPtr]::Zero,'${title}');
         if($candidate -ne [IntPtr]::Zero){
           [uint32]$dialogProcess=0; [uint32]$ownerProcess=0;
           [void][FreecodaNativeClose]::GetWindowThreadProcessId($candidate,[ref]$dialogProcess);
@@ -131,12 +180,12 @@ async function normalClose() {
         };
         Start-Sleep -Milliseconds 200;
       };
-      if($dialog -eq [IntPtr]::Zero){throw 'Owned native Close Freecoda? dialog was not found'};
+      if($dialog -eq [IntPtr]::Zero){throw 'Owned native ${title} dialog was not found'};
       [void][FreecodaNativeClose]::SetForegroundWindow($dialog);
-      if(-not $w.AppActivate('Close Freecoda?')){throw 'Cannot activate native close confirmation'};
+      if(-not $w.AppActivate('${title}')){throw 'Cannot activate native close confirmation'};
       Start-Sleep -Milliseconds 200;
       if([FreecodaNativeClose]::GetForegroundWindow() -ne $dialog){throw 'Native close confirmation does not have focus'};
-      # TaskDialog command links are vertical: observed default Keep working, then Close workspace.
+      # TaskDialog command links are vertical: Keep working, then the explicit close/quit action.
       $w.SendKeys('{DOWN}{ENTER}');
     `;
     try {
@@ -149,10 +198,10 @@ async function normalClose() {
   } else {
     const { stdout } = await run('xdotool', ['search', '--onlyvisible', '--name', '^Freecoda$']);
     const id = stdout.trim().split(/\s+/)[0]; assert(id);
-    await run('xdotool', ['windowactivate', '--sync', id, 'key', 'alt+F4']);
+    await run('xdotool', ['windowactivate', '--sync', id, 'key', ...(trayLifecycle ? ['ctrl+q'] : ['alt+F4'])]);
     const dialog = await waitFor('native Linux close confirmation', async () => {
       try {
-        const { stdout } = await run('xdotool', ['search', '--onlyvisible', '--name', '^Close Freecoda\\?$']);
+        const { stdout } = await run('xdotool', ['search', '--onlyvisible', '--name', `^${trayLifecycle ? 'Quit' : 'Close'} Freecoda[?]$`]);
         return stdout.trim().split(/\s+/)[0] || null;
       } catch (error) {
         if (error.code === 1) return null; // No matching window yet.
@@ -167,7 +216,7 @@ async function normalClose() {
     assert.equal(child.exitCode, 0, 'Application quit with an error.');
     return true;
   }, 30_000);
-  ws?.close(); record('Normal close completed with exit code zero.');
+  ws?.close(); record(`Native ${trayLifecycle ? 'File > Quit shortcut' : 'window close'} completed with exit code zero.`);
 }
 try {
   const [oldRelease, latest] = await Promise.all([getJSON(`${repo}/releases/tags/v${from}`), getJSON(`${repo}/releases/latest`)]);
@@ -206,7 +255,8 @@ try {
     return null;
   });
   record(`Actual electron-updater downloaded exact published ${to} installer (${path.basename(downloaded)}).`);
-  await normalClose();
+  await proveTrayRestore(from);
+  await normalClose(from);
   if (platform() === 'win32') {
     await waitFor('NSIS replaced installed app with new version', async () => {
       try { return readInstalledVersion(asar, installedAsar) === to; } catch { return false; }
@@ -219,6 +269,8 @@ try {
   }
   record(`Normal quit installed ${to}; verified installed version/binary identity.`);
   await launch(executable); await rendererProof('after');
+  await proveTrayRestore(to);
+  await normalClose(to);
   record(`PASS: genuine published ${from} -> ${to} SDK download, normal quit/install, and relaunched renderer.`);
 } catch (error) {
   record(`FAIL: ${error.stack || error}`); process.exitCode = 1;

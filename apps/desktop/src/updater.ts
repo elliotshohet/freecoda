@@ -50,9 +50,9 @@ export class DesktopUpdates {
     on("update-downloaded", () => {
       this.downloaded = true;
       this.message =
-        "An update is ready. Save your work and close Freecoda normally to install it. Active tasks will never be interrupted automatically.";
+        "An update is ready. Save your work and choose Quit Freecoda to install it. Closing the window keeps Freecoda running in the tray. Active tasks will never be interrupted automatically.";
       this.host.notify(
-        "A Freecoda update is ready. Save your work and close the app when convenient to install it.",
+        "A Freecoda update is ready. Save your work and choose Quit Freecoda when convenient to install it.",
       );
     });
     on("error", () => {

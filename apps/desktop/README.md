@@ -8,9 +8,15 @@ Freecoda starts in Chat: a general conversation with no repository access or too
 
 Type `/project` to choose a folder, then `/build`, `/plan`, or `/review` to work with it. Type `/chat` to return to general conversation. Type `/` to browse commands with arrow keys and Enter or Tab. Coding still requires selecting and trusting the folder. Returning to Chat restores the separate general conversations, hides repository tools, and resets session permission grants. Search, deletion, response copying, and clearly labeled sponsor placements remain part of the conversation interface.
 
-## Models, messages, and avatars
+## Messages and avatars
 
-Use `/model` to open the configured free-model picker. The selected model is saved locally, shared across desktop conversation modes, and checked against the approved zero-price Beam Free catalog before every request. An unavailable selection fails visibly instead of falling back to a paid model. Finish the active task before changing models.
+In the pending source build, closing the window keeps the workspace and active
+work available from the Freecoda system tray or macOS menu bar. Choose **Show
+Freecoda** to restore it, or **Quit Freecoda** to exit after the unsaved-work
+warning. This does not enable launch at login. Tray visibility on Linux depends
+on the desktop environment. This behavior is not part of installed 0.1.7.
+
+Hosted requests use the configured approved zero-price service. If it is unavailable, Freecoda reports the failure instead of silently switching to a paid service. The conversation interface does not expose provider names or a model selector.
 
 Enter sends a message; Ctrl+Enter queues one while a task is running. Queued messages keep their original conversation, mode, and folder. Failed launches retain the queued message; errors and cancellation pause the queue until **Resume queued messages**. Return to its original conversation before resuming, and keep the composer empty so an existing draft is preserved. Replies stream and support Markdown, code copying, lists, and tables.
 
@@ -137,3 +143,11 @@ not been configured or validated yet.
 ### Plugin bundles
 
 In **Plugins**, enter an HTTPS plugin manifest URL and choose **Review plugin**. Review every listed skill source and MCP endpoint, then choose **Install reviewed plugin**. The exact reviewed manifest is used; it is not fetched again during confirmation. Bundles contain instructions and server configurations, never install scripts or authentication headers. A failed member installation leaves the saved registry unchanged. Installed bundles show their actual member counts; remove a bundle to remove its owned members. Installation does not connect MCP servers: check individual servers explicitly, and follow any reported authentication requirements.
+
+### Account details and runtime version
+
+The bottom-left footer displays the version reported by Electron, with GitHub sign-in when signed out. The real account avatar remains at bottom right. Source runs explicitly say **Local development**; this is separate from a published release.
+
+Open the avatar or **Account & settings** for the current profile, local workspace, authenticated GitHub repository access and preferences, cloud workspaces, installed local integrations, daily allowance, and connected devices. Each section reports loading, empty, or failed requests separately. Repository and integration management reuse their existing dialogs. Email, privacy settings, and device revocation remain in **Open web account settings**. Device credentials do not gain administrator access.
+
+Building the desktop does not launch it. `bun run desktop:dev` is a one-time native launch; it does not watch or reopen a window after you close it. Web/API and PostgreSQL can run separately in Docker Compose; the macOS Electron GUI stays native.

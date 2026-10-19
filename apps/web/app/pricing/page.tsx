@@ -1,88 +1,45 @@
 import Link from "next/link";
-import { Check, ArrowUpRight } from "lucide-react";
-export const metadata = { title: "Free forever" };
+import { ArrowUpRight, Check } from "lucide-react";
+import s from "@/components/product-page.module.css";
+
+export const metadata = { title: "Pricing — Freecoda" };
+
 export default function Pricing() {
   return (
-    <main className="page-shell" id="main">
-      <div className="page-intro">
-        <span className="section-kicker">One plan. More possibility.</span>
-        <h1>
-          Free to start.
-          <br />
-          Free to keep going.
-        </h1>
-        <p>
-          Freecoda is supported by direct sponsors. No subscriptions, credit
-          packs, or card required. Just a little space for the people who help
-          keep it free.
-        </p>
-      </div>
-      <article className="free-plan">
+    <main className={s.page} id="main">
+      <header className={s.hero}>
+        <span className={s.eyebrow}>Pricing</span>
+        <h1>More room for your next idea.</h1>
+        <p>One free account for desktop, web, and terminal. Supported by clearly labeled sponsors, with no subscription or card required.</p>
+      </header>
+      <section className={s.plan} aria-labelledby="free-plan-title">
         <div>
-          <span className="status-badge">The only plan</span>
-          <h2>Freecoda. Free forever.</h2>
-          <div className="free-price">
-            $0<span>/ forever</span>
-          </div>
-          <p>Your next idea shouldn’t need a subscription.</p>
-          <Link className="button purple" href="/docs">
-            Get started <ArrowUpRight size={16} />
-          </Link>
+          <h2 id="free-plan-title">Freecoda</h2>
+          <div className={s.price}>$0<span>/ forever</span></div>
+          <p>Hosted access is invite-only during beta. Fair-use and capacity limits apply.</p>
+          <div className={s.actions}><Link href="/app">Start with the web app <ArrowUpRight size={16} aria-hidden="true" /></Link><Link href="/download">Get desktop</Link></div>
         </div>
-        <ul>
+        <ul className={s.features}>
           {[
-            "Local coding agent and repository tools",
-            "Plan, build, fix, and review",
-            "Clear approval before changes and commands",
+            "General conversations without repository access",
+            "Local project tools and connected cloud workspaces",
+            "Plan, build, and review with explicit permissions",
             "A daily hosted AI allowance during beta",
-            "No API key required for hosted access",
-            "No ads inside your code or model answers",
-            "No prompt or source-code ad targeting",
-          ].map((f) => (
-            <li key={f}>
-              <Check size={15} />
-              {f}
-            </li>
-          ))}
+            "Account conversation sync across supported clients",
+            "No hosted API key required",
+            "No ads inside your code or assistant answers",
+          ].map(feature => <li key={feature}><Check size={16} aria-hidden="true" />{feature}</li>)}
         </ul>
-      </article>
-      <div className="faq">
-        <h2>A fair way to keep it free.</h2>
-        <details open>
-          <summary>How do sponsors support Freecoda?</summary>
-          <p>
-            Direct sponsors buy clearly labeled placements on the website and
-            between agent turns in the terminal. Ads are separate from model
-            answers and generated code. We don’t sell your code or
-            conversations, or use them to target ads.
-          </p>
-        </details>
-        <details>
-          <summary>Does free mean unlimited?</summary>
-          <p>
-            No. Hosted AI has fair-use and capacity limits. The invite-only beta
-            has a daily allowance and a shared monthly budget. Your workspace
-            shows the remaining allowance and reset time. If capacity runs out,
-            you can return after the reset; there is no paid upgrade.
-          </p>
-        </details>
-        <details>
-          <summary>What happens when there isn’t a sponsor?</summary>
-          <p>
-            We show a Freecoda announcement, not an invented advertiser. Hosted
-            access stays within the beta’s funded budget, and we expand capacity
-            as sponsorship grows.
-          </p>
-        </details>
-        <details>
-          <summary>Can I sponsor Freecoda?</summary>
-          <p>
-            Yes. <Link href="/advertise">Tell us about your business</Link> to
-            ask about direct placements. Every campaign is reviewed before it
-            goes live.
-          </p>
-        </details>
-      </div>
+      </section>
+      <section className={s.section} aria-labelledby="pricing-questions">
+        <h2 id="pricing-questions">A fair way to keep it free.</h2>
+        <div className={s.questions}>
+          <article><h3>How does usage work?</h3><p>The invite-only beta has a daily hosted allowance and a shared monthly budget. Your account shows its remaining allowance and reset time. Access can pause when capacity runs out; there is no paid upgrade.</p></article>
+          <article><h3>What do sponsors support?</h3><p>Clearly labeled placements help fund the service. Sponsor messages stay separate from assistant answers and generated code. Private code and conversations are not used for ad targeting.</p></article>
+          <article><h3>What happens without a sponsor?</h3><p>Freecoda shows its own announcement instead of inventing an advertiser. Hosted access stays within the beta’s funded capacity.</p></article>
+          <article><h3>Can I sponsor Freecoda?</h3><p><Link href="/advertise">Tell us about your business</Link>. Inquiries are reviewed before any campaign runs or payment terms are agreed.</p></article>
+        </div>
+      </section>
     </main>
   );
 }
