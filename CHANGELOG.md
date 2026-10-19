@@ -7,7 +7,7 @@ remain under Unreleased until publication and artifact verification are complete
 
 ## Unreleased
 
-- Windows/Linux installed update qualification from 0.1.7 to 0.1.8 is pending; the published binaries and updater feeds are verified. Tray-menu clicking itself remains unqualified. macOS automatic installation requires Developer ID signing and notarization.
+No pending release changes.
 
 ## Desktop 0.1.8 — 2026-10-19
 
@@ -21,7 +21,7 @@ Checks and native packaging passed for Linux x64, Windows x64, Intel macOS, and 
 - Expand authenticated account settings with profile, repository access, cloud workspaces, local integrations, allowance, and connected devices, with loading and failure states.
 - Closing the window now keeps the workspace in the tray or macOS menu bar. Show Freecoda restores it; Quit Freecoda (Ctrl+Q / Cmd+Q) confirms unsaved work and exits. No launch-at-login behavior is added.
 - Remove the normal model picker, `/model` command, and underlying model branding while retaining background inference configuration and privacy disclosures.
-- Migration and limits: choose Quit to permit a downloaded update to install. Builds are unsigned; macOS requires manual downloads while Developer ID signing/notarization are unavailable. Windows can show SmartScreen warnings. Clients 0.1.4 and older with the retired updater feed require a manual reinstall. Installed Windows/Linux update qualification is tracked above until completed.
+- Migration and limits: choose Quit to permit a downloaded update to install. Builds are unsigned; macOS requires manual downloads while Developer ID signing/notarization are unavailable. Windows can show SmartScreen warnings. Clients 0.1.4 and older with the retired updater feed require a manual reinstall. Installed Windows/Linux updates from 0.1.7 to 0.1.8 passed CI, including replacement, relaunch, close-to-tray, second-launch restoration, and normal Quit. Tray-menu clicking itself remains unqualified.
 
 ## CLI 0.1.8 — 2026-10-19
 
@@ -40,7 +40,7 @@ The exact-source CI archive, package identity/version, public bytes, SHA-256 che
 - Add responsive Source, Download, CLI, Web, Pricing, Docs, and Advertise navigation, persistent theme switching, and real account state.
 - Add a dedicated GitHub sign-in screen with safe app/chat return paths. Canonicalize loopback hosts before creating OAuth state to fix localhost/127.0.0.1 cookie mismatches. Fresh local and production OAuth roundtrips passed.
 - Align web chat/workspace, pricing, and advertiser interfaces. Keep the free invite-only beta and reviewed sponsorship inquiries; no subscription or self-service advertising billing is introduced.
-- Publish a checksum-pinned shell installer and point downloads to verified desktop/CLI 0.1.8 assets. Public endpoint verification is required after deployment.
+- Publish a checksum-pinned shell installer and point downloads to verified desktop/CLI 0.1.8 assets. The production endpoint and checksum-only installer check passed after deployment.
 - Support optional Docker source Fast Refresh with narrow read-only mounts, separate generated-route caches, two CPU cores, and three-second polling. The Mini's active web service runs natively, preserving the existing PostgreSQL container and data.
 
 ## Desktop 0.1.7 — 2026-10-19
