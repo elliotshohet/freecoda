@@ -12,6 +12,7 @@ import { sessionUser } from "./auth";
 import { getPool, transaction } from "./db";
 import {
   identity,
+  requireInvite,
   rateLimit,
   clientKey,
   startDevice,
@@ -37,6 +38,25 @@ export async function route(req: Request) {
     if (path.startsWith("github/")) {
       const response = await githubRepositoryRoute(req, path);
       if (response) return response;
+    }
+    // Device credentials may list only their owner's workspace metadata.
+    // Cloud execution and mutation routes retain browser-session requirements.
+    if (path === "cloud/workspaces" && method === "GET") {
+      const user = await identity(req);
+      await requireInvite(user.id);
+      await rateLimit(`cloud-workspaces:${user.id}`, 60, 60);
+      const { listProjects } = await import("./cloud/store");
+      const projects = await listProjects(user.id);
+      return json({
+        workspaces: projects.map(project => ({
+          id: project.id,
+          name: project.name,
+          repository: project.repo ? `${project.repo.owner}/${project.repo.name}` : null,
+          status: project.status,
+          appDirectory: project.appDirectory,
+          ...(project.repo?.defaultBranch ? { branch: project.repo.defaultBranch } : {}),
+        })),
+      });
     }
     if (path === "health" && method === "GET")
       return json({ status: "ok", ...publicConfig() });
