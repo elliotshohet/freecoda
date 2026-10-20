@@ -163,22 +163,55 @@ async function normalClose(version) {
   if (platform() === 'win32') {
     // Exercise the actual native close confirmation. No IPC/test hooks.
     const script = `
-      Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class FreecodaNativeClose { [DllImport("user32.dll",EntryPoint="FindWindowW",ExactSpelling=true,CharSet=CharSet.Unicode)] public static extern IntPtr FindWindow(IntPtr cls,string title); [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd,out uint pid); [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr hwnd,uint command); [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd); }';
+      Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class FreecodaNativeClose { [DllImport("user32.dll",EntryPoint="FindWindowW",ExactSpelling=true,CharSet=CharSet.Unicode)] public static extern IntPtr FindWindow(IntPtr cls,string title); [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd,out uint pid); [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr hwnd,uint command); [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd); [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hwnd); }';
       $w=New-Object -ComObject WScript.Shell;
-      if(-not $w.AppActivate(${child.pid})){throw 'Cannot focus Freecoda'};
-      Start-Sleep -Milliseconds 400; ${trayLifecycle ? "$w.SendKeys('^q');" : "$w.SendKeys('%{F4}');"}
-      $deadline=(Get-Date).AddSeconds(10); $dialog=[IntPtr]::Zero; $loggedCandidate=[IntPtr]::Zero;
-      while((Get-Date) -lt $deadline){
+      function Find-OwnedQuitDialog {
         $candidate=[FreecodaNativeClose]::FindWindow([IntPtr]::Zero,'${title}');
-        if($candidate -ne [IntPtr]::Zero){
-          [uint32]$dialogProcess=0; [uint32]$ownerProcess=0;
-          [void][FreecodaNativeClose]::GetWindowThreadProcessId($candidate,[ref]$dialogProcess);
-          $owner=[FreecodaNativeClose]::GetWindow($candidate,4);
-          [void][FreecodaNativeClose]::GetWindowThreadProcessId($owner,[ref]$ownerProcess);
-          if($loggedCandidate -ne $candidate){Write-Output ('Native dialog handle='+$candidate+' pid='+$dialogProcess+' ownerHandle='+$owner+' ownerPid='+$ownerProcess+' expected=${child.pid}'); $loggedCandidate=$candidate};
-          if($dialogProcess -eq ${child.pid} -and ($owner -eq [IntPtr]::Zero -or $ownerProcess -eq ${child.pid})){$dialog=$candidate; break}
+        if($candidate -eq [IntPtr]::Zero){return [IntPtr]::Zero};
+        [uint32]$dialogProcess=0; [uint32]$ownerProcess=0;
+        [void][FreecodaNativeClose]::GetWindowThreadProcessId($candidate,[ref]$dialogProcess);
+        $owner=[FreecodaNativeClose]::GetWindow($candidate,4);
+        [void][FreecodaNativeClose]::GetWindowThreadProcessId($owner,[ref]$ownerProcess);
+        if($dialogProcess -eq ${child.pid} -and ($owner -eq [IntPtr]::Zero -or $ownerProcess -eq ${child.pid})){
+          Write-Host ('Native dialog handle='+$candidate+' pid='+$dialogProcess+' ownerHandle='+$owner+' ownerPid='+$ownerProcess+' expected=${child.pid}');
+          return $candidate;
         };
-        Start-Sleep -Milliseconds 200;
+        return [IntPtr]::Zero;
+      };
+      $dialog=[IntPtr]::Zero;
+      for($attempt=1; $attempt -le 3; $attempt++){
+        # Never resend a shortcut into an already open confirmation.
+        $dialog=Find-OwnedQuitDialog;
+        if($dialog -ne [IntPtr]::Zero){break};
+        $process=Get-Process -Id ${child.pid}; $process.Refresh(); $main=$process.MainWindowHandle;
+        [uint32]$mainProcess=0;
+        [void][FreecodaNativeClose]::GetWindowThreadProcessId($main,[ref]$mainProcess);
+        if($main -eq [IntPtr]::Zero -or $mainProcess -ne ${child.pid} -or -not [FreecodaNativeClose]::IsWindowVisible($main)){throw 'Owned visible Freecoda main window was not found'};
+        [void]$w.AppActivate(${child.pid});
+        [void][FreecodaNativeClose]::SetForegroundWindow($main);
+        $focusDeadline=(Get-Date).AddSeconds(2); $focused=$false;
+        do {
+          $dialog=Find-OwnedQuitDialog;
+          if($dialog -ne [IntPtr]::Zero){break};
+          $foreground=[FreecodaNativeClose]::GetForegroundWindow(); [uint32]$foregroundProcess=0;
+          [void][FreecodaNativeClose]::GetWindowThreadProcessId($foreground,[ref]$foregroundProcess);
+          if($foreground -eq $main -and $foregroundProcess -eq ${child.pid}){$focused=$true; break};
+          Start-Sleep -Milliseconds 100;
+        } while((Get-Date) -lt $focusDeadline);
+        Write-Host ('Native quit attempt='+$attempt+' mainHandle='+$main+' mainPid='+$mainProcess+' foregroundHandle='+$foreground+' foregroundPid='+$foregroundProcess+' focused='+$focused+' expected=${child.pid}');
+        if($dialog -ne [IntPtr]::Zero){break};
+        if(-not $focused){continue};
+        # Check once more immediately before delivering the production shortcut.
+        $dialog=Find-OwnedQuitDialog;
+        if($dialog -ne [IntPtr]::Zero){break};
+        ${trayLifecycle ? "$w.SendKeys('^q');" : "$w.SendKeys('%{F4}');"}
+        $deadline=(Get-Date).AddSeconds(3);
+        do {
+          $dialog=Find-OwnedQuitDialog;
+          if($dialog -ne [IntPtr]::Zero){break};
+          Start-Sleep -Milliseconds 100;
+        } while((Get-Date) -lt $deadline);
+        if($dialog -ne [IntPtr]::Zero){break};
       };
       if($dialog -eq [IntPtr]::Zero){throw 'Owned native ${title} dialog was not found'};
       [void][FreecodaNativeClose]::SetForegroundWindow($dialog);
