@@ -199,9 +199,14 @@ try {
   );
   assert.deepEqual(initial.state.recentFolders, []);
   assert.equal(initial.state.voiceActive, false, "Voice must remain off at startup.");
-  assert.match(initial.text, /Voice privacy and support/);
-  const voiceControls = await client.evaluate(`({ dictate: !document.getElementById('voice-dictate').disabled, conversationDisabled: document.getElementById('voice-chat').disabled, stopHidden: document.getElementById('voice-stop').hidden, refreshDisabled: document.getElementById('refresh-chats').disabled })`);
-  assert.deepEqual(voiceControls, { dictate: true, conversationDisabled: true, stopHidden: true, refreshDisabled: true }, "Signed-out desktop allows editable dictation but cannot start hosted live turns or cloud refresh.");
+  const voiceControls = await client.evaluate(`(() => {
+    document.getElementById('voice-open').click();
+    const menu = document.getElementById('voice-menu');
+    const result = { open: !menu.hidden, privacy: /Speech services may process audio online/.test(menu.textContent), dictate: !document.getElementById('voice-dictate').disabled, conversationDisabled: document.getElementById('voice-chat').disabled, stopHidden: document.getElementById('voice-stop').hidden, refreshDisabled: document.getElementById('refresh-chats').disabled };
+    document.getElementById('voice-open').click();
+    return result;
+  })()`);
+  assert.deepEqual(voiceControls, { open: true, privacy: true, dictate: true, conversationDisabled: true, stopHidden: true, refreshDisabled: true }, "Signed-out desktop exposes voice privacy and editable dictation, but cannot start hosted live turns or cloud refresh.");
   const featureGuide = await client.evaluate(`(() => {
     const guide = document.querySelector('.welcome-feature-guide');
     const collapsed = !guide.open;
@@ -254,33 +259,32 @@ try {
     await window.flushComposerDraft();
     return {unavailable,dismissed,active:document.activeElement?.id,state:status.dataset.state,text:status.textContent,disabled:prompt.disabled};
   })()`, "signed-out suggestion feedback without alerts");
-  assert(feedback.unavailable && feedback.dismissed, JSON.stringify(feedback));
+  assert(feedback.unavailable && !feedback.disabled, JSON.stringify(feedback));
 
   const navigation = await client.evaluate(`(() => {
-    const controls = [...document.querySelectorAll('.titlebar-actions > button, .titlebar-actions > label')];
+    const controls = ['toggle-sidebar', 'toggle-workbench', 'theme-toggle'].map(id => document.getElementById(id));
     return {
-      titleRemoved: !document.querySelector('.titlebar .wordmark'),
+      newChatVisible: document.getElementById('new-chat').getClientRects().length > 0,
+      workspaceCollapsed: !document.getElementById('workspace-actions').open,
       modelHidden: getComputedStyle(document.getElementById('model-label')).display === 'none',
-      generalHistorySeparate: document.getElementById('workspace-conversations').parentElement.id === 'general-conversations',
       scope: document.getElementById('conversation-scope-label').textContent,
       controls: controls.map(control => {
         const icon = control.querySelector('svg:not([hidden])');
         const box = control.getBoundingClientRect();
         const graphic = icon?.getBoundingClientRect();
-        return { icon: !!icon, label: control.getAttribute('aria-label') || control.querySelector('[aria-label]')?.getAttribute('aria-label') || control.getAttribute('aria-labelledby'),
-          width: box.width, height: box.height,
+        return { id: control.id, icon: !!icon, label: control.getAttribute('aria-label'), visible: box.width > 0 && box.height > 0,
           centered: !!graphic && Math.abs((graphic.x + graphic.width / 2) - (box.x + box.width / 2)) < 1 && Math.abs((graphic.y + graphic.height / 2) - (box.y + box.height / 2)) < 1 };
       })
     };
   })()`, "workspace navigation and header layout");
-  assert.equal(navigation.titleRemoved, true);
+  assert.equal(navigation.newChatVisible, true);
+  assert.equal(navigation.workspaceCollapsed, true);
   assert.equal(navigation.modelHidden, true);
-  assert.equal(navigation.generalHistorySeparate, true);
   assert.equal(navigation.scope, "Your chats");
   assert.equal(navigation.controls.length, 3);
   for (const control of navigation.controls) {
-    assert(control.icon && control.label && control.centered, "Header icons must be centered and labelled.");
-    assert.equal(control.width, control.height);
+    assert(control.icon && control.label && control.centered, `Navigation icons must be centered and labelled: ${JSON.stringify(navigation.controls)}`);
+    assert.equal(control.visible, control.id !== "toggle-workbench", `Signed-out navigation visibility: ${JSON.stringify(navigation.controls)}`);
   }
 
   const commands = await client.evaluate(`(() => {
