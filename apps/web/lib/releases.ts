@@ -1,6 +1,6 @@
 // Public GitHub archive and checksum verified before enabling installation.
 export const CLI_PUBLISHED = true;
-export const CLI_RELEASE_VERSION = "0.1.9";
+export const CLI_RELEASE_VERSION = "0.1.10";
 export const CLI_RELEASE_URL = `https://github.com/elliotshohet/freecoda/releases/tag/cli-v${CLI_RELEASE_VERSION}`;
 export const CLI_CHECKSUMS_URL = `https://github.com/elliotshohet/freecoda/releases/download/cli-v${CLI_RELEASE_VERSION}/SHA256SUMS.txt`;
 export const CLI_INSTALL_COMMAND = `npm install --global https://github.com/elliotshohet/freecoda/releases/download/cli-v${CLI_RELEASE_VERSION}/freecoda-${CLI_RELEASE_VERSION}.tgz --ignore-scripts`;
@@ -11,7 +11,7 @@ export const CLI_SHELL_INSTALL_COMMAND = "curl -fsSL https://freecoda.com/instal
 
 // Public release assets and checksums verified before exposing downloads.
 export const DESKTOP_PUBLISHED = true;
-export const DESKTOP_RELEASE_VERSION = "0.1.10";
+export const DESKTOP_RELEASE_VERSION = "0.1.11";
 export const DESKTOP_RELEASE_URL = `https://github.com/elliotshohet/freecoda/releases/tag/v${DESKTOP_RELEASE_VERSION}`;
 const desktopAssetBase = `https://github.com/elliotshohet/freecoda/releases/download/v${DESKTOP_RELEASE_VERSION}`;
 export const DESKTOP_CHECKSUMS_URL = `${desktopAssetBase}/SHA256SUMS.txt`;
