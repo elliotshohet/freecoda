@@ -2,7 +2,7 @@ import Link from "next/link";
 import styles from "./feature-overview.module.css";
 
 // Native releases are verified separately from the web deployment. Keep this truthful until publication.
-export const NATIVE_FEATURE_RELEASE_PENDING = true;
+export const NATIVE_FEATURE_RELEASE_PENDING = false;
 const groups = [
   {
     title: "Chat, history and drafts",
@@ -71,7 +71,7 @@ export function FeatureOverview({ compact = false }: { compact?: boolean }) {
           <dl>{group.items.map(([title, description]) => <div key={title}><dt>{title}</dt><dd>{description}</dd></div>)}</dl>
         </details>)}
       </div>
-      <p className={styles.note}>{NATIVE_FEATURE_RELEASE_PENDING ? "New native voice, draft recovery and workspace improvements are available in current source builds. Updated desktop and CLI installers are pending verification and publication; existing downloads may differ." : "Native voice uses a separate browser companion; desktop and CLI require a browser with the relevant speech support."}</p>
+      <p className={styles.note}>{NATIVE_FEATURE_RELEASE_PENDING ? "New native voice, draft recovery and workspace improvements are available in current source builds. Updated desktop and CLI installers are pending verification and publication; existing downloads may differ." : "Native voice is available in desktop 0.1.10 and CLI 0.1.9 through a separate browser companion. Both require a browser with the relevant speech support."}</p>
       <nav className={styles.links} aria-label="Feature documentation"><Link href="/docs">Read the guide</Link><Link href="/download">Choose a client</Link><Link href="/pricing">Free access and limits</Link><Link href="/privacy">Privacy and retention</Link></nav>
     </div>
   </details>;

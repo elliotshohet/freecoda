@@ -7,29 +7,32 @@ remain under Unreleased until publication and artifact verification are complete
 
 ## Unreleased
 
-### Desktop 0.1.10 — publication pending
+No pending client feature releases.
 
-Canonical release: [v0.1.10](https://github.com/elliotshohet/freecoda/releases/tag/v0.1.10). Release date and artifact verification remain pending.
+## Desktop 0.1.10 — 2026-10-20
 
-- Autosave composer drafts privately per account, workspace, and conversation; restore them after restart and flush before switching or quitting.
-- Show pending, generating, unavailable, and accepted AI suggestion states inline; cancel stale work when focus or context changes.
-- Restore local workspace and chat history without waiting for cloud requests, and reuse short-lived explorer snapshots. Explicit refresh and real turns retain cloud reconciliation.
-- Add desktop voice through an authenticated loopback browser companion. Dictation stays editable; live turns use the normal agent pipeline and approvals. No recording starts until Start is chosen in the browser.
-- Add a grouped, expandable overview of available features to the welcome screen, preserving quick startup and single-logo branding.
-- Voice support depends on browser speech services, which may process audio online. Microphone capture and speech output have not been qualified end to end on every platform. No new audio API key or paid inference fallback is introduced.
+[Release](https://github.com/elliotshohet/freecoda/releases/tag/v0.1.10)
 
-### CLI 0.1.9 — publication pending
+Source: `01951fe92530b55c6db4a59c4ed8a63218782bbd`.
 
-Canonical release: [cli-v0.1.9](https://github.com/elliotshohet/freecoda/releases/tag/cli-v0.1.9). Release date and archive verification remain pending.
+All 212 curated tests, full typechecking, production builds and native smoke passed locally; matching Checks and all native package jobs passed in CI. All 16 downloaded asset bytes, SHA-256 checksums, sizes and three SHA-512 updater feeds were independently verified before publication.
 
-- Add discoverable `/voice` for browser-companion dictation and live conversation in the interactive full-screen client; `/voice stop` closes the session. Plain and noninteractive sessions explain the unsupported mode.
-- Preserve typed drafts, normal tool approvals, explicit project trust, and mode isolation. Spoken slash commands cannot execute terminal commands. Closing or changing the conversation ends its voice session.
-- Browser speech recognition and synthesis support varies and may require online processing. No microphone capture starts until Start is chosen in the companion. No separate paid audio API is introduced. The npm registry remains a separate publication channel.
+- Recover composer drafts after restart, privately scoped to the account, workspace and conversation. Switching contexts and normal Quit flush pending draft writes; failed sends preserve the draft. First-turn and cloud conflict identities preserve next-message typing.
+- Show pending, generating and unavailable AI suggestion feedback inline, and cancel stale suggestions when focus or context changes. Tab inserts for review without sending.
+- Restore local workspace and chat history without waiting for cloud requests, reuse short-lived explorer snapshots, and offer explicit Refresh chats. Normal turns retain conflict-safe cloud reconciliation.
+- Add browser-companion dictation and live voice using the selected mode, explicit folder trust and normal approvals. Stop cancels only its own turn, including requests still loading cloud history. Dictation remains editable and cannot approve actions.
+- Add a grouped, expandable welcome feature guide with actual capabilities and client differences. The web splash and welcome screens also include this overview and browser voice controls; cloud coding supports editable dictation, while live web voice is in general chat.
+- Limits and migration: no manual data migration is required. Voice depends on browser speech recognition/synthesis and microphone permission; browser services may process audio online. No audio starts until Start is chosen. Live microphone transcription/playback has not been qualified end to end on every platform. Builds remain unsigned and macOS installation remains manual. Installed Windows/Linux 0.1.9→0.1.10 update qualification is pending; no new automatic-update success is claimed yet.
 
-### Web — deployment pending
+## CLI 0.1.9 — 2026-10-20
 
-- Add browser speech dictation and live conversation in general chat, and editable dictation in cloud coding workspaces.
-- Add an expandable overview of actual product capabilities and client/platform limitations to the splash and welcome surfaces.
+[Release](https://github.com/elliotshohet/freecoda/releases/tag/cli-v0.1.9)
+
+Source: `01951fe92530b55c6db4a59c4ed8a63218782bbd`. The public archive, SHA-256 manifest, sizes and eight allowlisted package files were independently verified after successful exact-source CI.
+
+- Discover `/voice` for browser-companion dictation and live conversation in the interactive full-screen client; `/voice stop` closes the session. Plain and noninteractive sessions explain the unsupported mode.
+- Preserve typed drafts, normal action approvals, explicit project trust and mode isolation. Voice cannot answer approval prompts or dispatch slash commands. Stop/Interrupt cancels a turn even before agent startup; changing conversations ends the companion session.
+- Limits and migration: no manual history migration is required. Browser speech support varies and may require online processing; recording begins only after Start is chosen in the companion. Live microphone transcription/playback has not been qualified on every platform. No separate paid audio API is introduced. The npm registry remains a separate publication channel.
 
 ## Desktop 0.1.9 — 2026-10-20
 
