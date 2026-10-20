@@ -15,6 +15,8 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { VoiceControls } from "@/components/voice-controls";
+import { runOwnedVoiceTurn, type OwnedVoiceTurnObserver } from "@/lib/owned-voice-turn";
 import { startGitHubSignIn } from "@/lib/start-github-sign-in";
 import { Mark } from "@/components/chrome";
 import { UserAvatar } from "@/components/user-avatar";
@@ -73,11 +75,12 @@ function CopyButton({
 }
 type ChatProps = {
   embedded?: boolean;
+  voiceVisible?: boolean;
   initialThreadId?: string;
   onOpenWorkspace?: (command?: string) => void;
 };
 
-export default function Chat({ embedded = false, initialThreadId, onOpenWorkspace }: ChatProps) {
+export default function Chat({ embedded = false, voiceVisible = true, initialThreadId, onOpenWorkspace }: ChatProps) {
   const [status, setStatus] = useState<Status | null>(null),
     [active, setActive] = useState<string | null>(initialThreadId || null),
     [draft, setDraft] = useState(""),
@@ -96,7 +99,7 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
     drainingQueue = useRef(false),
     autoDrainQueue = useRef(false),
     queueRef = useRef(queue),
-    sendTextRef = useRef<(retry?: boolean, textOverride?: string, queueId?: string, pendingId?: string, modelOverride?: string) => Promise<boolean>>(() => Promise.resolve(false)),
+    sendTextRef = useRef<(retry?: boolean, textOverride?: string, queueId?: string, pendingId?: string, modelOverride?: string, observer?: OwnedVoiceTurnObserver) => Promise<boolean>>(() => Promise.resolve(false)),
     owner = useRef<string | undefined>(undefined),
     initialThreadApplied = useRef(false),
     end = useRef<HTMLDivElement>(null),
@@ -269,7 +272,7 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
       ),
     );
   }
-  async function send(retry = false, textOverride?: string, queueId?: string, pendingId?: string, modelOverride?: string): Promise<boolean> {
+  async function send(retry = false, textOverride?: string, queueId?: string, pendingId?: string, modelOverride?: string, observer?: OwnedVoiceTurnObserver): Promise<boolean> {
     if (busy || sending.current || !status?.available || !historyReady || selected?.mode === "coding" || selected?.cloudDeleted || selected?.cloudLoaded === false) return false;
     const text = (textOverride ?? draft).trim();
     if (!retry && !text) return false;
@@ -313,6 +316,7 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
     setBusy(true);
     const controller = new AbortController();
     abort.current = controller;
+    observer?.onController(controller);
     try {
       const check = await fetch("/api/chat", {
         cache: "no-store",
@@ -427,6 +431,7 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
         { role: "assistant", content: answer, status: "complete" },
       ]);
       if (pendingId) setPendingSend((current) => current?.id === pendingId ? null : current);
+      observer?.onReply(answer);
       successful = true;
     } catch (e) {
       if (pendingId) setPendingSend((current) => current?.id === pendingId ? { ...current, status: "failed" } : current);
@@ -769,6 +774,12 @@ export default function Chat({ embedded = false, initialThreadId, onOpenWorkspac
               submitMessage();
             }}
           >
+            <VoiceControls visible={voiceVisible && !!status?.signedIn && !!status?.available} scopeKey={`${status?.userId || "signed-out"}:${active || "new"}`} disabled={busy || !status?.available || !historyReady || selected?.mode === "coding" || selected?.cloudDeleted || selected?.cloudLoaded === false}
+              onDictation={text => setDraft(current => (current + (current && !/\s$/.test(current) ? " " : "") + text).slice(0, 8000))}
+              onTurn={async (text, signal) => {
+                if (text.trimStart().startsWith("/")) throw Error("Voice cannot execute slash commands.");
+                return runOwnedVoiceTurn(signal, observer => sendTextRef.current(false, text, undefined, undefined, undefined, observer));
+              }} />
             {commands.list}
             <textarea
               {...commands.attributes}

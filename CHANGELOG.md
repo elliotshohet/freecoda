@@ -7,7 +7,29 @@ remain under Unreleased until publication and artifact verification are complete
 
 ## Unreleased
 
-No pending release changes.
+### Desktop 0.1.10 — publication pending
+
+Canonical release: [v0.1.10](https://github.com/elliotshohet/freecoda/releases/tag/v0.1.10). Release date and artifact verification remain pending.
+
+- Autosave composer drafts privately per account, workspace, and conversation; restore them after restart and flush before switching or quitting.
+- Show pending, generating, unavailable, and accepted AI suggestion states inline; cancel stale work when focus or context changes.
+- Restore local workspace and chat history without waiting for cloud requests, and reuse short-lived explorer snapshots. Explicit refresh and real turns retain cloud reconciliation.
+- Add desktop voice through an authenticated loopback browser companion. Dictation stays editable; live turns use the normal agent pipeline and approvals. No recording starts until Start is chosen in the browser.
+- Add a grouped, expandable overview of available features to the welcome screen, preserving quick startup and single-logo branding.
+- Voice support depends on browser speech services, which may process audio online. Microphone capture and speech output have not been qualified end to end on every platform. No new audio API key or paid inference fallback is introduced.
+
+### CLI 0.1.9 — publication pending
+
+Canonical release: [cli-v0.1.9](https://github.com/elliotshohet/freecoda/releases/tag/cli-v0.1.9). Release date and archive verification remain pending.
+
+- Add discoverable `/voice` for browser-companion dictation and live conversation in the interactive full-screen client; `/voice stop` closes the session. Plain and noninteractive sessions explain the unsupported mode.
+- Preserve typed drafts, normal tool approvals, explicit project trust, and mode isolation. Spoken slash commands cannot execute terminal commands. Closing or changing the conversation ends its voice session.
+- Browser speech recognition and synthesis support varies and may require online processing. No microphone capture starts until Start is chosen in the companion. No separate paid audio API is introduced. The npm registry remains a separate publication channel.
+
+### Web — deployment pending
+
+- Add browser speech dictation and live conversation in general chat, and editable dictation in cloud coding workspaces.
+- Add an expandable overview of actual product capabilities and client/platform limitations to the splash and welcome surfaces.
 
 ## Desktop 0.1.9 — 2026-10-20
 

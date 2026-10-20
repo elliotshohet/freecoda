@@ -35,13 +35,19 @@ export type DesktopState = {
   recentFolders: { root: string; name: string; trusted: boolean }[];
   auth: { signedIn: boolean; server: string; model?: string; allowPromptTraining?: boolean };
   running: boolean;
+  voiceActive?: boolean;
   permissionPreset: DesktopPermissionPreset;
   conversationMode: "chat" | "coding";
   threads?: { id: string; title: string; updatedAt: string; archived?: boolean }[];
   activeThreadId?: string;
+  composerDraftKey?: string;
   conversation?: { role: "user" | "assistant"; text: string }[];
 };
 export type DesktopEvent =
+  | { type: "composer-scope-migrated"; from: string; to: string }
+  | { type: "voice-dictation"; text: string; scope: string }
+  | { type: "voice-turn"; text: string; scope: string }
+  | { type: "voice-status"; active: boolean; text: string }
   | { type: "state"; state: DesktopState }
   | { type: "run-started"; runId: string }
   | { type: "text-delta"; runId: string; text: string }
@@ -124,8 +130,12 @@ export interface DesktopBridge {
   runCommand(input: { command: string }): Promise<DesktopCommandResult>;
   runAgent(input: DesktopRunInput): Promise<{ runId: string }>;
   cancelRun(): Promise<void>;
+  startVoice(input: { mode: "dictation" | "conversation"; agentMode: DesktopRunInput["mode"] }): Promise<void>;
+  stopVoice(): Promise<void>;
   suggestPrompt(input: { prefix: string }): Promise<{ suggestion: string }>;
   cancelSuggestion(): Promise<void>;
+  loadComposerDraft(): Promise<{ key: string; text: string; revision: number }>;
+  saveComposerDraft(input: { key: string; text: string; revision: number }): Promise<{ saved: boolean }>;
   respondApproval(
     input: DesktopApprovalResponse,
   ): Promise<{ accepted: boolean }>;

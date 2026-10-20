@@ -123,6 +123,7 @@ export const TERMINAL_COMMANDS = [
   { command: "/help", description: "Show commands and keyboard shortcuts" },
   { command: "/new", description: "Start a new task in this project" },
   { command: "/resume", description: "Open a saved task" },
+  { command: "/voice", description: "Open browser dictation or a live voice conversation" },
   { command: "/chat", description: "Continue without repository access" },
   { command: "/build", description: "Work in the trusted checkout with approvals" },
   { command: "/mcp", description: "List, discover, or enable MCP connections" },
@@ -360,6 +361,21 @@ export class TerminalScreen {
       };
       this.render();
     });
+  }
+  insertVoiceDraft(text: string) {
+    if (this.closed || (this.question && this.question.kind !== "composer")) throw Error("Finish the current confirmation before dictating.");
+    if (!this.question && !this.busy) throw Error("Wait for the composer before dictating.");
+    this.insert(text);
+  }
+  submitVoiceTurn(text: string) {
+    if (this.closed || this.busy || !this.question || this.question.kind !== "composer" || this.queue.items.length) throw Error("Wait for the current turn and queued messages before speaking.");
+    // Voice text is always a normal message, never a terminal slash command.
+    const question = this.question;
+    this.question = undefined;
+    // Keep the visible draft in place while the spoken turn runs. Existing
+    // approval prompts already preserve this value and restore it afterward.
+    question.resolve(`Voice message:\n${safeTerminalText(text)}`);
+    this.schedule();
   }
   private schedule() {
     if (this.closed || this.timer) return;

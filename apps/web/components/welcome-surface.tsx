@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FeatureOverview } from "./feature-overview";
 import styles from "./welcome-surface.module.css";
 
 type WelcomeAction = {
@@ -65,6 +66,7 @@ export function WelcomeSurface({
           {hint} <kbd>/</kbd> for commands.
         </p>
       )}
+      <FeatureOverview compact />
     </div>
   );
 }

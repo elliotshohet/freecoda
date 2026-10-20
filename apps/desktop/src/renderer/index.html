@@ -70,6 +70,7 @@
           <button id="current-thread" class="thread-link" aria-current="page"><span id="thread-title">New conversation</span></button>
           <label class="chat-history-search"><span class="sr-only">Search current conversations</span><input id="thread-search" type="search" placeholder="Search conversations…" /></label>
           <button id="toggle-archived" class="text-button" aria-pressed="false">Archived chats</button>
+          <button id="refresh-chats" class="text-button" type="button" title="Pull conversations from your account">Refresh chats</button>
           <div id="thread-history" class="thread-history" aria-label="Saved conversations"></div>
         </section>
         <nav class="sidebar-bottom sidebar-settings" aria-label="Settings and connections">
@@ -259,6 +260,63 @@ Command output will appear here. Your permission preset controls local command e
               </button>
             </div>
             <p class="welcome-command-hint">Start typing below, or use <kbd>/</kbd> for commands.</p>
+            <details class="welcome-feature-guide">
+              <summary>Explore what Freecoda can do <span>Chat, projects, voice, and more</span></summary>
+              <div class="welcome-feature-groups">
+                <p class="welcome-feature-intro">Start with a conversation. Open a section when you need a little more context.</p>
+                <details>
+                  <summary>Conversations &amp; drafts</summary>
+                  <ul>
+                    <li><strong>General chat:</strong> ask questions, write, and think things through without giving the agent access to project files or tools.</li>
+                    <li><strong>Saved conversations:</strong> start, resume, copy responses, archive with Undo, restore archived chats, or review deletion. Local copies remain available when account sync is offline.</li>
+                    <li><strong>Your next message:</strong> drafts save on this device per account, conversation, and workspace. Contextual AI suggestions appear inline when available; Tab inserts text for editing and never sends it.</li>
+                    <li><strong>Stay in control:</strong> browse slash commands, queue the next message, pause or remove queued turns, and cancel a running request.</li>
+                  </ul>
+                </details>
+                <details>
+                  <summary>Local projects &amp; files</summary>
+                  <ul>
+                    <li><strong>Choose your folder:</strong> reopen recent workspaces and their conversations. Folder trust is required before project tools can read files or run commands.</li>
+                    <li><strong>Read and edit:</strong> browse project text files, follow line numbers and syntax colors, preserve indentation, and scroll long lines. File saves check for external changes; sensitive or unsupported files remain restricted.</li>
+                    <li><strong>Build, Plan, or Review:</strong> request implementation or use read-only planning and review. Read-only, Default, and Full access permission modes determine which project actions need confirmation.</li>
+                    <li><strong>Inspect your work:</strong> use the local command panel and activity output, review repository differences, inspect Git status, or explicitly pull a clean checkout. Pulling does not publish changes.</li>
+                  </ul>
+                </details>
+                <details>
+                  <summary>Dictation &amp; voice conversation</summary>
+                  <ul>
+                    <li><strong>Dictation:</strong> open the browser companion and choose Start dictation. Recognized words become an editable draft here; you decide when to send.</li>
+                    <li><strong>Conversation:</strong> choose Start conversation to send spoken turns through the active conversation and hear completed replies. Project trust and action approvals still apply. Stop, mute, and interrupt controls remain available.</li>
+                    <li><strong>Browser support matters:</strong> microphone permission and browser/OS speech services are required. Their speech service may process audio online. Freecoda receives transcript text, not microphone audio; recognition and playback can be unavailable in some browsers.</li>
+                  </ul>
+                </details>
+                <details>
+                  <summary>Plugins, MCP, skills &amp; tools</summary>
+                  <ul>
+                    <li><strong>Plugins:</strong> review a manifest before installing a bundle of skills and MCP connections, or remove an installed bundle.</li>
+                    <li><strong>MCP connections:</strong> connect external services, discover the tools they expose, and enable or disable connections. Tools are callable actions, such as reading a file or searching a service.</li>
+                    <li><strong>Skills:</strong> install and read task instructions. A skill supplies guidance; it does not grant permission. Installed capabilities and tool choices still follow the active mode, folder trust, and approvals.</li>
+                  </ul>
+                </details>
+                <details>
+                  <summary>Web, cloud projects &amp; CLI</summary>
+                  <ul>
+                    <li><strong>Web:</strong> continue account conversations in the browser. Web cloud projects have their own consent, compute controls, file editor, changes, preview, and output views; reviewed publishing creates a branch and draft pull request.</li>
+                    <li><strong>Connected repositories:</strong> review GitHub App access and choose repositories, branches, and app directories. Desktop cloud project entries open the web workspace; they do not silently clone or trust a local folder.</li>
+                    <li><strong>CLI:</strong> use chat and trusted local project workflows from a terminal, with saved tasks, permissions, extensions, and a turn queue. Full-screen CLI voice uses the same browser companion. Web project dictation edits its draft; live web voice conversation is in general chat.</li>
+                  </ul>
+                </details>
+                <details>
+                  <summary>Account, preferences &amp; everyday controls</summary>
+                  <ul>
+                    <li><strong>Your account:</strong> connect through GitHub, view your real profile and hosted allowance, manage connected devices and repository preferences, and sign out.</li>
+                    <li><strong>Make it comfortable:</strong> choose a light, dark, or system theme, use keyboard shortcuts, and check the installed version and available updates.</li>
+                    <li><strong>Close or quit:</strong> closing the window keeps the desktop session in the tray when available. Restore it from the tray; use Quit to end the app. Save prompts and active-work checks protect unfinished work.</li>
+                    <li><strong>Free beta:</strong> hosted access requires an invited account and has fair-use limits. Sponsors support Freecoda without access to code or conversations. Unsigned macOS builds require a manual update installation.</li>
+                  </ul>
+                </details>
+              </div>
+            </details>
           </section>
         </div>
         <div id="working" class="working" role="status" hidden>
@@ -317,6 +375,15 @@ Command output will appear here. Your permission preset controls local command e
             </button>
           </div>
         </form>
+        <div class="desktop-voice" aria-label="Voice input">
+          <div class="desktop-voice-actions">
+            <button id="voice-dictate" type="button">Dictate</button>
+            <button id="voice-chat" type="button">Live voice</button>
+            <button id="voice-stop" type="button" hidden>Stop voice</button>
+          </div>
+          <p id="voice-status" role="status" aria-live="polite">Voice opens a browser companion. Press Start there to enable your microphone.</p>
+          <details><summary>Voice privacy and support</summary><p>Requires browser speech recognition; support varies by browser. Audio and speech output may be processed online by your browser’s speech provider. Freecoda receives transcripts, not audio recordings. Dictation adds editable text. Live voice sends spoken turns using the selected mode and normal permissions; review coding approvals in this window. Mute, interrupt and listening status are in the companion. Stop voice ends the session.</p></details>
+        </div>
         <div id="prompt-queue" class="prompt-queue" aria-label="Queued messages" hidden></div>
         <p class="permission-note" id="permission-note">
           <span aria-hidden="true">◇</span> You approve every file change and

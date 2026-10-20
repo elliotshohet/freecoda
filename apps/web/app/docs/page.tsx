@@ -1,3 +1,4 @@
+import { FeatureOverview } from "@/components/feature-overview";
 import { DesktopDownloads } from "@/components/desktop-downloads";
 import { Install } from "@/components/install";
 import { CLI_PUBLISHED, CLI_RELEASE_URL, CLI_CHECKSUMS_URL } from "@/lib/releases";
@@ -7,6 +8,7 @@ export default function Docs() {
   return (
     <main className="page-shell docs-layout" id="main">
       <nav className="docs-nav" aria-label="Documentation">
+        <a href="#features">Features by client</a>
         <a href="#installation">Installation</a>
         <a href="#browser">Browser workspace</a>
         <a href="#desktop">Desktop downloads</a>
@@ -98,6 +100,9 @@ export default function Docs() {
           confirming a draft pull request. Freecoda does not merge that pull
           request for you.
         </p>
+        <h2 id="features">Features by client</h2>
+        <p>Open a group for the current capabilities and boundaries. The compact overview is also available on the home page and new-conversation welcome.</p>
+        <FeatureOverview />
         <h2 id="first-project">Your first project</h2>
         <p>
           Run the CLI inside the project you want to work on. Review the

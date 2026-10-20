@@ -96,6 +96,7 @@ async function confirmQuit() {
       ? await dialog.showMessageBox(window, options)
       : await dialog.showMessageBox(options);
     if (result.response !== 1) return;
+    if (window && !window.isDestroyed()) await window.webContents.executeJavaScript("globalThis.flushComposerDraft?.()", true);
     await service.dispose();
     updates?.dispose();
     quitting = true;
@@ -223,8 +224,12 @@ function installIPC() {
       service.runCommand(input),
     runAgent: (input: Parameters<LocalAgentService["runAgent"]>[0]) =>
       service.runAgent(input),
+    startVoice: (input: Parameters<LocalAgentService["startVoice"]>[0]) => service.startVoice(input),
+    stopVoice: () => service.stopVoice(),
     cancelRun: () => service.cancelRun(),
     suggestPrompt: (input: { prefix: string }) => service.suggestPrompt(input),
+    loadComposerDraft: () => service.loadComposerDraft(),
+    saveComposerDraft: (input: Parameters<LocalAgentService["saveComposerDraft"]>[0]) => service.saveComposerDraft(input),
     cancelSuggestion: () => service.cancelSuggestion(),
     respondApproval: (
       input: Parameters<LocalAgentService["respondApproval"]>[0],
@@ -338,6 +343,13 @@ app
       dataDirectory: path.join(app.getPath("userData"), "private"),
       emit,
       openExternal,
+      openVoiceCompanion: async url => {
+        // This operation receives only the service's freshly minted URL. Keep
+        // loopback HTTP out of the generic renderer external-navigation API.
+        const target = new URL(url);
+        if (!/^http:\/\/127\.0\.0\.1:[0-9]+\/#[a-f0-9]{64}$/.test(url) || Number(target.port) < 1 || Number(target.port) > 65535) throw Error("Invalid voice companion URL.");
+        await shell.openExternal(target.toString());
+      },
     });
     await service.initialize();
     installIPC();

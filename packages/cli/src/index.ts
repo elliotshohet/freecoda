@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command, Option } from "commander";
+import { createVoiceTurnGuard } from "./voice-turn";
 import { codexUnsupportedCommand } from "@freecoda/contracts";
 import path from "node:path";
 import { realpath } from "node:fs/promises";
@@ -7,6 +8,8 @@ import { platform, arch } from "node:os";
 import c from "picocolors";
 import open from "open";
 import {
+  startVoiceBridge,
+  type VoiceBridge,
   runAgent,
   directModel,
   hostedModel,
@@ -487,6 +490,7 @@ program
       if (next !== "chat") await ensureRepositoryTrust();
       const nextScope = scopeFor(next);
       if (nextScope !== scope) {
+        await voice?.close();
         await persistConversation({ ...conversation, messages });
         scope = nextScope;
         conversation = newConversation(scope);
@@ -498,6 +502,29 @@ program
       }
       defaultMode = next;
       screen?.setMode(permissions.effectiveMode(defaultMode));
+    }
+    let voice: VoiceBridge | undefined;
+    let voiceTurn: string | undefined;
+    let voiceTurnId: string | undefined;
+    let voiceGuard: ReturnType<typeof createVoiceTurnGuard> | undefined;
+    async function openVoice() {
+      if (!screen || opts.prompt) throw Error("Voice needs the interactive full-screen CLI. Run freecoda without --plain or --prompt.");
+      if (!voice) {
+        const voiceScope = scope, voiceConversation = conversation.id;
+        const instance = await startVoiceBridge({
+          title: "Freecoda CLI voice",
+          onTranscript({ text, mode, turnId }) {
+            if (scope !== voiceScope || conversation.id !== voiceConversation) throw Error("The CLI conversation changed. Stop voice and open /voice again.");
+            if (mode === "dictation") { screen.insertVoiceDraft(text); notice("Voice dictation added to the composer. Review and send when ready."); }
+            else { if (voiceTurn) throw Error("Wait for the current voice response."); voiceTurn = `Voice message:\n${safeTerminalText(text)}`; voiceTurnId = turnId; voiceGuard = createVoiceTurnGuard(); try { screen.submitVoiceTurn(text); } catch (error) { voiceTurn = undefined; voiceTurnId = undefined; voiceGuard?.cancel(); voiceGuard = undefined; throw error; } }
+          },
+          onControl(action, turnId) { if ((action === "interrupt" || action === "stop") && voiceTurn && (!turnId || turnId === voiceTurnId)) voiceGuard?.cancel(); },
+          onClose() { if (voice === instance) { voiceGuard?.cancel(); voice = undefined; /* Keep the cancelled identity until its resolved composer input is consumed. */ } },
+        });
+        voice = instance;
+      }
+      await open(voice.url);
+      notice("Voice companion opened. Choose Start dictation to edit words here, or Start conversation for automatic conversational turns. Browser/OS speech may process audio online; no microphone audio is sent to Freecoda.");
     }
     let requestedUpdate: string | undefined;
     let explicitUpdateRequested = false;
@@ -513,7 +540,22 @@ program
           throw e;
         }
         if (!input) continue;
+        const inputVoiceGuard = input === voiceTurn ? voiceGuard : undefined;
+        if (inputVoiceGuard?.controller.signal.aborted) {
+          voiceTurn = undefined; voiceTurnId = undefined; voiceGuard = undefined;
+          continue;
+        }
         if (["/exit", "/quit"].includes(input)) break;
+        if (input === "/voice" || input.startsWith("/voice ")) {
+          try {
+            const argument = input.slice(6).trim();
+            if (argument === "stop") { await voice?.close(); voice = undefined; voiceTurn = undefined; notice("Voice companion stopped."); }
+            else if (!argument || ["dictate", "chat"].includes(argument)) await openVoice();
+            else throw Error("Use /voice, /voice chat, or /voice stop. Microphone starts only after you choose a mode in the browser.");
+          } catch (e) { error(e instanceof Error ? e.message : "Voice could not start."); }
+          if (opts.prompt) break;
+          continue;
+        }
         if (input === "/queue" || input.startsWith("/queue ")) {
           if (!screen) notice("Queued input is available in the full-screen interface. Plain mode sends one turn at a time.");
           else {
@@ -655,12 +697,13 @@ program
         }
         if (input === "/help") {
           notice(
-            "/plan <task>  Read-only plan\n/review <task>  Read-only code review\n/mode chat|build|plan|review  Set the default mode\n/mcp [enable|disable|discover <id>]  Manage connections\n/tools [enable|disable <name>]  Select next-turn tools\n/extensions [search]  Browse installed tools and skills\n/skills show <id>  Read installed skill instructions\n/install skill <source> | mcp <name> <url>  Review a local installation\n/queue [resume|remove <id>]  Review paused or queued turns\n/permissions [read-only|default|full-access]  Session tool permissions\n/theme auto|dark|light  Save the terminal palette\n/update  Check and install after saving and closing this session\n/usage  Hosted allowance and reset time\n/status  Current workspace and provider\n/new  Start a new saved task\n/resume [number or id]  List or reopen saved tasks\n/clear  Start a fresh chat; preserve saved history\n/copy  Copy the latest assistant response (macOS)\n/diff  Show tracked diff and untracked paths (trusted workspace)\n/pwd or /cwd  Show selected directory\n/exit  Exit Freecoda\n\nEnter sends. Ctrl+J adds a newline. Paste never submits automatically. Up/Down recalls input. PageUp/PageDown scrolls. Escape or Ctrl+C cancels a running request. Approval: y once, s category for this session, n decline.",
+            "/plan <task>  Read-only plan\n/review <task>  Read-only code review\n/mode chat|build|plan|review  Set the default mode\n/mcp [enable|disable|discover <id>]  Manage connections\n/tools [enable|disable <name>]  Select next-turn tools\n/extensions [search]  Browse installed tools and skills\n/skills show <id>  Read installed skill instructions\n/install skill <source> | mcp <name> <url>  Review a local installation\n/queue [resume|remove <id>]  Review paused or queued turns\n/permissions [read-only|default|full-access]  Session tool permissions\n/theme auto|dark|light  Save the terminal palette\n/update  Check and install after saving and closing this session\n/voice [chat|stop]  Browser dictation or live conversation\n/usage  Hosted allowance and reset time\n/status  Current workspace and provider\n/new  Start a new saved task\n/resume [number or id]  List or reopen saved tasks\n/clear  Start a fresh chat; preserve saved history\n/copy  Copy the latest assistant response (macOS)\n/diff  Show tracked diff and untracked paths (trusted workspace)\n/pwd or /cwd  Show selected directory\n/exit  Exit Freecoda\n\nEnter sends. Ctrl+J adds a newline. Paste never submits automatically. Up/Down recalls input. PageUp/PageDown scrolls. Escape or Ctrl+C cancels a running request. Approval: y once, s category for this session, n decline.",
           );
           if (opts.prompt) break;
           continue;
         }
         if (input === "/new" || input === "/clear") {
+          await voice?.close();
           conversation = await persistConversation({
             ...conversation,
             messages,
@@ -723,6 +766,7 @@ program
                   "Task not found. Use /resume to list tasks in this project.",
                 );
               else {
+                await voice?.close();
                 await persistConversation({ ...conversation, messages });
                 conversation = accountSync
                   ? await accountSync.load(root, defaultMode, item.id)
@@ -841,6 +885,12 @@ program
             continue;
           }
         }
+        // Trust and conversation selection can await. Stop must win before any
+        // visible turn dispatch or model work, even if no screen cancel hook existed.
+        if (inputVoiceGuard?.controller.signal.aborted) {
+          voiceTurn = undefined; voiceTurnId = undefined; voiceGuard = undefined;
+          continue;
+        }
         const prompt =
           mode === "review"
             ? `Review the project and report concrete issues. ${input.replace(/^\/review\s*/, "")}`
@@ -854,7 +904,7 @@ program
         screen?.append("you", input);
         screen?.setMode(permissions.effectiveMode(mode));
         screen?.setBusy(true, "Working");
-        const controller = new AbortController();
+        const controller = inputVoiceGuard?.controller ?? new AbortController();
         const abort = () => {
           if (controller.signal.aborted) return;
           controller.abort();
@@ -865,10 +915,13 @@ program
         process.on("SIGINT", abort);
         let responseCompleted = false;
         try {
+          const extensions = await loadExtensionRegistry(extensionFile());
+          inputVoiceGuard?.assertActive();
+          controller.signal.throwIfAborted();
           const result = await runAgent({
             root,
             disabledTools: [...new Set([...(captured?.disabledTools ?? []), ...sessionTools.disabled])],
-            extensions: await loadExtensionRegistry(extensionFile()),
+            extensions,
             model: captured?.model ?? model!,
             messages: next,
             mode: permissions.effectiveMode(mode),
@@ -888,6 +941,7 @@ program
           });
           controller.signal.throwIfAborted();
           responseCompleted = true;
+          if (voiceTurn === input) { voice?.publish({ type: "assistant", text: result.text, turnId: voiceTurnId }); voiceTurn = undefined; voiceTurnId = undefined; }
           messages = result.messages;
           conversation = await persistConversation({
             ...conversation,
@@ -902,6 +956,7 @@ program
             screen ? (ad) => screen.showSponsor(ad) : undefined,
           );
         } catch (e) {
+          if (voiceTurn === input) { voice?.publish({ type: "stop", text: controller.signal.aborted ? "Voice turn interrupted." : "Voice turn failed. Review the CLI error before restarting.", turnId: voiceTurnId }); voiceTurn = undefined; voiceTurnId = undefined; }
           if (screen) {
             screen.queue.paused = true;
             if (!responseCompleted) screen.queue.items.unshift(activeTurn ?? { id: crypto.randomUUID(), input, context: captureTurn() });
@@ -932,6 +987,7 @@ program
       }
     } finally {
       sessionOpen = false;
+      await voice?.close();
       screen?.close();
       closeReader();
       closeTerminal();

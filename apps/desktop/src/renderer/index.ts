@@ -1,3 +1,4 @@
+import { createDraftAutosave } from "./draft-autosave";
 import { createComposerSuggestions } from "./composer-suggestions";
 import { createFileView } from "./file-view";
 import { filterConversationCommands, parseSkillInstallIntent, codexUnsupportedCommand } from "../../../../packages/contracts/src/conversation-commands";
@@ -16,9 +17,19 @@ import type {
 declare global {
   interface Window {
     freecoda: DesktopBridge;
+    flushComposerDraft?: () => Promise<void>;
   }
 }
-const bridge = window.freecoda;
+let draftAutosave: ReturnType<typeof createDraftAutosave> | undefined;
+const rawBridge = window.freecoda;
+const scopeChanges = new Set(["openFolder", "openRecentFolder", "trustWorkspace", "setConversationMode", "createThread", "openThread", "setThreadArchived", "deleteThread", "clearHistory", "login", "logout", "refreshConversations"]);
+const bridge = new Proxy({ ...rawBridge }, {
+  get(target, property, receiver) {
+    const value = Reflect.get(target, property, receiver);
+    if (typeof property !== "string" || !scopeChanges.has(property) || typeof value !== "function") return value;
+    return async (...args: unknown[]) => { await draftAutosave?.flush(); return value(...args); };
+  },
+});
 function el<T extends HTMLElement = HTMLElement>(id: string): T {
   const node = document.getElementById(id);
   if (!node) throw new Error(`Missing app element: ${id}`);
@@ -63,6 +74,7 @@ let approvalQueue: Extract<DesktopEvent, { type: "approval" }>[] = [];
 let currentApproval: string | null = null;
 let loginInProgress = false;
 let commandInFlight = false;
+let voiceActive = false;
 let conversationRoot: string | null = null;
 const promptQueue: QueuedPrompt[] = [];
 let drainingPromptQueue = false;
@@ -70,9 +82,12 @@ let promptQueuePaused = false;
 const abort = new AbortController();
 const signal = abort.signal;
 const fileView = createFileView(editor, { signal });
+draftAutosave = createDraftAutosave(prompt, { load: () => rawBridge.loadComposerDraft(), save: draft => rawBridge.saveComposerDraft(draft), signal });
+window.flushComposerDraft = () => draftAutosave!.flush();
 const composerSuggestions = createComposerSuggestions(prompt, {
+  unavailableReason: () => !state?.auth.signedIn ? "Sign in to get AI suggestions." : running || actionBusy || commandInFlight || promptQueue.length ? "AI suggestions paused while work is running." : prompt.value.length > 2000 ? "AI suggestions are unavailable for drafts over 2,000 characters." : undefined,
   enabled: () => !!state?.auth.signedIn && !running && !actionBusy && !commandInFlight && !promptQueue.length,
-  contextKey: () => JSON.stringify([state?.conversationMode, state?.workspace?.root, state?.activeThreadId, state?.auth.signedIn, running, actionBusy, commandInFlight, promptQueue.length, mode.value]),
+  contextKey: () => JSON.stringify([state?.conversationMode, state?.workspace?.root, state?.activeThreadId, state?.composerDraftKey, state?.auth.signedIn, running, actionBusy, commandInFlight, promptQueue.length, mode.value]),
   request: async prefix => ({ completion: (await bridge.suggestPrompt({ prefix })).suggestion }),
   cancel: () => bridge.cancelSuggestion(),
   describeError: message,
@@ -193,6 +208,7 @@ async function openRecentWorkspace(root: string) {
   finally { actionBusy = false; updateControls(); }
 }
 function updateControls() {
+  draftAutosave?.update(state?.composerDraftKey || "", !actionBusy);
   composerSuggestions.update();
   const chat = isChat();
   text("sidebar-heading-label", "Workspaces");
@@ -222,6 +238,13 @@ function updateControls() {
   hide("stop", !running);
   button("stop").disabled = actionBusy;
   button("new-chat").disabled = !ready;
+  button("refresh-chats").disabled = !ready || commandInFlight || !!promptQueue.length || !state?.auth.signedIn;
+  voiceActive = state?.voiceActive ?? voiceActive;
+  button("voice-dictate").hidden = voiceActive;
+  button("voice-chat").hidden = voiceActive;
+  button("voice-stop").hidden = !voiceActive;
+  button("voice-dictate").disabled = actionBusy || running || commandInFlight || !!promptQueue.length;
+  button("voice-chat").disabled = !ready || !state?.auth.signedIn || commandInFlight || !!promptQueue.length || (!chat && dirty());
   el("thread-history")
     .querySelectorAll<HTMLButtonElement>("button")
     .forEach((node) => (node.disabled = !ready || node.dataset.archived === "true"));
@@ -297,7 +320,6 @@ function updateControls() {
   );
   hide("dirty-indicator", !dirty());
 }
-const conversationDrafts = new Map<string, string>();
 function draftScope(value: DesktopState | null | undefined) { return `${value?.conversationMode === "coding" ? value.workspace?.root || "none" : "chat"}:${value?.activeThreadId || "new"}`; }
 let archiveScopeGeneration = 0;
 function renderState(next: DesktopState) {
@@ -309,9 +331,6 @@ function renderState(next: DesktopState) {
     text("toggle-archived", "Archived chats");
   }
   document.querySelector(".agent-pane")?.classList.toggle("general-chat", next.conversationMode === "chat");
-  const previousScope = draftScope(state);
-  const nextScope = draftScope(next);
-  if (state && previousScope !== nextScope) conversationDrafts.set(previousScope, prompt.value.trim().startsWith("/") ? "" : prompt.value);
   const oldRoot = state?.workspace?.root;
   const oldMode = state?.conversationMode;
   const oldThread = state?.activeThreadId;
@@ -345,8 +364,6 @@ function renderState(next: DesktopState) {
         : `Trust ${next.workspace.name} to work with its files, or return to general chat.`
       : "A question, a first draft, or something you want to build.",
   );
-  prompt.placeholder =
-    "Ask Coda… Type / for commands";
   if (oldRoot !== next.workspace?.root) {
     file = null;
     editor.value = "";
@@ -400,7 +417,6 @@ function renderState(next: DesktopState) {
     for (const item of next.conversation) appendMessage(item.role, item.text);
     conversationRoot = conversationKey;
   }
-  if (previousScope !== nextScope) prompt.value = conversationDrafts.get(nextScope) || "";
   renderFiles();
   renderThreads();
   text("model-privacy-note", next.auth.allowPromptTraining === false
@@ -842,7 +858,17 @@ async function sendPrompt(event?: Event) {
   clearError();
   assistantParagraph = null;
   try {
-    const result = await bridge.runAgent({ prompt: value, mode: chosen });
+    const unsent = prompt.value;
+    let result;
+    try {
+      await draftAutosave?.clear();
+      result = await bridge.runAgent({ prompt: value, mode: chosen });
+    } catch (error) {
+      prompt.value = unsent;
+      draftAutosave?.changed();
+      await draftAutosave?.flush().catch(() => {});
+      throw error;
+    }
     activeRun = result.runId;
     appendMessage("user", value);
     prompt.value = "";
@@ -1747,6 +1773,34 @@ async function logout() {
 }
 async function handleEvent(event: DesktopEvent) {
   switch (event.type) {
+    case "composer-scope-migrated":
+      if (state?.composerDraftKey === event.from) {
+        draftAutosave?.migrate(event.from, event.to);
+        state.composerDraftKey = event.to;
+      }
+      break;
+    case "voice-status":
+      voiceActive = event.active;
+      if (state) state.voiceActive = event.active;
+      text("voice-status", event.text);
+      updateControls();
+      break;
+    case "voice-dictation":
+      if (event.scope !== state?.composerDraftKey) break;
+      {
+        const next = prompt.value + (prompt.value && !/\s$/.test(prompt.value) ? " " : "") + event.text;
+        prompt.value = next.slice(0, 20_000);
+        if (next.length > 20_000) notify("Draft limit reached. The last dictated words were shortened; review before sending.");
+      }
+      draftAutosave?.changed();
+      updateControls();
+      break;
+    case "voice-turn":
+      if (event.scope !== state?.composerDraftKey) break;
+      assistantParagraph = null;
+      appendMessage("user", event.text);
+      activity("Voice turn started. Review any requested approvals here.");
+      break;
     case "state":
       renderState(event.state);
       break;
@@ -1898,6 +1952,7 @@ async function switchAgentMode(chosen: AgentMode) {
     return;
   }
   try {
+    if (voiceActive) await bridge.stopVoice();
     if ((chosen === "chat") !== isChat() && dirty()) {
       mode.value = isChat() ? "chat" : "build";
       throw Error(
@@ -2011,6 +2066,27 @@ function showWorkbench(open: boolean) {
   button("toggle-workbench").setAttribute("aria-expanded", String(open));
 }
 let showingArchived = false;
+for (const [id, voiceMode] of [["voice-dictate", "dictation"], ["voice-chat", "conversation"]] as const) {
+  button(id).addEventListener("click", async () => {
+    if (actionBusy || running || commandInFlight || promptQueue.length || (voiceMode === "conversation" && (!state?.auth.signedIn || (!isChat() && (!trusted() || dirty()))))) return;
+    actionBusy = true;
+    updateControls();
+    try {
+      await draftAutosave?.flush();
+      await bridge.startVoice({ mode: voiceMode, agentMode: mode.value as AgentMode });
+    } catch (error) { showError(error); }
+    finally { actionBusy = false; updateControls(); }
+  }, { signal });
+}
+button("voice-stop").addEventListener("click", () => { void bridge.stopVoice().catch(showError); }, { signal });
+button("refresh-chats").addEventListener("click", async () => {
+  if (actionBusy || running || commandInFlight || promptQueue.length) return;
+  actionBusy = true;
+  updateControls();
+  try { renderState(await bridge.refreshConversations()); notify("Conversations refreshed."); }
+  catch (error) { showError(error); }
+  finally { actionBusy = false; updateControls(); }
+}, { signal });
 button("toggle-archived").addEventListener("click", () => {
   showingArchived = !showingArchived;
   button("toggle-archived").setAttribute("aria-pressed", String(showingArchived));
@@ -2385,7 +2461,7 @@ window.addEventListener(
   },
   { once: true },
 );
-if (!bridge) {
+if (!rawBridge) {
   showError(
     new Error(
       "The secure desktop connection is unavailable. Restart Freecoda to reconnect.",

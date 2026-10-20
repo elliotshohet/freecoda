@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { VoiceControls } from "@/components/voice-controls";
 import Link from "next/link";
 import {
   ArrowUpRight,
@@ -1499,6 +1500,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                       <div ref={endOfChat} />
                     </div>
                     <form className={styles.composer} onSubmit={sendPrompt}>
+                      <VoiceControls visible={conversationMode === "project" && consent && !inactive} scopeKey={project?.id || "no-project"} disabled={busy || !project || !consent || inactive} onDictation={text => { const next = (promptInputRef.current + (promptInputRef.current && !/\s$/.test(promptInputRef.current) ? " " : "") + text).slice(0, 12000); promptInputRef.current = next; setPrompt(next); }} />
                       {commands.list}
                       <label className="sr-only" htmlFor="cloud-prompt">
                         Message the coding agent

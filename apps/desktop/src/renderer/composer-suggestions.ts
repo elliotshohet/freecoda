@@ -4,6 +4,7 @@ export function canAcceptSuggestion(value: string, prefix: string, completion: s
 }
 export function createComposerSuggestions(prompt: HTMLTextAreaElement, options: {
   enabled(): boolean;
+  unavailableReason?(): string | undefined;
   contextKey(): string;
   request(prefix: string): Promise<{ completion: string }>;
   cancel(): Promise<unknown>;
@@ -26,17 +27,22 @@ export function createComposerSuggestions(prompt: HTMLTextAreaElement, options: 
   let generation = 0;
   let prefix = "", completion = "", dismissed: string | undefined;
   let context = options.contextKey();
+  let composing = false;
+  const setStatus = (phase: string, text: string) => {
+    status.dataset.state = phase;
+    if (status.textContent !== text) status.textContent = text;
+  };
   const placeholder = prompt.placeholder;
-  const clear = () => {
+  const clear = (keepStatus = false) => {
     clearTimeout(timer);
     generation++;
     prefix = completion = "";
     overlay.hidden = true;
     prompt.placeholder = placeholder;
-    status.textContent = "";
+    if (!keepStatus) setStatus("idle", "");
     void options.cancel().catch(() => {});
   };
-  const eligible = () => options.enabled() && !prompt.disabled && document.activeElement === prompt && prompt.value.length <= 2000 && !prompt.value.trimStart().startsWith("/") && prompt.selectionStart === prompt.value.length && prompt.selectionEnd === prompt.value.length && dismissed !== prompt.value;
+  const eligible = () => document.hasFocus() && !composing && options.enabled() && !prompt.disabled && document.activeElement === prompt && prompt.value.length <= 2000 && !prompt.value.trimStart().startsWith("/") && prompt.selectionStart === prompt.value.length && prompt.selectionEnd === prompt.value.length && dismissed !== prompt.value;
   const metrics = () => {
     const style = getComputedStyle(prompt);
     overlay.style.height = `${prompt.offsetHeight}px`;
@@ -50,33 +56,42 @@ export function createComposerSuggestions(prompt: HTMLTextAreaElement, options: 
   options.signal.addEventListener("abort", () => observer.disconnect(), { once: true });
   const scroll = () => { overlay.scrollTop = prompt.scrollTop; overlay.scrollLeft = prompt.scrollLeft; };
   const schedule = () => {
-    clear();
-    if (!eligible()) return;
+    clear(true);
+    if (!eligible()) {
+      const reason = document.activeElement === prompt ? options.unavailableReason?.() : undefined;
+      setStatus(reason ? "unavailable" : "idle", reason || "");
+      return;
+    }
+    setStatus("pending", "AI suggestion pending…");
     const current = generation, value = prompt.value, scope = options.contextKey();
     timer = setTimeout(async () => {
       if (!eligible() || current !== generation || scope !== options.contextKey()) return;
-      status.textContent = "Generating an AI suggestion…";
+      setStatus("loading", "Generating an AI suggestion…");
       try {
         const result = await options.request(value);
         if (current !== generation || scope !== options.contextKey() || !eligible() || prompt.value !== value) return;
-        if (!result.completion || result.completion.length + value.length > prompt.maxLength) { status.textContent = ""; return; }
+        if (!result.completion || result.completion.length + value.length > prompt.maxLength) { setStatus("unavailable", "No AI suggestion available for this draft."); return; }
         prefix = value; completion = result.completion;
         const typed = document.createElement("span"); typed.className = "composer-ghost-prefix"; typed.textContent = value;
         overlay.replaceChildren(typed, document.createTextNode(completion));
         overlay.hidden = false;
         prompt.placeholder = "";
-        status.textContent = "AI suggestion · Tab to insert · Esc to dismiss";
+        setStatus("ready", "AI suggestion · Tab to insert · Esc to dismiss");
         metrics(); scroll();
       } catch (error) {
-        if (current === generation && eligible()) status.textContent = `AI suggestions unavailable: ${options.describeError(error)}`;
+        if (current === generation && eligible()) setStatus("unavailable", `AI suggestions unavailable: ${options.describeError(error).slice(0, 180)}`);
       }
     }, 1500);
   };
+  window.addEventListener("blur", () => clear(), { signal: options.signal });
+  window.addEventListener("focus", () => { if (document.activeElement === prompt) schedule(); }, { signal: options.signal });
+  prompt.addEventListener("compositionstart", () => { composing = true; clear(); }, { signal: options.signal });
+  prompt.addEventListener("compositionend", () => { composing = false; schedule(); }, { signal: options.signal });
   prompt.addEventListener("input", () => { if (dismissed !== prompt.value) dismissed = undefined; schedule(); }, { signal: options.signal });
   prompt.addEventListener("focus", schedule, { signal: options.signal });
-  prompt.addEventListener("blur", clear, { signal: options.signal });
+  prompt.addEventListener("blur", () => clear(), { signal: options.signal });
   prompt.addEventListener("scroll", scroll, { passive: true, signal: options.signal });
-  prompt.addEventListener("select", () => { if (!eligible()) clear(); }, { signal: options.signal });
+  prompt.addEventListener("select", () => { if (["pending", "loading", "ready"].includes(status.dataset.state || "") && !eligible()) clear(); }, { signal: options.signal });
   prompt.addEventListener("keydown", event => {
     if (event.isComposing) { clear(); return; }
     if (event.key === "Escape" && completion) { dismissed = prompt.value; clear(); return; }
@@ -87,8 +102,8 @@ export function createComposerSuggestions(prompt: HTMLTextAreaElement, options: 
     prompt.setRangeText(value, prompt.selectionStart, prompt.selectionEnd, "end");
     dismissed = prompt.value;
     prompt.dispatchEvent(new Event("input", { bubbles: true }));
-    status.textContent = "Suggestion inserted. Review and send when ready.";
+    setStatus("inserted", "Suggestion inserted. Review and send when ready.");
   }, { capture: true, signal: options.signal });
-  options.signal.addEventListener("abort", clear, { once: true });
-  return { update() { const next = options.contextKey(); if (context !== next) { context = next; dismissed = undefined; clear(); if (eligible()) schedule(); } } };
+  options.signal.addEventListener("abort", () => clear(), { once: true });
+  return { update() { const next = options.contextKey(); if (context !== next) { context = next; dismissed = undefined; clear(); schedule(); } } };
 }

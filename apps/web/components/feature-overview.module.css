@@ -1,0 +1,25 @@
+.overview { width: 100%; margin: 0 0 28px; border: 1px solid var(--line, #ddd); border-radius: 10px; background: var(--white, transparent); text-align: left; color: var(--ink, inherit); }
+.summary { padding: 16px 20px; min-height: 52px; cursor: pointer; font-size: 14px; line-height: 1.5; }
+.summary > span { font-weight: 550; margin-right: 14px; }
+.summary small { color: var(--muted, inherit); font-size: 12px; }
+.summary:focus-visible, .group > summary:focus-visible, .links a:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; border-radius: 4px; }
+.content { padding: 0 20px 20px; }
+.intro { max-width: 68ch; margin: 4px 0 18px; font-size: 14px; line-height: 1.7; color: var(--muted, inherit); }
+.groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 10px; }
+.group { min-width: 0; border: 1px solid var(--line, #ddd); border-radius: 8px; }
+.group > summary { cursor: pointer; padding: 15px; min-height: 68px; font-size: 14px; line-height: 1.5; }
+.group > summary span { font-weight: 550; }
+.group > summary small { display: block; padding-left: 17px; margin-top: 4px; font-size: 12px; color: var(--muted, inherit); }
+.group dl { margin: 0; padding: 0 16px 6px; }
+.group dl > div { margin: 0 0 17px; }
+.group dt { font-weight: 550; font-size: 13px; line-height: 1.6; }
+.group dd { margin: 4px 0 0; font-size: 13px; line-height: 1.75; color: var(--muted, inherit); overflow-wrap: anywhere; }
+.note { font-size: 12px; line-height: 1.75; margin: 18px 0 10px; color: var(--muted, inherit); }
+.links { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.links a { display: inline-flex; min-height: 44px; align-items: center; font-size: 12px; color: inherit; text-underline-offset: 4px; }
+.compact { width: min(100%, 568px); margin: 16px auto 0; border-color: transparent; background: transparent; }
+.compact:not([open]) > .summary { padding: 8px 12px; text-align: center; min-height: 44px; font-size: 12px; }
+.compact:not([open]) > .summary small { display: none; }
+.compact[open] { border-color: var(--line, #ddd); background: var(--white, transparent); }
+.compact .groups { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 680px) { .groups { grid-template-columns: minmax(0, 1fr); } .summary { padding: 14px; } .summary small { display: block; margin: 5px 0 0 16px; } .content { padding: 0 14px 14px; } .compact .content { padding: 0 12px 12px; } }

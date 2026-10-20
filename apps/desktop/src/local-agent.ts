@@ -1,3 +1,4 @@
+import { ComposerDraftStore, composerDraftKey, type ComposerDraft } from "./composer-drafts";
 import {
   realpath,
   stat,
@@ -24,6 +25,8 @@ import {
   runShell,
   runAgent as executeAgent,
   hostedModel,
+  startVoiceBridge,
+  type VoiceBridge,
   validateBaseURL,
   redactSecrets,
   type Approval,
@@ -76,6 +79,8 @@ export type LocalAgentOptions = {
   dataDirectory: string;
   emit: (event: DesktopEvent) => void;
   openExternal: (url: string) => Promise<void>;
+  /** Dedicated opener only for the freshly generated authenticated loopback companion. */
+  openVoiceCompanion?: (url: string) => Promise<void>;
   serverUrl?: string;
   /** Dependency injection for transport tests. Never exposed through IPC. */
   fetch?: (
@@ -103,6 +108,7 @@ function wait(milliseconds: number, signal: AbortSignal): Promise<void> {
 /** Main-process service. No filesystem handles or account credentials cross IPC. */
 export class LocalAgentService {
   private readonly directory: string;
+  private readonly composerDrafts: ComposerDraftStore;
   private readonly server: string;
   private readonly transport: (
     input: string | URL | Request,
@@ -132,6 +138,9 @@ export class LocalAgentService {
   private syncingConversations = false;
   private selectedModel?: string;
   private allowPromptTraining?: boolean;
+  private voiceSession?: { bridge: VoiceBridge; scope: string; runId?: string; turnId?: string; turnController?: AbortController; agentMode: DesktopRunInput["mode"] };
+  private voiceStarting = false;
+  private voiceGeneration = 0;
   private suggestionController?: AbortController;
   private suggestionRequestedAt = 0;
   private activeController?: AbortController;
@@ -149,6 +158,7 @@ export class LocalAgentService {
     this.directory = path.resolve(
       text(options.dataDirectory, "Application data directory", 4096),
     );
+    this.composerDrafts = new ComposerDraftStore(path.join(this.directory, "composer-drafts"));
     this.server = validateBaseURL(options.serverUrl || "https://freecoda.com");
     this.transport = options.fetch || globalThis.fetch;
     this.pause = options.wait || wait;
@@ -278,11 +288,28 @@ export class LocalAgentService {
     return result;
   }
   private emit(event: DesktopEvent) {
+    const voice = this.voiceSession;
+    if (voice) {
+      if ((event.type === "done" || event.type === "error") && event.runId && event.runId === voice.runId) {
+        voice.runId = undefined;
+        voice.turnController = undefined;
+        if (event.type === "done" && !event.cancelled) {
+          // The first voice turn may create this conversation's persistent ID.
+          // Navigation and account changes close the session before changing scope.
+          voice.scope = this.composerDraftScope();
+          voice.bridge.publish({ type: "assistant", text: event.text, turnId: voice.turnId });
+        } else voice.bridge.publish({ type: "stop", text: event.type === "done" ? "Voice turn interrupted." : event.text, turnId: voice.turnId });
+      }
+    }
+    if (voice && event.type === "state" && event.state.composerDraftKey !== voice.scope && !voice.runId) void this.stopVoice().catch(() => {});
     if (!this.disposed) this.options.emit(event);
   }
   private async emitState() {
     this.emit({ type: "state", state: await this.getState() });
   }
+  // State events often request the same explorer snapshot several times per action.
+  // File reads/writes still perform their normal fresh trust and path checks.
+  private workspaceFiles?: { root: string; expiresAt: number; files: DesktopWorkspace["files"] };
   private async workspace(): Promise<DesktopWorkspace | null> {
     if (!this.root) return null;
     const trusted = this.config.trustedRoots.includes(this.root);
@@ -290,7 +317,11 @@ export class LocalAgentService {
       root: this.root,
       name: path.basename(this.root) || this.root,
       trusted,
-      files: trusted ? await this.listFiles() : [],
+      files: trusted
+        ? this.workspaceFiles?.root === this.root && this.workspaceFiles.expiresAt > Date.now()
+          ? this.workspaceFiles.files
+          : await this.listFiles()
+        : [],
     };
   }
   async githubRepositories(): Promise<DesktopGitHubState> {
@@ -530,6 +561,7 @@ export class LocalAgentService {
         ...(this.allowPromptTraining === undefined ? {} : { allowPromptTraining: this.allowPromptTraining }),
       },
       running: !!this.activeController,
+      voiceActive: !!this.voiceSession,
       permissionPreset: this.permissionPreset,
       conversationMode: this.conversationMode,
       threads: this.threads.filter(t => !t.cloudDeleted && (!t.cloudOwner || t.cloudOwner === this.cloudAccountId)).map(({ id, title, updatedAt, archived }) => ({
@@ -539,6 +571,7 @@ export class LocalAgentService {
         updatedAt,
       })),
       activeThreadId: this.activeThreadId,
+      composerDraftKey: this.composerDraftScope(),
       conversation: this.messages
         .flatMap((message) => {
           if (message.role !== "user" && message.role !== "assistant")
@@ -573,6 +606,7 @@ export class LocalAgentService {
   }
   /** Called only after native selection, or after validating an exact saved recent root. */
   async selectWorkspace(directory: string, recentOnly = false) {
+    await this.stopVoice();
     this.cancelSuggestion();
     await this.initialize();
     this.check();
@@ -589,7 +623,10 @@ export class LocalAgentService {
         throw new Error("Choose a repository folder.");
       if (recentOnly && (root !== directory || !this.config.recentRoots.includes(root)))
         throw new Error("This recent folder has changed. Choose it again with the native folder picker.");
-      if (this.activeThreadId) await this.saveHistory();
+      // Navigation persists locally; cloud reconciliation remains on Refresh or a turn.
+      // Never hold a scope switch behind transport or run stale sync in a new scope.
+      if (this.activeThreadId) await this.saveHistory(false);
+      this.workspaceFiles = undefined;
       this.root = root;
       this.conversationMode = "coding";
       this.messages = [];
@@ -602,7 +639,7 @@ export class LocalAgentService {
         ...this.config.recentRoots.filter((item) => item !== root),
       ].slice(0, 12);
       await this.saveConfig();
-      if (this.config.trustedRoots.includes(root)) await this.restoreHistory();
+      if (this.config.trustedRoots.includes(root)) await this.restoreHistory(false);
       const workspace = (await this.workspace())!;
       await this.emitState();
       return workspace;
@@ -630,6 +667,7 @@ export class LocalAgentService {
       if (!this.config.trustedRoots.includes(this.root!)) {
         if (this.config.trustedRoots.length >= 50)
           throw new Error("The trusted repository limit has been reached.");
+        this.workspaceFiles = undefined;
         this.config.trustedRoots.push(this.root!);
         await this.saveConfig();
         await this.restoreHistory();
@@ -642,15 +680,18 @@ export class LocalAgentService {
     }
   }
   async listFiles() {
+    this.workspaceFiles = undefined;
     await this.initialize();
     const root = this.trustedRoot();
     const ws = await Workspace.open(root, async () => false);
     const files = await ws.files();
     if (this.root !== root) throw new Error("The selected repository changed.");
-    return files.map((file) => ({
+    const entries = files.map((file) => ({
       path: file,
       type: "file" as const,
     }));
+    this.workspaceFiles = { root, expiresAt: Date.now() + 1000, files: entries };
+    return entries;
   }
   private async rawFile(
     relative: string,
@@ -692,6 +733,7 @@ export class LocalAgentService {
     };
   }
   async setConversationMode(mode: "chat" | "coding"): Promise<DesktopState> {
+    await this.stopVoice();
     this.cancelSuggestion();
     await this.initialize();
     this.check();
@@ -705,11 +747,11 @@ export class LocalAgentService {
     if (mode === "coding") this.trustedRoot(true);
     this.workspaceChanging = true;
     try {
-      if (this.activeThreadId) await this.saveHistory();
+      if (this.activeThreadId) await this.saveHistory(false);
       this.conversationMode = mode;
       this.permissionPreset = "default";
       this.sessionApprovals.clear();
-      await this.restoreHistory();
+      await this.restoreHistory(false);
       await this.emitState();
       return this.getState();
     } finally {
@@ -849,6 +891,7 @@ export class LocalAgentService {
         controller.signal,
       );
       const result = await ws.write(input.path, input.content, original);
+      this.workspaceFiles = undefined;
       if (result.startsWith("User declined"))
         throw new Error("The file change was declined.");
       return await this.readFile(input.path);
@@ -895,6 +938,93 @@ export class LocalAgentService {
         finish();
       }
     }
+  }
+  async startVoice(input: { mode: "dictation" | "conversation"; agentMode: DesktopRunInput["mode"] }): Promise<void> {
+    await this.initialize();
+    this.check();
+    if (!input || !["dictation", "conversation"].includes(input.mode) || !["chat", "build", "plan", "review"].includes(input.agentMode)) throw Error("Choose a valid voice mode.");
+    if (this.voiceStarting || this.activeController || this.workspaceChanging || this.authChanging || this.loginController) throw Error("Finish the current action before opening voice.");
+    if ((input.agentMode === "chat") !== (this.conversationMode === "chat")) throw Error("Choose voice in the active conversation mode.");
+    if (input.mode === "conversation" && !this.config.token) throw Error("Sign in to Freecoda before starting a voice conversation.");
+    if (input.mode === "conversation" && this.conversationMode === "coding") this.trustedRoot();
+    if (!this.options.openVoiceCompanion) throw Error("The browser voice companion is unavailable in this desktop runtime.");
+    this.voiceStarting = true;
+    try {
+      await this.stopVoice();
+      const generation = this.voiceGeneration;
+      const scope = this.composerDraftScope();
+      const bridge = await startVoiceBridge({
+        title: "Freecoda desktop voice",
+        onTranscript: async ({ text, mode, turnId }) => {
+          const session = this.voiceSession;
+          if (!session || session.bridge !== bridge || session.scope !== this.composerDraftScope()) throw Error("The conversation changed. Open voice again in your current conversation.");
+          if (this.authChanging || this.workspaceChanging || this.loginController) throw Error("Wait for the current conversation change.");
+          const content = this.clean(text);
+          if (mode === "dictation") {
+            this.emit({ type: "voice-dictation", text: content, scope: session.scope });
+            return;
+          }
+          if (this.activeController || session.runId || session.turnController) throw Error("Wait for the current request before speaking again.");
+          if (!this.config.token) throw Error("Sign in before starting a voice conversation.");
+          session.turnId = turnId;
+          const turnController = new AbortController();
+          session.turnController = turnController;
+          try {
+            // Direct normal agent input, never a renderer slash-command dispatcher.
+            const run = await this.runAgent({ prompt: content, mode: session.agentMode }, session, turnController.signal);
+            if (this.voiceSession !== session) { if (this.activeRun?.id === run.runId) await this.cancelRun(); return; }
+            this.emit({ type: "voice-status", active: true, text: "Voice turn is running with normal conversation permissions." });
+          } catch (error) { if (session.turnController === turnController) { session.turnController = undefined; session.turnId = undefined; } throw error; }
+        },
+        onClose: () => {
+          if (this.voiceSession?.bridge === bridge) { this.voiceSession = undefined; this.emit({ type: "voice-status", active: false, text: "Voice companion closed." }); }
+        },
+        onControl: async (action, turnId) => {
+          const session = this.voiceSession;
+          if (turnId && turnId !== session?.turnId) return;
+          if (session?.bridge === bridge && (action === "stop" || action === "interrupt")) session.turnController?.abort();
+          if (session?.bridge === bridge && (action === "stop" || action === "interrupt") && session.runId && this.activeRun?.id === session.runId) await this.cancelRun();
+        },
+      });
+      // Do not open a companion for a scope that changed while the socket started.
+      if (generation !== this.voiceGeneration || scope !== this.composerDraftScope() || this.authChanging || this.workspaceChanging || this.disposed) { await bridge.close(); throw Error("The conversation changed before voice could open."); }
+      this.voiceSession = { bridge, scope, agentMode: input.agentMode };
+      try { await this.options.openVoiceCompanion(bridge.url); if (this.voiceSession?.bridge !== bridge) throw Error("Voice opening was cancelled."); }
+      catch (error) { await this.stopVoice(); throw error; }
+      this.emit({ type: "voice-status", active: true, text: "Voice companion is open. Start the microphone there; dictation remains editable here." });
+      await this.emitState();
+    } finally { this.voiceStarting = false; }
+  }
+  async stopVoice(): Promise<void> {
+    this.voiceGeneration++;
+    const session = this.voiceSession;
+    if (!session) return;
+    session.turnController?.abort();
+    // Keep ownership until its own running turn has been cancelled. Unrelated
+    // typed requests must never be cancelled by closing a voice companion.
+    if (session.runId && this.activeRun?.id === session.runId) await this.cancelRun();
+    if (this.voiceSession === session) this.voiceSession = undefined;
+    await session.bridge.close();
+    this.emit({ type: "voice-status", active: false, text: "Voice companion stopped. Microphone is off." });
+  }
+  private composerDraftScope(): string {
+    this.check();
+    return composerDraftKey({
+      server: this.server,
+      account: this.config.token ? (this.cloudAccountId ? `account:${this.cloudAccountId}` : `device:${hash(this.config.token)}`) : "anonymous",
+      workspace: this.historyScope() || "unselected-workspace",
+      thread: this.activeThreadId || "new-conversation",
+    });
+  }
+  async loadComposerDraft(): Promise<ComposerDraft> {
+    await this.initialize();
+    if (this.authChanging || this.loginController || this.workspaceChanging) throw Error("Wait for the conversation change before loading a draft.");
+    return this.composerDrafts.load(this.composerDraftScope());
+  }
+  async saveComposerDraft(input: ComposerDraft): Promise<{ saved: boolean }> {
+    await this.initialize();
+    if (!input || this.authChanging || this.loginController || this.workspaceChanging || input.key !== this.composerDraftScope()) return { saved: false };
+    return this.composerDrafts.save({ key: input.key, text: input.text, revision: input.revision });
   }
   cancelSuggestion(): void {
     this.suggestionController?.abort();
@@ -949,9 +1079,10 @@ export class LocalAgentService {
       if (this.suggestionController === controller) this.suggestionController = undefined;
     }
   }
-  async runAgent(input: DesktopRunInput) {
+  async runAgent(input: DesktopRunInput, voiceOwner?: NonNullable<LocalAgentService["voiceSession"]>, voiceSignal?: AbortSignal) {
     this.cancelSuggestion();
     await this.initialize();
+    voiceSignal?.throwIfAborted();
     if (this.extensionMutation) throw Error("Finish installing extensions before starting a task.");
     const chat = input?.mode === "chat";
     if (chat !== (this.conversationMode === "chat"))
@@ -966,18 +1097,52 @@ export class LocalAgentService {
       throw new Error("A task or repository change is already running.");
     if (!input || !["chat", "build", "plan", "review"].includes(input.mode))
       throw new Error("Choose chat, build, plan, or review mode.");
+    const requestScope = this.composerDraftScope();
+    const requestToken = this.config.token;
+    const assertRequestScope = () => {
+      if (this.authChanging || this.workspaceChanging || this.loginController || requestToken !== this.config.token || requestScope !== this.composerDraftScope())
+        throw Error("The conversation changed before this request could start.");
+    };
     const active = this.threads.find(thread => thread.id === this.activeThreadId);
     if (active?.cloudLoaded === false && this.config.token) {
-      const { conversation } = await this.api(`conversations/${active.id}`) as { conversation: { messages: ModelMessage[]; version: number } };
+      const { conversation } = await this.api(`conversations/${active.id}`, undefined, voiceSignal) as { conversation: { messages: ModelMessage[]; version: number } };
+      voiceSignal?.throwIfAborted();
+      assertRequestScope();
+      if (voiceOwner && (this.voiceSession !== voiceOwner || voiceOwner.scope !== this.composerDraftScope())) throw Error("The voice conversation changed.");
       active.messages = conversation.messages; active.cloudVersion = conversation.version; active.cloudLoaded = true; this.messages = active.messages;
     }
+    assertRequestScope();
     const prompt = text(input.prompt, "Prompt", 20_000);
     if (!this.config.token)
       throw new Error("Sign in to Freecoda before running a task.");
+    voiceSignal?.throwIfAborted();
+    if (voiceOwner && (this.voiceSession !== voiceOwner || voiceOwner.scope !== this.composerDraftScope())) throw Error("The voice conversation changed.");
+    if (this.activeController) throw Error("A task is already running.");
+    const runContext = { token: this.config.token, root: this.root, mode: this.conversationMode };
+    const migrateRunDraft = (from: string) => {
+      if (this.config.token !== runContext.token || this.root !== runContext.root || this.conversationMode !== runContext.mode) return;
+      const to = this.composerDraftScope();
+      if (from !== to) this.emit({ type: "composer-scope-migrated", from, to });
+      if (voiceOwner && this.voiceSession === voiceOwner) voiceOwner.scope = to;
+    };
+    // Establish a stable thread before the first run state is visible, so typing
+    // the next message during a slow model response already uses its final scope.
+    if (!this.activeThreadId) {
+      if (this.threads.length >= 100) throw Error("The conversation limit has been reached.");
+      const from = this.composerDraftScope();
+      this.activeThreadId = randomUUID();
+      this.threads.push({ id: this.activeThreadId, title: "New conversation", updatedAt: new Date().toISOString(), messages: this.messages });
+      migrateRunDraft(from);
+    }
     const id = randomUUID(),
       controller = (this.activeController = new AbortController());
+    if (voiceOwner) {
+      voiceOwner.runId = id;
+      this.emit({ type: "voice-turn", text: prompt, scope: voiceOwner.scope });
+    }
     const completion = (async () => {
       try {
+        await this.saveHistory(false);
         const catalog = (await this.api(
           "models",
           undefined,
@@ -1031,7 +1196,9 @@ export class LocalAgentService {
             }),
         });
         this.messages = result.messages;
+        const previousDraftScope = this.composerDraftScope();
         await this.saveHistory();
+        migrateRunDraft(previousDraftScope);
         this.emit({ type: "done", runId: id, text: this.clean(result.text) });
       } catch (error) {
         if (controller.signal.aborted)
@@ -1052,6 +1219,7 @@ export class LocalAgentService {
             ).slice(0, 1000),
           });
       } finally {
+        this.workspaceFiles = undefined;
         if (this.activeRun?.id === id) this.activeRun = undefined;
         if (this.activeController === controller)
           this.activeController = undefined;
@@ -1140,7 +1308,7 @@ export class LocalAgentService {
       this.emit({ type: "auth", signedIn: !!this.config.token, message: "Cloud conversation sync is unavailable. Your local copy is preserved and will retry on the next conversation refresh or turn." });
     } finally { this.syncingConversations = false; }
   }
-  private async restoreHistory() {
+  private async restoreHistory(sync = true) {
     this.messages = [];
     this.threads = [];
     this.activeThreadId = undefined;
@@ -1194,9 +1362,9 @@ export class LocalAgentService {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
-    await this.syncConversations(true);
+    if (sync) await this.syncConversations(true);
   }
-  private async saveHistory() {
+  private async saveHistory(sync = true) {
     if (!this.activeThreadId) {
       this.activeThreadId = randomUUID();
       this.threads.push({
@@ -1226,7 +1394,7 @@ export class LocalAgentService {
         "Conversation history reached its limit. Clear a thread before starting a new task.",
       );
     await this.savePrivate(this.historyFile(), value);
-    await this.syncConversations(true);
+    if (sync) await this.syncConversations(true);
   }
   private threadChangeAllowed() {
     if (this.conversationMode === "coding") this.trustedRoot();
@@ -1235,6 +1403,7 @@ export class LocalAgentService {
       throw Error("Finish the current action before switching conversations.");
   }
   private async changeThread<T>(action: () => Promise<T>): Promise<T> {
+    await this.stopVoice();
     this.cancelSuggestion();
     await this.initialize();
     this.threadChangeAllowed();
@@ -1518,6 +1687,7 @@ export class LocalAgentService {
     return value;
   }
   async login(): Promise<DesktopLogin> {
+    await this.stopVoice();
     this.cancelSuggestion();
     await this.initialize();
     if (this.activeController || this.authChanging)
@@ -1588,6 +1758,9 @@ export class LocalAgentService {
           )
             throw new Error("The server returned an invalid device token.");
           this.config.token = result.token;
+          // A newly approved device credential may belong to another account.
+          // Never persist or reuse the previous account identity if sync fails.
+          delete this.config.accountId;
           this.cloudAccountId = undefined;
           this.messages = [];
           this.activeThreadId = undefined;
@@ -1634,6 +1807,7 @@ export class LocalAgentService {
     };
   }
   async logout() {
+    await this.stopVoice();
     this.cancelSuggestion();
     await this.initialize();
     if (this.authChanging)
@@ -1676,10 +1850,12 @@ export class LocalAgentService {
     return this.publicValue(await this.api("usage"));
   }
   async dispose() {
+    await this.stopVoice();
     this.cancelSuggestion();
     this.disposed = true;
     this.loginController?.abort();
     await this.cancelRun();
+    await this.composerDrafts.flush();
     this.disposed = true;
     this.sessionApprovals.clear();
     this.secrets.clear();

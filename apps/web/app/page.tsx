@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowDownToLine, ArrowUpRight, Terminal } from "lucide-react";
+import { FeatureOverview } from "@/components/feature-overview";
 import { Install } from "@/components/install";
 import { GitHubIcon } from "@/components/github-icon";
 
@@ -24,6 +25,7 @@ export default function Home() {
             <p className="marketing-cli-requirements">Requires Node.js 22+ and npm. Follow the installer’s PATH instructions, then run <code>freecoda</code>.</p>
           </section>
         </div>
+        <FeatureOverview />
         <figure className="marketing-product">
           <div className="marketing-product-frame">
             <Image src="/images/freecoda-desktop-0.1.8-preview.webp" alt="Freecoda desktop interface with workspace navigation and a conversation composer." width={1480} height={950} priority sizes="(max-width: 1120px) 100vw, 1040px" />

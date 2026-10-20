@@ -98,7 +98,7 @@ export function UnifiedWebApp({ initialView, initialThreadId, user }: { initialV
       </div>
       <section className={styles.conversationSurface} hidden={!conversationBounds || conversationBounds.width <= 0 || conversationBounds.height <= 0} style={conversationBounds || undefined} aria-label="Conversation">
         <div className={styles.chatSurface} hidden={view !== "chat"}>
-          <Chat embedded initialThreadId={initialThreadId} onOpenWorkspace={(command = "/project") => {
+          <Chat embedded voiceVisible={view === "chat"} initialThreadId={initialThreadId} onOpenWorkspace={(command = "/project") => {
             if (!["/project", "/repos"].includes(command.trim().split(/\s+/)[0].toLowerCase())) selectView("workspace");
             window.dispatchEvent(new CustomEvent("freecoda:project-command", { detail: { command } }));
           }} />

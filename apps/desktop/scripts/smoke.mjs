@@ -173,6 +173,7 @@ try {
   // Observe requests without adding a test-only network policy: the shipped CSP
   // must independently reject the fetch probe below.
   await client.send("Runtime.enable");
+  await client.send("Emulation.setFocusEmulationEnabled", { enabled: true });
 
   let initial;
   while (Date.now() < deadline) {
@@ -197,6 +198,21 @@ try {
     "Smoke profile must be signed out.",
   );
   assert.deepEqual(initial.state.recentFolders, []);
+  assert.equal(initial.state.voiceActive, false, "Voice must remain off at startup.");
+  assert.match(initial.text, /Voice privacy and support/);
+  const voiceControls = await client.evaluate(`({ dictate: !document.getElementById('voice-dictate').disabled, conversationDisabled: document.getElementById('voice-chat').disabled, stopHidden: document.getElementById('voice-stop').hidden, refreshDisabled: document.getElementById('refresh-chats').disabled })`);
+  assert.deepEqual(voiceControls, { dictate: true, conversationDisabled: true, stopHidden: true, refreshDisabled: true }, "Signed-out desktop allows editable dictation but cannot start hosted live turns or cloud refresh.");
+  const featureGuide = await client.evaluate(`(() => {
+    const guide = document.querySelector('.welcome-feature-guide');
+    const collapsed = !guide.open;
+    guide.querySelector('summary').click();
+    const groups = [...guide.querySelectorAll('.welcome-feature-groups > details')];
+    groups.forEach(group => group.querySelector('summary').click());
+    const result = { collapsed, expanded: guide.open, groups: groups.length, allOpen: groups.every(group => group.open), overflow: document.documentElement.scrollWidth > innerWidth };
+    guide.open = false;
+    return result;
+  })()`);
+  assert.deepEqual(featureGuide, { collapsed: true, expanded: true, groups: 6, allOpen: true, overflow: false }, "Feature guide must start collapsed and expand accessibly without horizontal overflow.");
   for (const key of ["requireType", "processType", "ipcType", "electronType"])
     assert.equal(
       initial[key],
@@ -209,6 +225,36 @@ try {
     !initial.csp.includes("unsafe-eval") &&
       !initial.csp.includes("unsafe-inline"),
   );
+
+  await client.send("Page.bringToFront");
+  const persistedDraft = "  Native draft recovery\n  keep indentation 🌿  ";
+  await client.evaluate(`(async () => {
+    const prompt = document.getElementById('prompt');
+    prompt.value = ${JSON.stringify(persistedDraft)};
+    prompt.dispatchEvent(new Event('input', {bubbles:true}));
+    await window.flushComposerDraft();
+  })()`, "save exact composer draft");
+  await client.evaluate("globalThis.__freecodaDraftSmokeReload = true");
+  await client.send("Page.reload");
+  let restored = false;
+  while (Date.now() < deadline) {
+    restored = await client.evaluate(`!globalThis.__freecodaDraftSmokeReload && document.readyState === 'complete' && document.getElementById('prompt')?.value === ${JSON.stringify(persistedDraft)}`);
+    if (restored) break;
+    await pause(50);
+  }
+  assert(restored, "Saved composer draft must survive a renderer restart.");
+  const feedback = await client.evaluate(`(async () => {
+    const prompt = document.getElementById('prompt');
+    prompt.blur(); prompt.focus();
+    const status = document.getElementById('composer-suggestion-status');
+    const unavailable = status.dataset.state === 'unavailable' && status.textContent.includes('Sign in');
+    prompt.blur();
+    const dismissed = status.textContent === '';
+    prompt.value = ''; prompt.dispatchEvent(new Event('input', {bubbles:true}));
+    await window.flushComposerDraft();
+    return {unavailable,dismissed,active:document.activeElement?.id,state:status.dataset.state,text:status.textContent,disabled:prompt.disabled};
+  })()`, "signed-out suggestion feedback without alerts");
+  assert(feedback.unavailable && feedback.dismissed, JSON.stringify(feedback));
 
   const navigation = await client.evaluate(`(() => {
     const controls = [...document.querySelectorAll('.titlebar-actions > button, .titlebar-actions > label')];

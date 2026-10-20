@@ -41,7 +41,11 @@ const api: DesktopBridge = {
   runCommand: (input) => ipcRenderer.invoke("desktop:runCommand", input),
   runAgent: (input) => ipcRenderer.invoke("desktop:runAgent", input),
   suggestPrompt: (input) => ipcRenderer.invoke("desktop:suggestPrompt", input),
+  loadComposerDraft: () => ipcRenderer.invoke("desktop:loadComposerDraft"),
+  saveComposerDraft: (input) => ipcRenderer.invoke("desktop:saveComposerDraft", input),
   cancelSuggestion: () => ipcRenderer.invoke("desktop:cancelSuggestion"),
+  startVoice: (input) => ipcRenderer.invoke("desktop:startVoice", input),
+  stopVoice: () => ipcRenderer.invoke("desktop:stopVoice"),
   cancelRun: () => ipcRenderer.invoke("desktop:cancelRun"),
   respondApproval: (input) =>
     ipcRenderer.invoke("desktop:respondApproval", input),
