@@ -449,15 +449,15 @@ kbd {
   color: light-dark(#95899f, #b7adc5);
 }
 .editor-status {
-  height: 26px;
+  min-height: 32px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  padding: 0 15px;
+  padding: 8px 15px;
   border-top: 1px solid light-dark(#f0edf5, #393143);
   color: light-dark(#7d6d8c, #baa6df);
-  font: 9px var(--mono);
+  font: 11px var(--mono);
 }
 .output-pane {
   height: 182px;
@@ -471,8 +471,8 @@ kbd {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 13px;
-  height: 36px;
+  padding: 8px 13px;
+  min-height: 44px;
   border-bottom: 1px solid light-dark(#eeebf3, #393143);
   flex-shrink: 0;
 }
@@ -533,12 +533,12 @@ kbd {
   min-width: 0;
 }
 .agent-header {
-  height: 47px;
+  min-height: 47px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--line);
-  padding: 0 16px;
+  padding: 8px 16px;
   flex-shrink: 0;
 }
 .agent-header > div {
@@ -560,7 +560,7 @@ kbd {
   justify-content: space-between;
   gap: 12px;
   padding: 11px 17px;
-  font-size: 9px;
+  font-size: 12px;
   color: light-dark(#7d6d8c, #baa6df);
   border-bottom: 1px solid light-dark(#efebf5, #393143);
   flex-shrink: 0;
@@ -888,7 +888,7 @@ dialog p {
   margin-top: 24px;
 }
 .dialog-caption {
-  font-size: 9px !important;
+  font-size: 12px !important;
   color: light-dark(#7d6d8c, #baa6df) !important;
   margin: 16px 0 0 !important;
 }
@@ -1427,7 +1427,7 @@ textarea {
 }
 .agent-header {
   height: 46px;
-  padding: 0 25px;
+  padding: 8px 25px;
   border-bottom: 0;
 }
 .agent-header strong {
@@ -1619,8 +1619,8 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 46px;
-  padding: 0 15px;
+  min-height: 46px;
+  padding: 8px 15px;
   border-bottom: 1px solid var(--line);
   flex-shrink: 0;
 }
@@ -2510,3 +2510,45 @@ dialog.settings-dialog .extension-actions { flex-wrap: wrap; justify-content: fl
 .desktop-voice-actions button:disabled { opacity: .45; cursor: default; }
 .desktop-voice p { margin: 5px 0; line-height: 1.5; }
 .desktop-voice summary { cursor: pointer; }
+
+/* Align the desktop navigation and conversation with the web client. */
+.sidebar-brand { margin-bottom: 12px; font-weight: 700; letter-spacing: -0.025em; }
+.sidebar-primary { margin-bottom: 14px; }
+#new-chat { min-height: 40px; border: 1px solid color-mix(in srgb, var(--purple) 28%, var(--line)); background: var(--white); font-weight: 620; }
+#new-chat:hover { border-color: color-mix(in srgb, var(--purple) 55%, var(--line)); }
+.sidebar-heading, .sidebar-section-label { letter-spacing: 0.01em; }
+.desktop-sessions > summary { border-radius: 7px; font-weight: 600; }
+.desktop-sessions > summary:hover, .desktop-session-select:hover { background: var(--pale); }
+.agent-header { min-height: 54px; height: auto; }
+.agent-header strong { font-weight: 650; letter-spacing: -0.02em; }
+.conversation { padding-bottom: 36px; }
+.message { max-width: 72ch; }
+.message.user { max-width: min(86%, 62ch); }
+.composer { border-radius: 16px; }
+.chat-welcome { max-width: 700px; margin: 0 auto; text-align: left; }
+.chat-welcome .welcome-identity { justify-content: flex-start; }
+.chat-welcome h2 { margin-top: 24px; font-size: clamp(32px, 3.6vw, 46px); line-height: 1.1; letter-spacing: -.05em; }
+.chat-welcome > #chat-welcome-description { max-width: 42ch; font-size: 15px; line-height: 1.6; }
+.chat-welcome .prompt-suggestions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 28px; }
+.chat-welcome .prompt-suggestions button { min-height: 100px; padding: 17px; border-radius: 12px; background: var(--white); text-align: left; }
+.chat-welcome .prompt-suggestions button strong { font-size: 14px; font-weight: 650; }
+.chat-welcome .prompt-suggestions button span { font-size: 12px; line-height: 1.5; }
+.chat-welcome > .welcome-command-hint { margin-top: 22px; text-align: left; }
+.chat-welcome .welcome-feature-guide { width: 100%; max-width: none; margin-top: 24px; }
+.chat-welcome details > summary { margin-left: 0; }
+.chat-welcome .welcome-feature-intro, .chat-welcome .welcome-feature-groups { text-align: left; }
+.desktop-session-help, .workspace-empty, .workspace-details, .folder-path, .sidebar-section-label, .sidebar-heading { font-size: 12px; }
+.composer-hint, .model-privacy-note, .permission-note, .welcome-command-hint { font-size: 12px; line-height: 1.5; }
+.chat-welcome .welcome-feature-guide, .chat-welcome details li { font-size: 12px; line-height: 1.6; }
+.cloud-workspace-section .workspace-empty, .workspace-conversations .workspace-empty { font-size: 12px; }
+.chat-welcome > .welcome-command-hint, .composer-suggestion-status { font-size: 12px; }
+.workspace-conversations .chat-history-search input::placeholder { color: var(--muted); opacity: 1; }
+.workbench-heading, .output-header, .agent-header { height: auto; min-height: 46px; padding-block: 8px; }
+.editor-status { height: auto; min-height: 32px; padding-block: 8px; font-size: 11px; }
+.agent-context { padding-block: 9px; font-size: 12px; }
+.output-header [role="tab"] { min-height: 30px; padding-inline: 8px; font-size: 11px; }
+#account-dialog .dialog-caption { font-size: 12px; line-height: 1.6; }
+@media (max-width: 740px) {
+  .chat-welcome .prompt-suggestions { grid-template-columns: 1fr; }
+  .chat-welcome .prompt-suggestions button { min-height: 74px; }
+}

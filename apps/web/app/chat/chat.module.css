@@ -878,3 +878,18 @@
   .threadHeading small { font-size: 9px; }
 }
 @media (prefers-reduced-motion: reduce) { .delete { transition: none; } }
+
+/* Give conversation content room while keeping controls easy to find. */
+.welcomeContainer { width: min(100%, 800px); }
+.messages { max-width: 880px; gap: 38px; }
+.assistantMessage { max-width: 72ch; }
+.userMessage { max-width: min(85%, 62ch); }
+.composerArea { max-width: 880px; }
+.composer { border-radius: 16px; }
+.search:focus-within { border-color: color-mix(in srgb, #8068ce 60%, var(--chat-line)); }
+.historyRow:focus-within { background: var(--chat-hover); border-radius: 8px; }
+@media (max-width: 760px) {
+  .messages { gap: 28px; }
+  .assistantMessage { max-width: calc(100% - 38px); }
+  .userMessage { max-width: 90%; }
+}

@@ -734,21 +734,22 @@ export class TerminalScreen {
     const inner = columns - 4;
     const inputRowCount = rows < 20 ? 2 : 3;
     const lines: string[] = [];
-    const cardWidth = Math.min(columns, 76);
+    const cardWidth = Math.min(columns - 4, 76);
     const card = (text: string, accent = false) => {
       const content = clip(text, cardWidth - 4);
       return (
-        palette.muted("│ ") +
+        palette.muted("  │ ") +
         (accent ? c.bold(palette.accent(content)) : content) +
         " ".repeat(Math.max(0, cardWidth - 3 - textWidth(content))) +
         palette.muted("│")
       );
     };
-    lines.push("  " + c.bold(palette.accent("freecoda")) + palette.muted("  /help for commands"));
-    lines.push(palette.muted("╭" + "─".repeat(cardWidth - 2) + "╮"));
-    lines.push(card(this.mode === "chat" ? "General chat · no repository tools" : `${this.mode === "build" ? "Build" : this.mode === "plan" ? "Plan" : "Review"} · ${this.permissions}`, true));
-    lines.push(card(`Workspace: ${this.root}`));
-    lines.push(palette.muted("╰" + "─".repeat(cardWidth - 2) + "╯"));
+    const helpLabel = columns >= 72 ? "help /help   mode /mode   quit /exit" : columns >= 54 ? "/help · /mode" : "/help";
+    lines.push("  " + c.bold(palette.accent("✳  FREECODA")) + palette.muted("   " + helpLabel));
+    lines.push(palette.muted("  ╭" + "─".repeat(cardWidth - 2) + "╮"));
+    lines.push(card(this.mode === "chat" ? "GENERAL CHAT   No repository access" : `${this.mode === "build" ? "Build" : this.mode === "plan" ? "Plan" : "Review"} · ${this.permissions}`, true));
+    lines.push(card(`Location   ${this.root}`));
+    lines.push(palette.muted("  ╰" + "─".repeat(cardWidth - 2) + "╯"));
     const commands = this.commandMatches();
     const menuSize = Math.min(
       commands.length,
