@@ -6,7 +6,8 @@
   --button-dark-fg: light-dark(#fff, #251b35);
   --paper: light-dark(#fafbfe, #17151f);
   --ink: light-dark(#262536, #eee8f5);
-  --muted: light-dark(#747586, #b1a6c0);
+  --muted: light-dark(#666779, #b1a6c0);
+  --focus-ring: light-dark(#6853d8, #b19aef);
   --purple: light-dark(#6853d8, #b19aef);
   --pale: light-dark(#efedfb, #30263f);
   --line: light-dark(#e4e5ee, #393143);
@@ -51,8 +52,9 @@ button:disabled {
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,
-textarea:focus-visible {
-  outline: 3px solid light-dark(#9b89ef, #393143);
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 3px solid var(--focus-ring);
   outline-offset: 4px;
 }
 button {
@@ -1787,7 +1789,7 @@ textarea::placeholder {
   opacity: 1;
 }
 select:focus-visible {
-  outline: 3px solid light-dark(#9b89ef, #b19aef);
+  outline: 3px solid var(--focus-ring);
   outline-offset: 4px;
 }
 input:-webkit-autofill {

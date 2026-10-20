@@ -9,6 +9,7 @@
   "main": "dist/main.cjs",
   "scripts": {
     "build": "bun build.ts",
+    "dev": "bun dev.ts",
     "typecheck": "tsc --noEmit",
     "start": "electron .",
     "package": "electron-builder --publish never"

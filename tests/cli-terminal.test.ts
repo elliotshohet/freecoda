@@ -32,7 +32,7 @@ test("terminal theme follows explicit preferences and standard foreground/backgr
 });
 
 const ptyDriver = String.raw`
-import os,pty,select,subprocess,sys,time,json,fcntl,termios,struct
+import os,pty,select,subprocess,sys,time,json,fcntl,termios,struct,signal,re
 node,entry,root,config=sys.argv[1:]
 master,slave=pty.openpty()
 fcntl.ioctl(slave,termios.TIOCSWINSZ,struct.pack('HHHH',30,100,0,0))
@@ -82,12 +82,28 @@ try:
  time.sleep(.2)
  assert child.poll() is None,'Pasted slash command exited the application'
  send('\x03') # clear the composer; not an exit while text exists
+ fcntl.ioctl(master,termios.TIOCSWINSZ,struct.pack('HHHH',16,80,0,0));child.send_signal(signal.SIGWINCH)
  start=len(output);send('Fix addition. Do not run commands.');send('\r')
  wait_for('Allow file changes?',start)
  assert 'a - b' in open(os.path.join(root,'sum.ts')).read(),'Write happened before approval'
  wait_for('2. Yes, allow ALL file edits for this session',start)
+ frame=output[start:].split(b'\x1b[H')[-1].decode(errors='replace')
+ assert 'a - b' in frame and 'a + b' in frame,'Short terminal hid approval diff evidence'
+ assert 'Session approval covers ALL' in frame,'Short terminal hid category warning'
+ assert len(frame.split('\r\n'))<=16,'Frame exceeded actual terminal height'
+ fcntl.ioctl(master,termios.TIOCSWINSZ,struct.pack('HHHH',16,30,0,0));child.send_signal(signal.SIGWINCH)
+ wait_for('Resize terminal',len(output))
+ send('1');send('\r')
+ assert 'a - b' in open(os.path.join(root,'sum.ts')).read(),'Invisible approval was accepted while terminal was too small'
+ frame=output.split(b'\x1b[H')[-1].decode(errors='replace')
+ clean=re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]','',frame)
+ assert all(len(line)<=30 for line in clean.split('\r\n')),'Resize notice exceeded actual width'
+ fcntl.ioctl(master,termios.TIOCSWINSZ,struct.pack('HHHH',16,80,0,0));child.send_signal(signal.SIGWINCH)
+ time.sleep(.1)
+
  send('\x1b[B');send('\x1b[B');send('\r')
  wait_for('No changes approved',start)
+ fcntl.ioctl(master,termios.TIOCSWINSZ,struct.pack('HHHH',30,100,0,0));child.send_signal(signal.SIGWINCH)
  assert 'a - b' in open(os.path.join(root,'sum.ts')).read(),'Denied write changed source'
  start=len(output);send('Fix addition. Do not run commands.');send('\r')
  wait_for('Allow file changes?',start)

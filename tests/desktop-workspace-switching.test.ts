@@ -61,3 +61,30 @@ test("workspace and chat switching restore local selections without waiting for 
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("open workspaces persist independently of recent-folder eviction and retain picker authorization", async () => {
+  const directory = await realpath(await mkdtemp(path.join(tmpdir(), "freecoda-open-workspaces-")));
+  const data = path.join(directory, "data");
+  const roots = Array.from({ length: 13 }, (_, index) => path.join(directory, `workspace-${index}`));
+  for (const root of roots) await mkdir(root);
+  const options = { dataDirectory: data, emit() {}, async openExternal() {} };
+  let service = new LocalAgentService(options);
+  try {
+    for (const root of roots) await service.selectWorkspace(root);
+    const opened = await service.getState();
+    expect(opened.openFolders.map(folder => folder.root)).toEqual(roots);
+    expect(opened.openFolders.every(folder => !folder.trusted)).toBe(true);
+    expect(opened.recentFolders).toHaveLength(12);
+    expect(opened.recentFolders.some(folder => folder.root === roots[0])).toBe(false);
+    await service.dispose();
+    service = new LocalAgentService(options);
+    expect((await service.getState()).openFolders.map(folder => folder.root)).toEqual(roots);
+    await service.openRecentFolder(roots[0]);
+    expect((await service.getState()).workspace?.root).toBe(roots[0]);
+    expect((await service.getState()).openFolders.map(folder => folder.root)).toEqual(roots);
+    await expect(service.openRecentFolder(directory)).rejects.toThrow("native folder picker");
+  } finally {
+    await service.dispose();
+    await rm(directory, { recursive: true, force: true });
+  }
+});

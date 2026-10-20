@@ -16,14 +16,22 @@ import {
   type IpcMainInvokeEvent,
 } from "electron";
 import path from "node:path";
+import { readFileSync, watchFile, unwatchFile } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
 import { APP_URL, assetPath, externalURL, isAppDocument } from "./security";
 import { LocalAgentService } from "./local-agent";
+import { DesktopSessionManager } from "./desktop-session-manager";
+import type { DesktopCreateSessionInput } from "./desktop-sessions";
+import { DesktopTerminalManager, type TerminalLaunchRequest } from "./interactive-terminal";
+import { discoverExternalAgents } from "./external-agents";
 import type { DesktopEvent } from "./shared";
 import { autoUpdater } from "electron-updater";
 import { DesktopUpdates } from "./updater";
+import { openVoicePanel, type VoicePanelHandle } from "./voice-panel";
+import { DesktopPreview } from "./preview-panel";
+import type { DesktopPreviewInput } from "./shared";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -40,7 +48,15 @@ app.setName("Freecoda");
 if (process.platform === "win32") app.setAppUserModelId("com.freecoda.desktop");
 const assetsDirectory = path.join(app.getAppPath(), "dist");
 let window: BrowserWindow | null = null;
+let preview: DesktopPreview | undefined;
+let voicePanel: VoicePanelHandle | undefined;
+let nativeModalOpen = false;
 let service: LocalAgentService;
+let sessions: DesktopSessionManager;
+let terminals: DesktopTerminalManager | undefined;
+let terminalGeneration = 0;
+const sessionContextEpochs = new Map<string, number>();
+const contextChangingIPC = new Set(["openFolder", "openRecentFolder", "trustWorkspace", "setConversationMode", "createThread", "openThread", "setThreadArchived", "deleteThread", "clearHistory", "refreshConversations", "setPermissions"]);
 let quitting = false;
 let closing = false;
 let updates: DesktopUpdates | undefined;
@@ -97,6 +113,7 @@ async function confirmQuit() {
       : await dialog.showMessageBox(options);
     if (result.response !== 1) return;
     if (window && !window.isDestroyed()) await window.webContents.executeJavaScript("globalThis.flushComposerDraft?.()", true);
+    await stopTerminals();
     await service.dispose();
     updates?.dispose();
     quitting = true;
@@ -112,7 +129,7 @@ const openExternal = async (value: string) => {
 };
 const emit = (event: DesktopEvent) => {
   if (window && !window.isDestroyed())
-    window.webContents.send("desktop:event", event);
+    try { window.webContents.send("desktop:event", event); } catch { /* Closing the renderer must not interrupt a service run. */ }
 };
 function validateSender(event: IpcMainInvokeEvent) {
   if (
@@ -125,6 +142,10 @@ function validateSender(event: IpcMainInvokeEvent) {
 }
 async function chooseFolder() {
   if (!window) return null;
+  const owner = sessions.snapshot().activeSessionId;
+  if (terminals?.list(owner).length) throw Error("Close the interactive terminal before changing folders.");
+  sessionContextEpochs.set(owner, (sessionContextEpochs.get(owner) || 0) + 1);
+  if (!await window.webContents.executeJavaScript("globalThis.prepareSessionSwitch?.() ?? false")) throw Error("Save editor changes and finish pending commands or dialogs before choosing a folder.");
   const current = await service.getState();
   if (current.running)
     throw new Error("Stop the active task before changing folders.");
@@ -153,23 +174,79 @@ async function openRecentFolder(root: string) {
   const current = await service.getState();
   if (current.running)
     throw new Error("Stop the active task before changing folders.");
-  if (typeof root !== "string" || !current.recentFolders.some(folder => folder.root === root))
+  if (typeof root !== "string" || ![...current.recentFolders, ...current.openFolders].some(folder => folder.root === root))
     throw new Error("Choose this folder with the native folder picker first.");
-  if (current.workspace) {
-    const { response } = await dialog.showMessageBox(window, {
-      type: "question",
-      buttons: ["Keep current folder", "Open recent folder"],
-      defaultId: 0,
-      cancelId: 0,
-      message: "Switch project folders?",
-      detail: "Save any unsaved editor changes before switching. Changes in the editor will be discarded.",
-    });
-    if (response !== 1) return null;
-  }
   return service.openRecentFolder(root);
+}
+async function stopTerminals() {
+  terminalGeneration++;
+  const previous = terminals; terminals = undefined;
+  await previous?.dispose();
+}
+function terminalManager() {
+  return terminals ??= new DesktopTerminalManager({
+    emit: event => emit({ type: "terminal-event", event }),
+    authorize: async request => {
+      if (!window || window.isDestroyed() || nativeModalOpen) throw Error("Close the current dialog before connecting a terminal.");
+      const owner = sessions.snapshot().activeSessionId;
+      const generation = terminalGeneration;
+      const contextEpoch = sessionContextEpochs.get(owner) || 0;
+      const source = sessions.currentService();
+      const before = await source.getState();
+      const account = await source.sessionAccountScope();
+      if (request.mode !== "build" || !before.auth.signedIn || before.conversationMode !== "coding" || !before.workspace?.trusted || before.workspace.root !== request.root || before.permissionPreset !== "full-access") throw Error("Select a trusted coding folder in Build mode with command permissions first.");
+      const name = request.agentId === "codex" ? "Codex" : request.agentId === "claude" ? "Claude Code" : "an interactive shell";
+      const result = await dialog.showMessageBox(window, {
+        type: "warning", title: "Connect interactive terminal", buttons: ["Cancel", "Connect"], defaultId: 0, cancelId: 0,
+        message: `Open ${name} in ${before.workspace.name}?`,
+        detail: `Folder: ${before.workspace.root}\n\nThis interactive process runs as your user, can access files outside this folder, and is not an OS sandbox. Typed input is sent directly to the process; Freecoda tool approvals do not mediate its commands. ${request.agentId ? "The agent uses its own existing sign-in, configuration, approvals and billing, not Freecoda's free hosted allowance. No credentials are copied or installation performed." : "Only start commands you intend to run. Close the terminal before this workspace's managed agent can modify files."}`,
+      });
+      if (result.response !== 1) throw Error("Terminal connection cancelled.");
+      const current = await source.getState();
+      const isCurrent = () => generation === terminalGeneration && contextEpoch === (sessionContextEpochs.get(owner) || 0) && sessions.snapshot().activeSessionId === owner && !nativeModalOpen && !!window && !window.isDestroyed();
+      if (!isCurrent() || account !== await source.sessionAccountScope() || !current.auth.signedIn || current.conversationMode !== "coding" || current.workspace?.root !== request.root || !current.workspace.trusted || current.permissionPreset !== "full-access") throw Error("The account, workspace or permissions changed. Connect again explicitly.");
+      const release = await sessions.reserveExternalWorkspace(request.root, owner);
+      if (!isCurrent()) { release(); throw Error("The selected session changed before terminal connection."); }
+      return { root: request.root, ownerKey: owner, release, isCurrent };
+    },
+  });
+}
+async function prepareSessionChange() {
+  if (!window || window.isDestroyed() || !await window.webContents.executeJavaScript("globalThis.prepareSessionSwitch?.() ?? false")) throw Error("Save editor changes and finish current commands, queued input or dialogs before switching sessions.");
+  await service.stopVoice();
+  preview?.dispose(); preview = undefined;
 }
 function installIPC() {
   const methods = {
+    terminalAvailability: () => terminalManager().availability(),
+    listExternalAgents: () => discoverExternalAgents(),
+    terminalStart: (input: TerminalLaunchRequest) => terminalManager().start(input),
+    terminalList: () => terminalManager().list(sessions.snapshot().activeSessionId),
+    terminalWrite: (input: { id: string; data: string }) => terminalManager().write(input, sessions.snapshot().activeSessionId),
+    terminalClose: (id: string) => terminalManager().close(id, sessions.snapshot().activeSessionId),
+    listSessions: () => sessions.listSessions(),
+    listSessionApprovals: () => sessions.listSessionApprovals(),
+    createSession: async (input: DesktopCreateSessionInput) => { await prepareSessionChange(); return sessions.createSession(input); },
+    selectSession: async (id: string) => { await prepareSessionChange(); return sessions.selectSession(id); },
+    cancelSession: (id: string) => sessions.cancelSession(id),
+    closeSession: async (id: string) => {
+      if (id === sessions.snapshot().activeSessionId) await prepareSessionChange();
+      await terminals?.closeOwner(id);
+      return sessions.closeSession(id);
+    },
+    setNativeModalOpen: (open: unknown) => {
+      if (typeof open !== "boolean") throw Error("Invalid dialog state.");
+      nativeModalOpen = open;
+      preview?.setSuspended(open);
+      voicePanel?.setSuspended(open);
+    },
+    preview: (input: DesktopPreviewInput) => {
+      if (!window || window.isDestroyed()) throw Error("The desktop window is unavailable.");
+      if (nativeModalOpen && ["open", "show"].includes(input?.action)) throw Error("Close the current dialog before showing preview.");
+      preview ??= new DesktopPreview(window, state => emit({ type: "preview-state", state }));
+      preview.setSuspended(nativeModalOpen);
+      return preview.command(input);
+    },
     appInfo: () => ({ version: app.getVersion(), packaged: app.isPackaged }),
     listPlugins: () => service.listPlugins(),
     previewPlugin: (source: string) => service.previewPlugin(source),
@@ -234,12 +311,20 @@ function installIPC() {
     respondApproval: (
       input: Parameters<LocalAgentService["respondApproval"]>[0],
     ) => service.respondApproval(input),
-    login: () => service.login(),
-    logout: () => service.logout(),
+    login: async () => { await stopTerminals(); return service.login(); },
+    logout: async () => { await stopTerminals(); return service.logout(); },
     usage: () => service.usage(),
     setPermissions: (
       preset: Parameters<LocalAgentService["setPermissions"]>[0],
-    ) => service.setPermissions(preset),
+    ) => {
+      const owner = sessions.snapshot().activeSessionId;
+      const generation = terminalGeneration;
+      const epoch = sessionContextEpochs.get(owner);
+      return Promise.resolve(terminals?.closeOwner(owner)).then(() => {
+        if (owner !== sessions.snapshot().activeSessionId || generation !== terminalGeneration || epoch !== sessionContextEpochs.get(owner)) throw Error("The selected session changed before permissions could be updated.");
+        return service.setPermissions(preset);
+      });
+    },
     createThread: () => service.createThread(),
     setConversationMode: (mode: "chat" | "coding") =>
       service.setConversationMode(mode),
@@ -263,9 +348,58 @@ function installIPC() {
       // Renderer arguments have a hard transport limit before operation-specific validation.
       if (JSON.stringify(input ?? null).length > 300_000)
         throw new Error("Desktop request too large.");
+      if (contextChangingIPC.has(name)) {
+        const owner = sessions.snapshot().activeSessionId;
+        sessionContextEpochs.set(owner, (sessionContextEpochs.get(owner) || 0) + 1);
+        if (name !== "setPermissions" && terminals?.list(owner).length) throw Error("Close the interactive terminal before changing this session's workspace or conversation.");
+      }
       return (handler as (input: unknown) => unknown)(input);
     });
   }
+}
+function installDevelopmentReload() {
+  const marker = process.env.FREECODA_DESKTOP_DEV_RELOAD_FILE;
+  if (app.isPackaged || process.env.FREECODA_DESKTOP_DEV !== "1" || !marker) return;
+  let revision: unknown;
+  try { revision = JSON.parse(readFileSync(marker, "utf8")).revision; } catch { /* First source transform has no update yet. */ }
+  let pending: { kind: string; revision: unknown } | undefined;
+  let reloading = false;
+  const attempt = async () => {
+    if (!pending || reloading || quitting || !window || window.isDestroyed() || window.webContents.isLoading()) return;
+    reloading = true;
+    try {
+      const current = await service.getState();
+      if (current.running || current.voiceActive || sessions.snapshot().sessions.some(item => ["running", "queued"].includes(item.status)) || sessions.snapshot().sessions.some(item => terminals?.list(item.id).length)) return;
+      const safe = await window.webContents.executeJavaScript("globalThis.prepareDevReload?.() ?? false");
+      if (!safe) return;
+      const change = pending;
+      if (change.kind === "main") {
+        await service.dispose();
+        updates?.dispose();
+        quitting = true;
+        app.relaunch();
+        app.quit();
+      } else {
+        preview?.dispose(); preview = undefined;
+        window.webContents.reload();
+      }
+      if (pending === change) pending = undefined;
+    } catch (error) { console.warn("Source reload deferred:", error instanceof Error ? error.message : "Save work and retry."); }
+    finally { reloading = false; }
+  };
+  watchFile(marker, { interval: 250 }, () => {
+    try {
+      const change = JSON.parse(readFileSync(marker, "utf8"));
+      if (change.revision !== revision && ["renderer", "main"].includes(change.kind)) {
+        revision = change.revision;
+        pending = { kind: pending?.kind === "main" ? "main" : change.kind, revision };
+        void attempt();
+      }
+    } catch { /* Atomic marker replacement may briefly be unavailable. */ }
+  });
+  const retry = setInterval(() => { if (pending) void attempt(); }, 1000);
+  app.once("will-quit", () => { unwatchFile(marker); clearInterval(retry); });
+  console.log("Source hot reload enabled; active work and unsaved editor changes defer reloads.");
 }
 function createWindow() {
   window = new BrowserWindow({
@@ -301,7 +435,7 @@ function createWindow() {
     if (tray && !tray.isDestroyed()) window?.hide();
     else app.quit();
   });
-  window.on("closed", () => { window = null; });
+  window.on("closed", () => { preview?.dispose(); preview = undefined; window = null; });
   window.once("ready-to-show", () => window?.show());
   void window.loadURL(APP_URL);
 }
@@ -339,19 +473,26 @@ app
       (_contents, _permission, callback) => callback(false),
     );
     session.defaultSession.setPermissionCheckHandler(() => false);
-    service = new LocalAgentService({
+    sessions = new DesktopSessionManager({
       dataDirectory: path.join(app.getPath("userData"), "private"),
-      emit,
+      emit: event => {
+        if (event.type === "auth" && !event.signedIn) { void stopTerminals(); }
+        emit(event);
+      },
+      emitSession: payload => emit({ type: "session-event", ...payload }),
+      emitSessions: snapshot => emit({ type: "sessions", snapshot }),
       openExternal,
       openVoiceCompanion: async url => {
-        // This operation receives only the service's freshly minted URL. Keep
-        // loopback HTTP out of the generic renderer external-navigation API.
-        const target = new URL(url);
-        if (!/^http:\/\/127\.0\.0\.1:[0-9]+\/#[a-f0-9]{64}$/.test(url) || Number(target.port) < 1 || Number(target.port) > 65535) throw Error("Invalid voice companion URL.");
-        await shell.openExternal(target.toString());
+        showWindow();
+        if (!window) throw Error("The desktop window is unavailable.");
+        if (nativeModalOpen) throw Error("Close the current dialog before starting voice.");
+        const owner = sessions.currentService();
+        voicePanel = await openVoicePanel(window, url, () => { void owner.stopVoice().catch(() => {}); });
+        return voicePanel;
       },
     });
-    await service.initialize();
+    service = sessions.activeService;
+    await sessions.initialize();
     installIPC();
     let unsignedMac = false;
     if (app.isPackaged && process.platform === "darwin") {
@@ -408,7 +549,7 @@ app
           {
             label: "Open folder…",
             accelerator: "CmdOrCtrl+O",
-            click: () => void chooseFolder(),
+            click: () => { if (window && !window.isDestroyed()) void window.webContents.executeJavaScript("document.getElementById(\"open-folder\")?.click()").catch(() => {}); },
           },
           {
             label: "Cloud workspace",
@@ -459,6 +600,7 @@ app
     Menu.setApplicationMenu(Menu.buildFromTemplate(menu));
     createWindow();
     installTray();
+    installDevelopmentReload();
     updates.start();
   })
   .catch((error) => {

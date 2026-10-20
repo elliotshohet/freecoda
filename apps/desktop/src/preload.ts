@@ -2,6 +2,20 @@ import { contextBridge, ipcRenderer } from "electron";
 import type { DesktopBridge, DesktopEvent } from "./shared";
 // Expose individual operations, never raw IPC or Node APIs.
 const api: DesktopBridge = {
+  terminalAvailability: () => ipcRenderer.invoke("desktop:terminalAvailability"),
+  listExternalAgents: () => ipcRenderer.invoke("desktop:listExternalAgents"),
+  terminalStart: input => ipcRenderer.invoke("desktop:terminalStart", input),
+  terminalList: () => ipcRenderer.invoke("desktop:terminalList"),
+  terminalWrite: input => ipcRenderer.invoke("desktop:terminalWrite", input),
+  terminalClose: id => ipcRenderer.invoke("desktop:terminalClose", id),
+  setNativeModalOpen: open => ipcRenderer.invoke("desktop:setNativeModalOpen", open),
+  listSessions: () => ipcRenderer.invoke("desktop:listSessions"),
+  listSessionApprovals: () => ipcRenderer.invoke("desktop:listSessionApprovals"),
+  createSession: input => ipcRenderer.invoke("desktop:createSession", input),
+  selectSession: id => ipcRenderer.invoke("desktop:selectSession", id),
+  cancelSession: id => ipcRenderer.invoke("desktop:cancelSession", id),
+  closeSession: id => ipcRenderer.invoke("desktop:closeSession", id),
+  preview: (input) => ipcRenderer.invoke("desktop:preview", input),
   appInfo: () => ipcRenderer.invoke("desktop:appInfo"),
   listPlugins: () => ipcRenderer.invoke("desktop:listPlugins"),
   previewPlugin: (source) => ipcRenderer.invoke("desktop:previewPlugin", source),

@@ -1,5 +1,12 @@
 # Repository Guidelines
 
+## Approval defaults
+
+- Keep filesystem and command execution sandboxed to the task workspace. Never use full access or broad unsandboxed execution. If an operation needs access beyond the sandbox, request it through Codex's normal permission flow and proceed only after approval.
+- Proceed with routine, reversible, in-scope file edits and local development actions without another approval prompt.
+- Ask before destructive or hard-to-reverse actions, external messages or submissions, purchases, actual permission or security changes, production pushes or deployments, or work outside the requested scope.
+- Never bypass hooks; resolve the underlying finding instead.
+
 ## Project Structure & Module Organization
 
 Freecoda is a Bun/TypeScript monorepo with three clients. `apps/web` contains the Next.js website, API routes, shared web components, and database code; static assets live in `apps/web/public`. `apps/desktop/src` contains Electron main/preload code and the renderer; installer assets are in `apps/desktop/resources`. `packages/cli` provides the terminal client, `packages/core` the agent loop and repository tools, and `packages/contracts` shared validation. Root `tests/` holds unit and integration suites. Operational scripts live in `scripts/`, SQL migrations in `apps/web/lib/db/migrations`, and release documentation in `distribution/`.
@@ -57,10 +64,14 @@ Use `.env.example` to prepare local configuration without replacing existing sec
 
 ## Parallel Execution & Coordination
 
-- For substantial tasks, identify independent workstreams and proactively use available subagents in parallel when useful. Keep trivial work local and avoid duplicate effort.
+- Default to one main agent. Use additional subagents only for genuinely independent, necessary work; avoid automatic parallel reviews and redundant exploration. This lower-usage policy supersedes earlier preferences to do everything in parallel.
+- Use GPT-6 Luna (`gpt-6-luna`) with low reasoning at Standard speed by default for routine UI, code, documentation, and status work. Raise Luna to medium only when low reasoning is insufficient. Use GPT-6.1 Sol (`gpt-6.1-sol`) with medium reasoning only for genuinely complex integration or conflicting evidence. Apply model, effort, and speed settings where supported; preserve fixed mandatory reviewer roles and report unsupported settings honestly.
 - Give each worker a clear objective, file/module ownership, dependencies, and validation expectations. Tell workers they share the codebase and must preserve others’ edits; never revert unrelated or uncommitted work.
 - Parallelize independent searches, read-only commands, and tests when resources permit. Run dependent steps sequentially. Coordinate shared files, ports, databases, browser pages, and lockfiles before using them; serialize conflicting operations.
-- Check for active work before editing. Use isolated worktrees for conflicting edits, preserve existing changes, and coordinate integration with other active agents or chats.
-- Prefer subagents for subtasks. Separate agents or user-visible chats are authorized for independent Freecoda work where supported and appropriate; avoid fragmenting a single task unnecessarily.
+- Keep any necessary delegated work in the shared checkout. Do not create or use Git worktrees unless the user explicitly requests them. Check for active work before editing, preserve all uncommitted changes, assign clear file ownership, and serialize conflicting edits with other active agents or chats. Verify the combined result after integration.
+- Separate agents or user-visible chats are authorized only for genuinely independent work where useful and supported; avoid fragmenting a single task. Preserve existing workers' edits and retire redundant workers safely after valuable in-flight work finishes.
 - Review and integrate worker results, resolve conflicts deliberately, and run required checks on the combined result before declaring completion. Optimize elapsed time while preserving correctness.
 - Work within runtime tools, concurrency limits, and permissions. These instructions do not enable unavailable tools, unlimited agents, or automatic scheduling.
+## Voice Output
+
+- Keep voice output available. Spoken replies should be brief and outcome-first; put long explanations and exact URLs or file paths in visible text when useful.

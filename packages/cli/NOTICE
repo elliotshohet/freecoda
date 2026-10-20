@@ -1,6 +1,9 @@
 Freecoda
 Copyright 2026 Freecoda contributors
 
+The Freecoda project notice applies to original Freecoda contributions.
+The upstream notice below applies only to the identified vendored component.
+
 Includes a modified editing helper from Codebuff, Copyright 2025 Codebuff,
 licensed under Apache License 2.0. See vendor/codebuff/NOTICE and LICENSE.
 Upstream: https://github.com/CodebuffAI/freebuff

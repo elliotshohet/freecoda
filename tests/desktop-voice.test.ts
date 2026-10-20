@@ -7,8 +7,8 @@ import type { DesktopEvent } from "../apps/desktop/src/shared";
 async function fixture(signedIn = false, failOpen = false) {
   const directory = await mkdtemp(path.join(tmpdir(), "freecoda-voice-"));
   if (signedIn) await writeFile(path.join(directory, "desktop.json"), JSON.stringify({ server: "https://freecoda.com", token: "a".repeat(40), accountId: "alice", trustedRoots: [], recentRoots: [] }));
-  const events: DesktopEvent[] = []; let opened = "", modelAborted = false;
-  const service = new LocalAgentService({ dataDirectory: directory, emit(event) { events.push(event); }, async openExternal() { throw Error("Generic opener must not receive a voice URL"); }, async openVoiceCompanion(url) { opened = url; if (failOpen) throw Error("Browser could not open"); },
+  const events: DesktopEvent[] = []; let opened = "", modelAborted = false, panelsClosed = 0;
+  const service = new LocalAgentService({ dataDirectory: directory, emit(event) { events.push(event); }, async openExternal() { throw Error("Generic opener must not receive a voice URL"); }, async openVoiceCompanion(url) { opened = url; if (failOpen) throw Error("Browser could not open"); return () => { panelsClosed++; }; },
     async fetch(input, init) {
       if (String(input).endsWith("/models")) return new Promise<Response>((_, reject) => { const cancel = () => { modelAborted = true; reject(Error("Cancelled")); }; if (init?.signal?.aborted) cancel(); else init?.signal?.addEventListener("abort", cancel, { once: true }); });
       throw Error("Offline fixture");
@@ -17,7 +17,7 @@ async function fixture(signedIn = false, failOpen = false) {
   const post = async (endpoint: string, body: unknown) => {
     const url = new URL(opened); const token = url.hash.slice(1); return fetch(new URL(endpoint, url), { method: "POST", headers: { Authorization: `Bearer ${token}`, Origin: url.origin, "Content-Type": "application/json" }, body: JSON.stringify(body) });
   };
-  return { service, events, post, get opened() { return opened; }, get modelAborted() { return modelAborted; }, async cleanup() { await service.dispose(); await rm(directory, { recursive: true, force: true }); } };
+  return { service, events, post, get opened() { return opened; }, get panelsClosed() { return panelsClosed; }, get modelAborted() { return modelAborted; }, async cleanup() { await service.dispose(); await rm(directory, { recursive: true, force: true }); } };
 }
 
 test("desktop dictation stays an editable scoped event, never starts an agent, and closes on navigation", async () => {
@@ -33,6 +33,7 @@ test("desktop dictation stays an editable scoped event, never starts an agent, a
     const oldURL = f.opened;
     await f.service.createThread();
     expect((await f.service.getState()).voiceActive).toBe(false);
+    expect(f.panelsClosed).toBe(1);
     await expect(fetch(oldURL)).rejects.toThrow();
     expect(f.events.filter(event => event.type === "voice-dictation")).toHaveLength(1);
   } finally { await f.cleanup(); }

@@ -1,4 +1,9 @@
+import type { TerminalSession, TerminalEvent, TerminalLaunchRequest } from "./interactive-terminal";
+import type { ExternalAgentAvailability } from "./external-agents";
+import type { DesktopSessionSnapshot, DesktopCreateSessionInput } from "./desktop-sessions";
 export type AgentMode = "chat" | "build" | "plan" | "review";
+export type DesktopPreviewInput = { action: "open" | "show" | "hide" | "back" | "forward" | "reload" | "resize"; url?: string; bounds?: { x: number; y: number; width: number; height: number } };
+export type DesktopPreviewState = { visible: boolean; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean; error?: string };
 export type DesktopPermissionPreset = "read-only" | "default" | "full-access";
 export type ApprovalKind = "write" | "shell";
 export type DesktopFileEntry = { path: string; type: "file" };
@@ -33,9 +38,11 @@ export type DesktopCloudWorkspace = {
 export type DesktopState = {
   workspace: DesktopWorkspace | null;
   recentFolders: { root: string; name: string; trusted: boolean }[];
-  auth: { signedIn: boolean; server: string; model?: string; allowPromptTraining?: boolean };
+  openFolders: { root: string; name: string; trusted: boolean }[];
+  auth: { signedIn: boolean; server: string; accountScope?: string; model?: string; allowPromptTraining?: boolean };
   running: boolean;
   voiceActive?: boolean;
+  activeStream?: { runId: string; text: string; revision: number };
   permissionPreset: DesktopPermissionPreset;
   conversationMode: "chat" | "coding";
   threads?: { id: string; title: string; updatedAt: string; archived?: boolean }[];
@@ -44,13 +51,17 @@ export type DesktopState = {
   conversation?: { role: "user" | "assistant"; text: string }[];
 };
 export type DesktopEvent =
+  | { type: "terminal-event"; event: TerminalEvent }
+  | { type: "sessions"; snapshot: DesktopSessionSnapshot }
+  | { type: "session-event"; sessionId: string; event: DesktopEvent }
+  | { type: "preview-state"; state: DesktopPreviewState }
   | { type: "composer-scope-migrated"; from: string; to: string }
   | { type: "voice-dictation"; text: string; scope: string }
   | { type: "voice-turn"; text: string; scope: string }
   | { type: "voice-status"; active: boolean; text: string }
   | { type: "state"; state: DesktopState }
   | { type: "run-started"; runId: string }
-  | { type: "text-delta"; runId: string; text: string }
+  | { type: "text-delta"; runId: string; text: string; streamText?: string; streamRevision?: number }
   | { type: "tool-start"; runId: string; name: string }
   | { type: "tool-result"; runId: string; name: string; result: unknown }
   | {
@@ -88,6 +99,20 @@ export type DesktopGitHubState = { repos: DesktopGitHubRepo[]; repositories: Des
 export type DesktopExtension = { id: string; name: string; kind: "skill" | "mcp"; enabled: boolean };
 export type DesktopPlugin = { id: string; name: string; skillCount: number; serverCount: number };
 export interface DesktopBridge {
+  terminalAvailability(): Promise<{ available: boolean; detail: string; resizable: false }>;
+  listExternalAgents(): Promise<ExternalAgentAvailability[]>;
+  terminalStart(input: TerminalLaunchRequest): Promise<TerminalSession>;
+  terminalList(): Promise<TerminalSession[]>;
+  terminalWrite(input: { id: string; data: string }): Promise<void>;
+  terminalClose(id: string): Promise<void>;
+  setNativeModalOpen(open: boolean): Promise<void>;
+  listSessions(): Promise<DesktopSessionSnapshot>;
+  listSessionApprovals(): Promise<Extract<DesktopEvent, { type: "approval" }>[]>;
+  createSession(input: DesktopCreateSessionInput): Promise<DesktopSessionSnapshot>;
+  selectSession(id: string): Promise<DesktopSessionSnapshot>;
+  cancelSession(id: string): Promise<void>;
+  closeSession(id: string): Promise<DesktopSessionSnapshot>;
+  preview(input: DesktopPreviewInput): Promise<DesktopPreviewState>;
   appInfo(): Promise<{ version: string; packaged: boolean }>;
   listPlugins(): Promise<DesktopPlugin[]>;
   previewPlugin(source: string): Promise<import("../../../packages/contracts/src/extensions").PluginManifest>;

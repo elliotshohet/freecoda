@@ -12,3 +12,12 @@ coverage/
 
 apps/desktop/release/
 *.tgz
+
+apps/desktop/.dev/
+
+# Local agent tooling and machine-specific hook state.
+.agents/skills/openui/
+.codex/
+.github/hooks/
+.impeccable/config.local.json
+.impeccable/hook.cache.json

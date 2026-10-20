@@ -15,20 +15,7 @@
   <body>
     <a class="skip" href="#prompt">Skip to conversation</a>
     <header class="titlebar">
-      <div class="navigation-context"><strong id="navigation-context">General chat</strong><span>On this computer</span></div>
-      <div class="titlebar-actions">
-        <button id="toggle-sidebar" class="titlebar-icon-button" aria-label="Toggle project sidebar" title="Show or hide navigation" aria-expanded="true"><svg class="titlebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18"/></svg></button>
-        <button id="toggle-workbench" class="titlebar-icon-button" aria-label="Toggle project tools" title="Show or hide project tools" aria-expanded="false" aria-controls="workbench"><svg class="titlebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m8 5-5 7 5 7m8-14 5 7-5 7m-3-16-2 18"/></svg></button>
-        <button id="theme-toggle" type="button" class="theme-control" aria-label="Switch to dark mode" title="Switch to dark mode">
-          <svg class="titlebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path id="theme-dark-icon" d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"/>
-            <g id="theme-light-icon" hidden><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></g>
-          </svg>
-        </button>
-
-
-
-      </div>
+        <button id="toggle-sidebar" class="titlebar-icon-button" aria-label="Toggle project sidebar" title="Show or hide navigation" aria-expanded="true"><svg class="titlebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18"/></svg></button>      <div class="navigation-context"><strong id="navigation-context">General chat</strong><span>On this computer</span></div>
     </header>
     <div id="notice" class="notice" role="status" hidden></div>
     <div id="error" class="error" role="alert" hidden>
@@ -45,10 +32,11 @@
         <div class="sidebar-brand"><img src="./logo.svg" alt="" width="26" height="26" /><span>Freecoda</span></div>
         <nav class="sidebar-primary" aria-label="Conversation navigation">
           <button id="new-chat" type="button" class="sidebar-action"><span aria-hidden="true">＋</span> New chat</button>
-          <button id="open-folder" class="sidebar-action" title="Open a local folder"><span aria-hidden="true">＋</span> Open folder…</button>
         </nav>
+        <details id="workspace-actions" class="workspace-actions"><summary>Workspace actions</summary>
+          <button id="open-folder" class="sidebar-action" title="Open a local folder"><span aria-hidden="true">＋</span> Open folder…</button>
         <div class="sidebar-heading"><span id="sidebar-heading-label">Workspaces</span></div>
-        <div id="workspace-list" class="workspace-list" aria-label="Recent local workspaces"></div>
+        <div id="workspace-list" class="workspace-list" aria-label="Open local workspaces"></div></details>
         <section id="selected-workspace" class="workspace-context" aria-label="Selected workspace details" hidden>
           <span id="workspace-kind" class="sr-only">Local workspace</span>
           <strong id="folder-name" class="sr-only"></strong>
@@ -57,6 +45,7 @@
             <span id="coding-section-label" class="sr-only">Workspace tools</span>
             <button id="sidebar-files" class="sidebar-action"><span aria-hidden="true">▱</span> Files & changes</button>
             <button id="sidebar-output" class="sidebar-action"><span aria-hidden="true">›_</span> Terminal & activity</button>
+          <button id="sidebar-terminal" class="sidebar-action">Interactive & connected agents</button>
           </div>
         </section>
         <section class="cloud-workspace-section" aria-labelledby="cloud-workspaces-title">
@@ -64,15 +53,32 @@
           <button id="cloud-open" class="sidebar-action" title="Open the cloud workspace in your browser">Open cloud workspace ↗</button>
           <div id="cloud-workspace-list" aria-live="polite"></div>
         </section>
-        <section id="general-conversations" aria-label="General chat"><div class="sidebar-heading">General chat</div><button id="sidebar-general-chat" class="sidebar-action"><span aria-hidden="true">◌</span> General chat</button><p id="general-chat-hint" class="workspace-empty">Chats without a project folder.</p></section>
+        <section id="general-conversations" aria-label="Conversations"><div class="sidebar-heading">Conversations</div><button id="sidebar-general-chat" class="sidebar-action"><span aria-hidden="true">◌</span> General chat</button><p id="general-chat-hint" class="workspace-empty">Chats without a project folder.</p></section>
         <section id="workspace-conversations" class="workspace-conversations" aria-labelledby="conversation-scope-label">
           <h2 id="conversation-scope-label" class="sidebar-section-label">General conversations</h2>
           <button id="current-thread" class="thread-link" aria-current="page"><span id="thread-title">New conversation</span></button>
           <label class="chat-history-search"><span class="sr-only">Search current conversations</span><input id="thread-search" type="search" placeholder="Search conversations…" /></label>
-          <button id="toggle-archived" class="text-button" aria-pressed="false">Archived chats</button>
-          <button id="refresh-chats" class="text-button" type="button" title="Pull conversations from your account">Refresh chats</button>
           <div id="thread-history" class="thread-history" aria-label="Saved conversations"></div>
         </section>
+      <details id="session-manager" class="desktop-sessions">
+        <summary>Agent sessions <span id="session-count">0</span></summary>
+        <div class="desktop-session-actions"><button id="session-new-chat" type="button">New chat session</button><button id="session-new-project" type="button" disabled>New project session</button></div>
+        <p class="desktop-session-help">Independent sessions keep their own context and progress while work continues in the background.</p>
+        <div id="session-list" aria-label="Agent sessions" aria-live="polite"></div>
+      </details>
+      <div class="sidebar-view-controls">
+
+        <button id="toggle-workbench" class="titlebar-icon-button" aria-label="Toggle project tools" title="Show or hide project tools" aria-expanded="false" aria-controls="workbench"><svg class="titlebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m8 5-5 7 5 7m8-14 5 7-5 7m-3-16-2 18"/></svg></button>
+        <button id="theme-toggle" type="button" class="theme-control" aria-label="Switch to dark mode" title="Switch to dark mode">
+          <svg class="titlebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path id="theme-dark-icon" d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"/>
+            <g id="theme-light-icon" hidden><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></g>
+          </svg>
+        </button>
+
+
+
+      </div>
         <nav class="sidebar-bottom sidebar-settings" aria-label="Settings and connections">
           <button id="github-repos-open" class="sidebar-action" aria-haspopup="dialog">GitHub repositories</button>
           <button id="extensions-open" class="sidebar-action" aria-haspopup="dialog">Plugins &amp; MCP</button>
@@ -85,7 +91,7 @@
         hidden
       >
         <div class="workbench-heading">
-          <strong>Project tools</strong
+          <div class="workbench-views"><button id="view-code" type="button" aria-pressed="true">Code</button><button id="view-preview" type="button" aria-pressed="false">Preview</button></div
           ><button
             id="close-workbench"
             class="icon-button"
@@ -94,6 +100,7 @@
             ×
           </button>
         </div>
+        <section id="preview-pane" class="preview-pane" aria-label="Browser preview" hidden><form id="preview-form" class="preview-navigation"><button id="preview-back" type="button" aria-label="Back" disabled>←</button><button id="preview-forward" type="button" aria-label="Forward" disabled>→</button><button id="preview-reload" type="button" aria-label="Reload preview">↻</button><label class="sr-only" for="preview-url">Preview address</label><input id="preview-url" type="url" value="http://localhost:3000" placeholder="http://localhost:3000" required /><button type="submit">Open</button></form><p id="preview-status" role="status">Enter the address of your running app.</p><div id="preview-surface" class="preview-surface"></div></section>
         <div class="workbench-files">
           <label class="file-search"
             ><span class="sr-only">Find a project file</span
@@ -176,6 +183,7 @@
               >
                 Agent activity
               </button>
+              <button role="tab" id="interactive-tab" aria-controls="interactive-panel" aria-selected="false">Interactive</button>
             </div>
             <button
               class="icon-button"
@@ -216,6 +224,7 @@ Command output will appear here. Your permission preset controls local command e
           >
             <p>No agent activity yet.</p>
           </div>
+          <section id="interactive-panel" class="interactive-panel" role="tabpanel" aria-labelledby="interactive-tab" hidden></section>
         </section>
       </section>
       <section class="agent-pane" aria-label="Ask Coda">
@@ -285,7 +294,7 @@ Command output will appear here. Your permission preset controls local command e
                 <details>
                   <summary>Dictation &amp; voice conversation</summary>
                   <ul>
-                    <li><strong>Dictation:</strong> open the browser companion and choose Start dictation. Recognized words become an editable draft here; you decide when to send.</li>
+                    <li><strong>Dictation:</strong> choose Voice input in the composer, then Dictate into draft. Recognized words become an editable draft here; you decide when to send.</li>
                     <li><strong>Conversation:</strong> choose Start conversation to send spoken turns through the active conversation and hear completed replies. Project trust and action approvals still apply. Stop, mute, and interrupt controls remain available.</li>
                     <li><strong>Browser support matters:</strong> microphone permission and browser/OS speech services are required. Their speech service may process audio online. Freecoda receives transcript text, not microphone audio; recognition and playback can be unavailable in some browsers.</li>
                   </ul>
@@ -323,18 +332,6 @@ Command output will appear here. Your permission preset controls local command e
           <span class="spinner" aria-hidden="true"></span
           ><span id="working-text">Working in your project…</span>
         </div>
-        <aside
-          class="house-ad"
-          id="sponsor-placement"
-          aria-label="Freecoda announcement"
-        >
-          <span id="sponsor-label">Freecoda announcement</span
-          ><strong id="sponsor-headline">Help keep Freecoda free.</strong>
-          <p id="sponsor-description">
-            Sponsor a placement without access to code or conversations.
-          </p>
-          <button id="sponsor-info" class="quiet-button">Learn more ↗</button>
-        </aside>
         <form id="chat-form" class="composer">
           <div id="slash-menu" class="slash-menu" role="listbox" aria-label="Conversation commands" hidden></div>
           <label class="sr-only" for="prompt">Message Freecoda</label
@@ -373,17 +370,8 @@ Command output will appear here. Your permission preset controls local command e
             ><button id="stop" type="button" class="stop" aria-label="Stop response" title="Stop response" hidden>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
             </button>
-          </div>
+<div class="composer-voice"><button id="voice-open" type="button" class="voice-entry" aria-label="Voice input" title="Dictation or live voice" aria-expanded="false" aria-controls="voice-menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11v1a7 7 0 0 0 14 0v-1m-7 8v3m-4 0h8"/></svg></button><div id="voice-menu" class="voice-menu" hidden><strong>Voice input</strong><button id="voice-dictate" type="button">Dictate into draft</button><button id="voice-chat" type="button">Start live voice</button><button id="voice-stop" type="button" hidden>Stop voice</button><p id="voice-status" role="status" aria-live="polite">Choose dictation or a live conversation in Freecoda.</p><small>Speech recognition may be unavailable in this Electron runtime; the voice panel reports support and permission errors. Speech services may process audio online. Dictation stays editable; live voice uses normal permissions.</small></div></div>          </div>
         </form>
-        <div class="desktop-voice" aria-label="Voice input">
-          <div class="desktop-voice-actions">
-            <button id="voice-dictate" type="button">Dictate</button>
-            <button id="voice-chat" type="button">Live voice</button>
-            <button id="voice-stop" type="button" hidden>Stop voice</button>
-          </div>
-          <p id="voice-status" role="status" aria-live="polite">Voice opens a browser companion. Press Start there to enable your microphone.</p>
-          <details><summary>Voice privacy and support</summary><p>Requires browser speech recognition; support varies by browser. Audio and speech output may be processed online by your browser’s speech provider. Freecoda receives transcripts, not audio recordings. Dictation adds editable text. Live voice sends spoken turns using the selected mode and normal permissions; review coding approvals in this window. Mute, interrupt and listening status are in the companion. Stop voice ends the session.</p></details>
-        </div>
         <div id="prompt-queue" class="prompt-queue" aria-label="Queued messages" hidden></div>
         <p class="permission-note" id="permission-note">
           <span aria-hidden="true">◇</span> You approve every file change and
@@ -393,7 +381,19 @@ Command output will appear here. Your permission preset controls local command e
 
       </section>
     </main>
-    <footer class="account-footer"><div class="app-footer-left"><span id="app-version" class="app-version" aria-label="Running app version">Version unavailable</span><button id="footer-github-login" class="footer-github-login" type="button" hidden>Sign in with GitHub</button></div><button id="account-avatar-open" type="button" aria-label="Account & settings"><span id="account-avatar" class="account-avatar" aria-hidden="true">U</span><span id="account-footer-label">Sign in</span></button></footer>
+    <footer class="account-footer"><div class="footer-account"><button id="account-avatar-open" type="button" aria-label="Account & settings"><span id="account-avatar" class="account-avatar" aria-hidden="true">U</span><span id="account-footer-label">Sign in</span></button><button id="footer-github-login" class="footer-github-login" type="button" hidden>Sign in with GitHub</button></div>        <aside
+          class="house-ad"
+          id="sponsor-placement"
+          aria-label="Freecoda announcement"
+        >
+          <span id="sponsor-label">Freecoda announcement</span
+          ><strong id="sponsor-headline">Help keep Freecoda free.</strong>
+          <p id="sponsor-description">
+            Sponsor a placement without access to code or conversations.
+          </p>
+          <button id="sponsor-info" class="quiet-button">Learn more ↗</button>
+        </aside>
+<span id="app-version" class="app-version" aria-label="Running app version">Version unavailable</span></footer>
     <dialog
       id="permissions-dialog"
       aria-labelledby="permissions-title"
@@ -609,6 +609,9 @@ Command output will appear here. Your permission preset controls local command e
         <section class="settings-section account-section" aria-labelledby="account-repositories-heading"><h3 id="account-repositories-heading">Connected repositories</h3><div id="account-repositories" aria-live="polite"></div><button id="account-manage-repositories" class="button secondary" type="button">Manage repositories</button></section>
         <section class="settings-section account-section" aria-labelledby="account-cloud-heading"><h3 id="account-cloud-heading">Cloud workspaces</h3><div id="account-cloud-workspaces" aria-live="polite"></div><p>Cloud projects open in your browser; compute is managed there.</p></section>
       </div>
+      <section class="settings-section"><h3>Conversation history</h3>          <button id="toggle-archived" class="text-button" aria-pressed="false">Archived chats</button>
+          <button id="refresh-chats" class="text-button" type="button" title="Pull conversations from your account">Refresh chats</button>
+</section>
       <section class="settings-section account-section" aria-labelledby="account-integrations-heading"><h3 id="account-integrations-heading">Local integrations</h3><div id="account-integrations" aria-live="polite"></div><button id="account-manage-integrations" class="button secondary" type="button">Manage plugins &amp; tools</button><p>Installed on this computer. Configuration and enabled state do not imply an active MCP connection.</p></section>
       <div id="usage-view" hidden>
         <div class="usage-heading">

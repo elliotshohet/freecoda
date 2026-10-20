@@ -28,6 +28,8 @@ export function createComposerSuggestions(prompt: HTMLTextAreaElement, options: 
   let prefix = "", completion = "", dismissed: string | undefined;
   let context = options.contextKey();
   let composing = false;
+  let observedValue = prompt.value;
+  let pendingValue: string | undefined, pendingScope: string | undefined;
   const setStatus = (phase: string, text: string) => {
     status.dataset.state = phase;
     if (status.textContent !== text) status.textContent = text;
@@ -37,12 +39,13 @@ export function createComposerSuggestions(prompt: HTMLTextAreaElement, options: 
     clearTimeout(timer);
     generation++;
     prefix = completion = "";
+    pendingValue = pendingScope = undefined;
     overlay.hidden = true;
     prompt.placeholder = placeholder;
     if (!keepStatus) setStatus("idle", "");
     void options.cancel().catch(() => {});
   };
-  const eligible = () => document.hasFocus() && !composing && options.enabled() && !prompt.disabled && document.activeElement === prompt && prompt.value.length <= 2000 && !prompt.value.trimStart().startsWith("/") && prompt.selectionStart === prompt.value.length && prompt.selectionEnd === prompt.value.length && dismissed !== prompt.value;
+  const eligible = () => document.hasFocus() && !composing && options.enabled() && !prompt.disabled && prompt.value.length <= 2000 && !prompt.value.trimStart().startsWith("/") && prompt.selectionStart === prompt.value.length && prompt.selectionEnd === prompt.value.length && dismissed !== prompt.value;
   const metrics = () => {
     const style = getComputedStyle(prompt);
     overlay.style.height = `${prompt.offsetHeight}px`;
@@ -56,14 +59,25 @@ export function createComposerSuggestions(prompt: HTMLTextAreaElement, options: 
   options.signal.addEventListener("abort", () => observer.disconnect(), { once: true });
   const scroll = () => { overlay.scrollTop = prompt.scrollTop; overlay.scrollLeft = prompt.scrollLeft; };
   const schedule = () => {
+    observedValue = prompt.value;
+    if (eligible() && pendingValue === prompt.value && pendingScope === options.contextKey()) return;
+    // A prepared completion remains usable when focus moves into the composer.
+    if (eligible() && completion && prefix === prompt.value && context === options.contextKey()) {
+      overlay.hidden = false;
+      prompt.placeholder = "";
+      setStatus("ready", "AI suggestion · Tab to insert · Esc to dismiss");
+      metrics(); scroll();
+      return;
+    }
     clear(true);
     if (!eligible()) {
-      const reason = document.activeElement === prompt ? options.unavailableReason?.() : undefined;
+      const reason = options.unavailableReason?.();
       setStatus(reason ? "unavailable" : "idle", reason || "");
       return;
     }
     setStatus("pending", "AI suggestion pending…");
     const current = generation, value = prompt.value, scope = options.contextKey();
+    pendingValue = value; pendingScope = scope;
     timer = setTimeout(async () => {
       if (!eligible() || current !== generation || scope !== options.contextKey()) return;
       setStatus("loading", "Generating an AI suggestion…");
@@ -80,22 +94,25 @@ export function createComposerSuggestions(prompt: HTMLTextAreaElement, options: 
         metrics(); scroll();
       } catch (error) {
         if (current === generation && eligible()) setStatus("unavailable", `AI suggestions unavailable: ${options.describeError(error).slice(0, 180)}`);
+      } finally {
+        if (current === generation) pendingValue = pendingScope = undefined;
       }
     }, 1500);
   };
   window.addEventListener("blur", () => clear(), { signal: options.signal });
-  window.addEventListener("focus", () => { if (document.activeElement === prompt) schedule(); }, { signal: options.signal });
+  window.addEventListener("focus", schedule, { signal: options.signal });
   prompt.addEventListener("compositionstart", () => { composing = true; clear(); }, { signal: options.signal });
   prompt.addEventListener("compositionend", () => { composing = false; schedule(); }, { signal: options.signal });
   prompt.addEventListener("input", () => { if (dismissed !== prompt.value) dismissed = undefined; schedule(); }, { signal: options.signal });
   prompt.addEventListener("focus", schedule, { signal: options.signal });
-  prompt.addEventListener("blur", () => clear(), { signal: options.signal });
+  // Moving to Send or another control must not start a fresh inference on return.
+  prompt.addEventListener("blur", () => { overlay.hidden = true; prompt.placeholder = placeholder; }, { signal: options.signal });
   prompt.addEventListener("scroll", scroll, { passive: true, signal: options.signal });
   prompt.addEventListener("select", () => { if (["pending", "loading", "ready"].includes(status.dataset.state || "") && !eligible()) clear(); }, { signal: options.signal });
   prompt.addEventListener("keydown", event => {
     if (event.isComposing) { clear(); return; }
     if (event.key === "Escape" && completion) { dismissed = prompt.value; clear(); return; }
-    if (event.key !== "Tab" || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey || !eligible() || !canAcceptSuggestion(prompt.value, prefix, completion, prompt.selectionStart, prompt.selectionEnd)) return;
+    if (event.key !== "Tab" || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey || document.activeElement !== prompt || context !== options.contextKey() || !eligible() || !canAcceptSuggestion(prompt.value, prefix, completion, prompt.selectionStart, prompt.selectionEnd)) return;
     event.preventDefault(); event.stopImmediatePropagation();
     const value = completion;
     clear();
@@ -105,5 +122,10 @@ export function createComposerSuggestions(prompt: HTMLTextAreaElement, options: 
     setStatus("inserted", "Suggestion inserted. Review and send when ready.");
   }, { capture: true, signal: options.signal });
   options.signal.addEventListener("abort", () => clear(), { once: true });
-  return { update() { const next = options.contextKey(); if (context !== next) { context = next; dismissed = undefined; clear(); schedule(); } } };
+  schedule();
+  return { invalidate() { dismissed = undefined; clear(); }, update() {
+    const next = options.contextKey();
+    if (context !== next) { context = next; dismissed = undefined; clear(); schedule(); }
+    else if (observedValue !== prompt.value) { dismissed = undefined; schedule(); }
+  } };
 }

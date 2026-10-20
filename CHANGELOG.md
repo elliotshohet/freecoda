@@ -7,7 +7,13 @@ remain under Unreleased until publication and artifact verification are complete
 
 ## Unreleased
 
-No pending client feature releases.
+Local implementation; publication pending.
+
+- Add independently owned desktop sessions, background status/approval recovery, interrupted-session restoration without replay, and repository-wide execution serialization.
+- Add explicit macOS interactive shell/Codex/Claude connections with separate-account consent and session-bound controls. Full terminal emulation and managed external-agent protocols remain incomplete.
+- Improve stream hydration, draft/suggestion ownership, and native preview/voice dialog ordering.
+- Prepare a zero-cost-only concurrency admission migration; it has not been applied or deployed. Hosted admission limits remain unchanged.
+- Correct first-party LICENSE ownership while retaining required upstream component notices.
 
 ## Desktop 0.1.10 — 2026-10-20
 

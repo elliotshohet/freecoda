@@ -23,6 +23,40 @@ export function isVerifiedZeroCostFreeModel(value: unknown): boolean {
   );
 }
 
+export const MAX_CONCURRENT_ZERO_COST_RESERVATIONS = 3;
+
+/** Reservation rows record the original zero-cost proof; never re-price them
+ * from the current mutable catalog. Unknown values (including NULL) fail closed.
+ * Nonzero/unknown-cost traffic retains its existing single-request admission.
+ */
+export function canAdmitUsageReservation(
+  model: string,
+  maxCostMicros: number,
+  active: readonly {
+    status: unknown;
+    source: unknown;
+    model: unknown;
+    maxCostMicros: unknown;
+  }[],
+): boolean {
+  if (!Number.isSafeInteger(maxCostMicros) || maxCostMicros < 0 ||
+    (maxCostMicros === 0 && model !== PREFERRED_FREE_MODEL)) return false;
+  if (active.length === 0) return true;
+  return (
+    active.length < MAX_CONCURRENT_ZERO_COST_RESERVATIONS &&
+    model === PREFERRED_FREE_MODEL &&
+    maxCostMicros === 0 &&
+    active.every(row =>
+      row.status === "pending" &&
+      row.source === "free" &&
+      row.model === PREFERRED_FREE_MODEL &&
+      // pg returns bigint as a decimal string by default. Do not coerce null,
+      // booleans, empty strings or malformed values into a zero-cost proof.
+      (row.maxCostMicros === 0 || row.maxCostMicros === "0"),
+    )
+  );
+}
+
 export function canReleaseStaleFreeReservation(
   row: {
     status: unknown;
@@ -115,13 +149,16 @@ export async function reserve(
     const day = utcDay(),
       month = utcMonth();
     const active = await db.query(
-      "SELECT id FROM reservations WHERE user_id=$1 AND status IN ('pending','uncertain')",
+      "SELECT id,status,source,model,max_cost_micros AS \"maxCostMicros\" FROM reservations WHERE user_id=$1 AND status IN ('pending','uncertain') FOR UPDATE",
       [userId],
     );
-    if (active.rowCount)
+    // Admission and insertion share the existing global budget advisory lock.
+    // Lock these rows too so a concurrent uncertain transition cannot invalidate
+    // the admission snapshot before this transaction has committed.
+    if (!canAdmitUsageReservation(model, maxCostMicros, active.rows))
       throw new ApiError(
         409,
-        "Another request is running or waiting for usage reconciliation.",
+        `Another request is waiting for usage reconciliation, uses an unverified cost, or the limit of ${MAX_CONCURRENT_ZERO_COST_RESERVATIONS} simultaneous verified free requests has been reached.`,
       );
     await db.query(
       "INSERT INTO usage_buckets(scope,period) VALUES($1,$2),('global',$3) ON CONFLICT DO NOTHING",

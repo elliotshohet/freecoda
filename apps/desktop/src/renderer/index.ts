@@ -1,6 +1,9 @@
 import { createDraftAutosave } from "./draft-autosave";
 import { createComposerSuggestions } from "./composer-suggestions";
 import { createFileView } from "./file-view";
+import { createSessionList } from "./session-list";
+import { createTerminalPanel } from "./terminal-panel";
+import { createHydrationBuffer, mergeSessionStream, type SessionStream } from "./session-stream";
 import { filterConversationCommands, parseSkillInstallIntent, codexUnsupportedCommand } from "../../../../packages/contracts/src/conversation-commands";
 import { canDeliverQueuedPrompt, settleQueuedPrompt, type QueuedPrompt } from "./prompt-queue";
 import { parseMarkdownBlocks, safeMarkdownLink } from "./markdown";
@@ -12,12 +15,15 @@ import type {
   DesktopFile,
   DesktopState,
   DesktopWorkspace,
+  DesktopPreviewState,
 } from "../shared";
 
 declare global {
   interface Window {
     freecoda: DesktopBridge;
     flushComposerDraft?: () => Promise<void>;
+    prepareDevReload?: () => Promise<boolean>;
+    prepareSessionSwitch?: () => Promise<boolean>;
   }
 }
 let draftAutosave: ReturnType<typeof createDraftAutosave> | undefined;
@@ -56,6 +62,7 @@ const mode = el<HTMLSelectElement>("mode");
 let state: DesktopState | null = null;
 let accountProfile: { name?: string; avatar?: string } = {};
 let profileSignedIn: boolean | undefined;
+let profileAccountKey = "";
 let accountDetailsRequest = 0;
 let accountAuthGeneration = 0;
 let file: DesktopFile | null = null;
@@ -72,10 +79,25 @@ let assistantParagraph: HTMLElement | null = null;
 let noticeTimer: ReturnType<typeof setTimeout>;
 let approvalQueue: Extract<DesktopEvent, { type: "approval" }>[] = [];
 let currentApproval: string | null = null;
+const resolvedApprovals = new Set<string>();
+function rememberResolvedApproval(id: string) {
+  resolvedApprovals.add(id);
+  if (resolvedApprovals.size > 256) resolvedApprovals.delete(resolvedApprovals.values().next().value!);
+}
 let loginInProgress = false;
 let commandInFlight = false;
 let voiceActive = false;
 let conversationRoot: string | null = null;
+let activeDesktopSession = "";
+const sessionStreams = new Map<string, SessionStream>();
+let sessionHydration: { generation: number; buffer: ReturnType<typeof createHydrationBuffer<DesktopEvent>> } | undefined;
+function rememberStream(sessionId: string, value: SessionStream): SessionStream {
+  const key = `${sessionId}:${value.runId}`;
+  const merged = mergeSessionStream(sessionStreams.get(key), value);
+  sessionStreams.set(key, merged);
+  if (sessionStreams.size > 50) sessionStreams.delete(sessionStreams.keys().next().value!);
+  return merged;
+}
 const promptQueue: QueuedPrompt[] = [];
 let drainingPromptQueue = false;
 let promptQueuePaused = false;
@@ -84,14 +106,89 @@ const signal = abort.signal;
 const fileView = createFileView(editor, { signal });
 draftAutosave = createDraftAutosave(prompt, { load: () => rawBridge.loadComposerDraft(), save: draft => rawBridge.saveComposerDraft(draft), signal });
 window.flushComposerDraft = () => draftAutosave!.flush();
+window.prepareDevReload = async () => {
+  if (running || actionBusy || commandInFlight || promptQueue.length || voiceActive || dirty() || approvalQueue.length || document.querySelector("dialog[open]")) return false;
+  await draftAutosave!.flush();
+  return true;
+};
+window.prepareSessionSwitch = async () => {
+  if (dirty() || commandInFlight || actionBusy || promptQueue.length || voiceActive || currentApproval || approvalQueue.length || pendingDialogs || document.querySelector("dialog[open]")) return false;
+  composerSuggestions.invalidate();
+  await rawBridge.cancelSuggestion();
+  await draftAutosave!.flush();
+  return true;
+};
 const composerSuggestions = createComposerSuggestions(prompt, {
   unavailableReason: () => !state?.auth.signedIn ? "Sign in to get AI suggestions." : running || actionBusy || commandInFlight || promptQueue.length ? "AI suggestions paused while work is running." : prompt.value.length > 2000 ? "AI suggestions are unavailable for drafts over 2,000 characters." : undefined,
   enabled: () => !!state?.auth.signedIn && !running && !actionBusy && !commandInFlight && !promptQueue.length,
-  contextKey: () => JSON.stringify([state?.conversationMode, state?.workspace?.root, state?.activeThreadId, state?.composerDraftKey, state?.auth.signedIn, running, actionBusy, commandInFlight, promptQueue.length, mode.value]),
+  contextKey: () => JSON.stringify([activeDesktopSession, state?.conversationMode, state?.workspace?.root, state?.activeThreadId, state?.composerDraftKey, state?.conversation, state?.auth.signedIn, state?.auth.server, state?.auth.accountScope, state?.auth.model, state?.auth.allowPromptTraining, accountAuthGeneration, running, actionBusy, commandInFlight, promptQueue.length, mode.value]),
   request: async prefix => ({ completion: (await bridge.suggestPrompt({ prefix })).suggestion }),
   cancel: () => bridge.cancelSuggestion(),
   describeError: message,
   signal,
+});
+let sessionViewGeneration = 0;
+const terminalPanel = createTerminalPanel({ bridge, host: el("interactive-panel"), error: showError, signal });
+function setSessionViewBusy(busy: boolean) {
+  el("app").inert = busy;
+  document.querySelector<HTMLElement>(".account-footer")?.toggleAttribute("inert", busy);
+  el("app").setAttribute("aria-busy", String(busy));
+}
+const sessionList = createSessionList({
+  bridge, host: el("session-list"), count: el("session-count"),
+  newChat: button("session-new-chat"), newProject: button("session-new-project"),
+  projectRoot: () => state?.conversationMode === "coding" && state.workspace?.trusted ? state.workspace.root : undefined,
+  prepareSwitch: () => window.prepareSessionSwitch!(),
+  busyChanged: setSessionViewBusy,
+  async activated(session) {
+    const generation = ++sessionViewGeneration;
+    const hydration = { generation, buffer: createHydrationBuffer<DesktopEvent>((previous, event) => event.type === "text-delta" && previous.type === "text-delta" && previous.runId === event.runId && event.streamText !== undefined) };
+    sessionHydration = hydration;
+    activeDesktopSession = session.id;
+    setSessionViewBusy(true);
+    filesRequest++; fileRequest++; accountDetailsRequest++; accountAuthGeneration++;
+    profileSignedIn = undefined; accountProfile = {};
+    archiveScopeGeneration++; showingArchived = false; hide("notice");
+    button("toggle-archived").setAttribute("aria-pressed", "false");
+    text("toggle-archived", "Archived chats");
+    activeRun = session.runId || null;
+    running = session.status === "running" || session.status === "queued";
+    approvalQueue = []; currentApproval = null;
+    assistantParagraph = null; conversationRoot = null;
+    clearConversation(false, true);
+    draftAutosave?.update("", false);
+    file = null; editor.value = "";
+    hide("editor-wrap"); hide("welcome", false);
+    output = ""; text("output-log", "Command output will appear here."); el("activity-log").replaceChildren();
+    try {
+      const next = await bridge.getState();
+      if (generation !== sessionViewGeneration) return;
+      renderState(next, true);
+      const completedRun = !next.running ? session.runId : undefined;
+      if (completedRun) activeRun = null;
+      while (hydration.buffer.hasNext()) {
+        const event = hydration.buffer.take()!;
+        if (generation !== sessionViewGeneration) return;
+        if (completedRun && (("runId" in event && event.runId === completedRun) || (event.type === "state" && event.state.activeStream?.runId === completedRun))) continue;
+        await handleEvent(event, true);
+      }
+      if (sessionHydration === hydration) sessionHydration = undefined;
+      const approvals = await bridge.listSessionApprovals();
+      if (generation !== sessionViewGeneration || activeDesktopSession !== session.id) return;
+      for (const approval of approvals) await handleEvent(approval);
+    } catch (error) {
+      if (generation === sessionViewGeneration) {
+        state = null; activeRun = null; running = false;
+        draftAutosave?.update("", false);
+        updateControls();
+      }
+      throw error;
+    } finally {
+      if (sessionHydration === hydration) sessionHydration = undefined;
+      if (generation === sessionViewGeneration) setSessionViewBusy(false);
+    }
+  },
+  error: showError, signal,
 });
 const modifier = /Mac/i.test(navigator.platform) ? "⌘" : "Ctrl";
 text("save-shortcut", `${modifier}S`);
@@ -118,6 +215,27 @@ function showError(error: unknown) {
 function clearError() {
   hide("error");
 }
+let pendingDialogs = 0;
+/** Suspend privileged native surfaces before the HTML modal enters the top layer. */
+async function showDesktopDialog(dialog: HTMLDialogElement, stillCurrent: () => boolean = () => true): Promise<boolean> {
+  pendingDialogs++;
+  try {
+    await bridge.setNativeModalOpen(true);
+    if (!dialog.isConnected || !stillCurrent() || (dialog.id === "trust-dialog" && pendingFolder?.root !== state?.workspace?.root)) return false;
+    if (!dialog.open) dialog.showModal();
+    if (dialog.id === "approval-dialog") button("deny-tool").focus();
+    return true;
+  } catch (error) { showError(error); return false; }
+  finally {
+    pendingDialogs--;
+    if (!pendingDialogs && !document.querySelector("dialog[open]")) void releaseNativeModal().catch(showError);
+  }
+}
+async function releaseNativeModal() {
+  if (pendingDialogs || document.querySelector("dialog[open]")) return;
+  await bridge.setNativeModalOpen(false);
+  if (!pendingDialogs && !document.querySelector("dialog[open]")) await restorePreview();
+}
 function notify(value: string) {
   clearTimeout(noticeTimer);
   text("notice", value);
@@ -141,7 +259,7 @@ function renderWorkspaceNavigation() {
   const workspace = state?.workspace;
   const chat = isChat();
   const blocked = running || actionBusy || commandInFlight || promptQueue.length > 0;
-  const recent = [...(state?.recentFolders || [])];
+  const recent = [...(state?.openFolders || state?.recentFolders || [])];
   if (workspace && !recent.some(folder => folder.root === workspace.root)) recent.unshift(workspace);
   const key = JSON.stringify([chat, workspace?.root, workspace?.trusted, workspace?.files.length, recent, blocked]);
   if (key === workspaceNavigationKey) return;
@@ -182,16 +300,17 @@ function renderWorkspaceNavigation() {
     folderIcon.classList.add("workspace-folder-icon");
     const name = document.createElement("span"); name.textContent = folder.name;
     control.append(icon, folderIcon, name);
-    control.addEventListener("click", () => { if (!active) void openRecentWorkspace(folder.root); }, { signal });
+    control.addEventListener("click", () => { el<HTMLDetailsElement>("workspace-actions").open = false; if (!active) void openRecentWorkspace(folder.root); }, { signal });
     group.append(control);
-    if (active) group.append(context, conversations);
+    if (active) group.append(context);
     list.append(group);
   }
-  if (chat) el("general-conversations").append(conversations);
+  el("general-conversations").append(conversations);
   // Context remains hidden outside the active group in general chat.
   if (chat) el("general-conversations").append(context);
 }
 async function openRecentWorkspace(root: string) {
+  el<HTMLDetailsElement>("workspace-actions").open = false;
   if (running || actionBusy || commandInFlight || promptQueue.length) { notify("Finish the current action and queued messages before switching workspaces."); return; }
   if (dirty()) { showError(new Error("Save your editor changes before switching workspaces.")); return; }
   actionBusy = true; updateControls(); clearError();
@@ -202,7 +321,7 @@ async function openRecentWorkspace(root: string) {
     if (!workspace.trusted) {
       pendingFolder = workspace; input("trust-check").checked = false; button("trust-confirm").disabled = true;
       text("trust-path", workspace.root); const dialog = el<HTMLDialogElement>("trust-dialog"); dialog.returnValue = "";
-      if (!dialog.open) dialog.showModal();
+      if (!dialog.open) void showDesktopDialog(dialog);
     } else { mode.value = "build"; notify(`Opened ${workspace.name}. Its saved conversations are in the sidebar.`); }
   } catch (error) { showError(error); }
   finally { actionBusy = false; updateControls(); }
@@ -210,6 +329,8 @@ async function openRecentWorkspace(root: string) {
 function updateControls() {
   draftAutosave?.update(state?.composerDraftKey || "", !actionBusy);
   composerSuggestions.update();
+  sessionList.refresh();
+  terminalPanel.context(activeDesktopSession, state, mode.value as AgentMode);
   const chat = isChat();
   text("sidebar-heading-label", "Workspaces");
   hide("workspace-tools", chat);
@@ -240,6 +361,8 @@ function updateControls() {
   button("new-chat").disabled = !ready;
   button("refresh-chats").disabled = !ready || commandInFlight || !!promptQueue.length || !state?.auth.signedIn;
   voiceActive = state?.voiceActive ?? voiceActive;
+  button("voice-open").setAttribute("aria-label", voiceActive ? "Voice panel open" : "Voice input");
+  button("voice-open").classList.toggle("active", voiceActive);
   button("voice-dictate").hidden = voiceActive;
   button("voice-chat").hidden = voiceActive;
   button("voice-stop").hidden = !voiceActive;
@@ -320,10 +443,19 @@ function updateControls() {
   );
   hide("dirty-indicator", !dirty());
 }
-function draftScope(value: DesktopState | null | undefined) { return `${value?.conversationMode === "coding" ? value.workspace?.root || "none" : "chat"}:${value?.activeThreadId || "new"}`; }
+function draftScope(value: DesktopState | null | undefined) { return JSON.stringify([value?.auth.server, value?.auth.accountScope, value?.conversationMode === "coding" ? value.workspace?.root || "none" : "chat", value?.activeThreadId || "new"]); }
 let archiveScopeGeneration = 0;
-function renderState(next: DesktopState) {
-  if (state && (state.conversationMode !== next.conversationMode || state.workspace?.root !== next.workspace?.root || state.auth.signedIn !== next.auth.signedIn)) {
+function renderState(next: DesktopState, restoreConversation = false) {
+  const accountChanged = state && (state.auth.signedIn !== next.auth.signedIn || state.auth.server !== next.auth.server || state.auth.accountScope !== next.auth.accountScope);
+  if (accountChanged) {
+    sessionStreams.clear();
+    accountAuthGeneration++; accountDetailsRequest++; fileRequest++; filesRequest++;
+    conversationRoot = null; assistantParagraph = null;
+    if (!restoreConversation) activeRun = null;
+    approvalQueue = []; currentApproval = null; showApproval();
+    if (promptQueue.length) { promptQueuePaused = true; renderPromptQueue(); }
+  }
+  if (state && (state.conversationMode !== next.conversationMode || state.workspace?.root !== next.workspace?.root || accountChanged)) {
     archiveScopeGeneration++;
     hide("notice");
     showingArchived = false;
@@ -406,15 +538,22 @@ function renderState(next: DesktopState) {
   );
   const scope =
     next.conversationMode === "chat" ? "chat" : next.workspace?.root;
-  const conversationKey = `${scope}:${next.activeThreadId || "current"}`;
+  const conversationKey = JSON.stringify([next.auth.server, next.auth.accountScope, scope, next.activeThreadId || "current"]);
   if (
     (next.conversationMode === "chat" || next.workspace?.trusted) &&
     next.conversation &&
     conversationRoot !== conversationKey &&
-    !running
+    (!running || restoreConversation)
   ) {
-    clearConversation(false);
-    for (const item of next.conversation) appendMessage(item.role, item.text);
+    clearConversation(false, restoreConversation);
+    const stream = restoreConversation && next.activeStream ? rememberStream(activeDesktopSession, next.activeStream) : undefined;
+    if (stream) activeRun = stream.runId;
+    for (const item of next.conversation) {
+      const streaming = restoreConversation && running && item.role === "assistant" && item === next.conversation.at(-1);
+      const paragraph = appendMessage(item.role, streaming && stream ? stream.text : item.text);
+      if (streaming) assistantParagraph = paragraph;
+    }
+    if (stream?.text && !assistantParagraph) setStreamText(stream.text);
     conversationRoot = conversationKey;
   }
   renderFiles();
@@ -437,7 +576,7 @@ function renderState(next: DesktopState) {
     button("trust-confirm").disabled = true;
     text("trust-path", next.workspace.root);
     el<HTMLDialogElement>("trust-dialog").returnValue = "";
-    el<HTMLDialogElement>("trust-dialog").showModal();
+    void showDesktopDialog(el<HTMLDialogElement>("trust-dialog"));
   }
 }
 function renderFiles() {
@@ -536,7 +675,7 @@ async function chooseFolder() {
       text("trust-path", next.root);
       el<HTMLDialogElement>("trust-dialog").returnValue = "";
       if (!el<HTMLDialogElement>("trust-dialog").open)
-        el<HTMLDialogElement>("trust-dialog").showModal();
+        void showDesktopDialog(el<HTMLDialogElement>("trust-dialog"));
     }
   } catch (error) {
     showError(error);
@@ -768,8 +907,15 @@ function appendText(value: string) {
   assistantParagraph.textContent = assistantParagraph.dataset.raw;
   scrollChat();
 }
-function clearConversation(confirm = true) {
-  if (running) return;
+function setStreamText(value: string) {
+  if (!assistantParagraph) assistantParagraph = appendMessage("assistant", "");
+  assistantParagraph.classList.add("streaming-response");
+  assistantParagraph.dataset.raw = value;
+  assistantParagraph.textContent = value;
+  scrollChat();
+}
+function clearConversation(confirm = true, force = false) {
+  if (running && !force) return;
   if (
     confirm &&
     !window.confirm(
@@ -1030,7 +1176,7 @@ async function openExtensions(kind?: "skill" | "mcp", source?: string | null) {
   if (kind) el<HTMLSelectElement>("extension-kind").value = kind;
   if (source) input("extension-url").value = source;
   const dialog = el<HTMLDialogElement>("extensions-dialog");
-  if (!dialog.open) dialog.showModal();
+  if (!dialog.open) await showDesktopDialog(dialog);
   if (kind) input("extension-url").focus();
   const results = await Promise.allSettled([bridge.listExtensions(), bridge.listPlugins(), bridge.toolChoices()]);
   if (request !== extensionLoadRequest || !dialog.open) return;
@@ -1205,7 +1351,7 @@ function activity(value: string) {
   while (log.children.length > 200) log.firstElementChild?.remove();
   log.scrollTop = log.scrollHeight;
 }
-function outputTab(panel: "output" | "activity") {
+function outputTab(panel: "output" | "activity" | "interactive") {
   button("output-tab").setAttribute(
     "aria-selected",
     String(panel === "output"),
@@ -1217,6 +1363,8 @@ function outputTab(panel: "output" | "activity") {
   hide("output-log", panel !== "output");
   hide("command-form", panel !== "output");
   hide("activity-log", panel !== "activity");
+  hide("interactive-panel", panel !== "interactive");
+  button("interactive-tab").setAttribute("aria-selected", String(panel === "interactive"));
 }
 async function runCommand(event: Event) {
   event.preventDefault();
@@ -1292,8 +1440,8 @@ function showApproval() {
   button("approve-tool").disabled = false;
   button("approve-session-tool").disabled = false;
   button("deny-tool").disabled = false;
-  if (!dialog.open) dialog.showModal();
-  button("deny-tool").focus();
+  if (!dialog.open) void showDesktopDialog(dialog, () => currentApproval === request.id && approvalQueue.some(item => item.id === request.id));
+  if (dialog.open) button("deny-tool").focus();
 }
 async function decideApproval(approved: boolean, scope: "once" | "session" = "once") {
   const id = currentApproval;
@@ -1353,7 +1501,7 @@ function filterRepositories() {
 }
 input("github-repos-search").addEventListener("input", filterRepositories, { signal });
 button("github-repos-open").addEventListener("click", async () => {
-  try { await refreshGitHubRepositories(); el<HTMLDialogElement>("github-repos-dialog").showModal(); } catch (error) { showError(error); }
+  try { await refreshGitHubRepositories(); await showDesktopDialog(el<HTMLDialogElement>("github-repos-dialog")); } catch (error) { showError(error); }
 }, { signal });
 button("github-repos-close").addEventListener("click", () => el<HTMLDialogElement>("github-repos-dialog").close(), { signal });
 button("github-repos-refresh").addEventListener("click", () => { void refreshGitHubRepositories().catch(error => text("github-repos-status", error instanceof Error ? error.message : "Could not refresh repositories.")); }, { signal });
@@ -1461,7 +1609,7 @@ function renderExtensions(items: import("../shared").DesktopExtension[]) {
           const skill = await bridge.readSkill(item.id);
           text("skill-reader-title", skill.name);
           text("skill-reader-content", skill.instructions);
-          el<HTMLDialogElement>("skill-reader").showModal();
+          await showDesktopDialog(el<HTMLDialogElement>("skill-reader"));
         } catch (error) { showError(error); }
       }, { signal });
       actions.append(view);
@@ -1559,14 +1707,17 @@ function renderAccountAvatar() {
 }
 function renderAccount() {
   if (!state) return;
-  if (profileSignedIn !== state.auth.signedIn) {
+  const accountKey = JSON.stringify([state.auth.server, state.auth.accountScope, state.auth.signedIn]);
+  if (profileSignedIn !== state.auth.signedIn || profileAccountKey !== accountKey) {
     accountDetailsRequest++;
     accountAuthGeneration++;
     profileSignedIn = state.auth.signedIn;
+    profileAccountKey = accountKey;
     accountProfile = {};
     void loadCloudWorkspaces();
+    const generation = accountAuthGeneration;
     if (state.auth.signedIn) void bridge.accountProfile().then(profile => {
-      if (!state?.auth.signedIn) return;
+      if (!state?.auth.signedIn || generation !== accountAuthGeneration) return;
       accountProfile = profile;
       renderAccountAvatar();
       for (const avatar of document.querySelectorAll<HTMLElement>(".message-avatar.user")) {
@@ -1595,7 +1746,7 @@ function renderAccount() {
 }
 function openAccount() {
   const dialog = el<HTMLDialogElement>("account-dialog");
-  if (!dialog.open) dialog.showModal();
+  if (!dialog.open) void showDesktopDialog(dialog);
   void refreshAccountDetails();
   if (state?.auth.signedIn) void refreshUsage();
 }
@@ -1771,8 +1922,21 @@ async function logout() {
     button("logout").disabled = false;
   }
 }
-async function handleEvent(event: DesktopEvent) {
+async function handleEvent(event: DesktopEvent, replaying = false) {
+  const eventSessionGeneration = sessionViewGeneration;
+  if (sessionHydration && !replaying && !["sessions", "session-event", "terminal-event", "preview-state"].includes(event.type)) {
+    sessionHydration.buffer.push(event);
+    return;
+  }
   switch (event.type) {
+    case "sessions": await sessionList.update(event.snapshot); break;
+    case "terminal-event": terminalPanel.event(event.event); break;
+    case "session-event": {
+      const nested = event.event;
+      if (nested.type === "text-delta" && nested.streamText !== undefined && nested.streamRevision !== undefined) rememberStream(event.sessionId, { runId: nested.runId, text: nested.streamText, revision: nested.streamRevision });
+      break; // Cache cumulative background text; active legacy events render it once.
+    }
+    case "preview-state": renderPreview(event.state); break;
     case "composer-scope-migrated":
       if (state?.composerDraftKey === event.from) {
         draftAutosave?.migrate(event.from, event.to);
@@ -1784,6 +1948,7 @@ async function handleEvent(event: DesktopEvent) {
       if (state) state.voiceActive = event.active;
       text("voice-status", event.text);
       updateControls();
+      void restorePreview().catch(showError);
       break;
     case "voice-dictation":
       if (event.scope !== state?.composerDraftKey) break;
@@ -1805,14 +1970,19 @@ async function handleEvent(event: DesktopEvent) {
       renderState(event.state);
       break;
     case "run-started":
+      if (activeRun !== event.runId) assistantParagraph = null;
       activeRun = event.runId;
       running = true;
-      assistantParagraph = null;
       updateControls();
       renderFiles();
       break;
     case "text-delta":
-      if (!activeRun || event.runId === activeRun) appendText(event.text);
+      if (event.runId === activeRun) {
+        if (event.streamText !== undefined && event.streamRevision !== undefined) {
+          const stream = rememberStream(activeDesktopSession, { runId: event.runId, text: event.streamText, revision: event.streamRevision });
+          setStreamText(stream.text);
+        } else appendText(event.text);
+      }
       break;
     case "tool-start":
       if (event.runId === activeRun) {
@@ -1844,6 +2014,7 @@ async function handleEvent(event: DesktopEvent) {
       }
       break;
     case "approval":
+      if (resolvedApprovals.has(event.id) || (event.runId && event.runId !== activeRun)) break;
       if (!approvalQueue.some((a) => a.id === event.id)) {
         approvalQueue.push(event);
         activity(
@@ -1853,6 +2024,7 @@ async function handleEvent(event: DesktopEvent) {
       }
       break;
     case "approval-resolved":
+      rememberResolvedApproval(event.id);
       approvalQueue = approvalQueue.filter((a) => a.id !== event.id);
       if (currentApproval === event.id) currentApproval = null;
       activity(
@@ -1868,7 +2040,7 @@ async function handleEvent(event: DesktopEvent) {
         appendOutput(`\nExit code: ${event.exitCode ?? "cancelled"}\n`);
       break;
     case "done":
-      if (!activeRun || event.runId === activeRun) {
+      if (event.runId === activeRun) {
         if (event.cancelled && event.text) appendMessage("system", event.text);
         else if (!assistantParagraph && event.text) appendText(event.text);
         if (assistantParagraph) {
@@ -1890,14 +2062,17 @@ async function handleEvent(event: DesktopEvent) {
         if (event.cancelled) { promptQueuePaused = true; renderPromptQueue(); }
         activity(event.cancelled ? "Task stopped." : "Task completed.");
         text("working-text", "Working in your project…");
+        for (const approval of approvalQueue) if (approval.runId === event.runId) rememberResolvedApproval(approval.id);
         approvalQueue = approvalQueue.filter((a) => a.runId !== event.runId);
         showApproval();
         updateControls();
         if (!isChat()) await refreshFiles();
+        if (eventSessionGeneration !== sessionViewGeneration) return;
         if (!isChat() && file && !dirty()) {
           const path = file.path;
           try {
             const fresh = await bridge.readFile(path);
+            if (eventSessionGeneration !== sessionViewGeneration) return;
             file = fresh;
             editor.value = fresh.content;
             updateLineNumbers();
@@ -1906,7 +2081,9 @@ async function handleEvent(event: DesktopEvent) {
             /* The agent may have removed this file; preserve the visible editor. */
           }
         }
-        renderState(await bridge.getState());
+        const completedState = await bridge.getState();
+        if (eventSessionGeneration !== sessionViewGeneration) return;
+        renderState(completedState);
         if (
           state?.auth.signedIn &&
           el<HTMLDialogElement>("account-dialog").open
@@ -1916,6 +2093,7 @@ async function handleEvent(event: DesktopEvent) {
       }
       break;
     case "error":
+      if (event.runId && event.runId !== activeRun) break;
       promptQueuePaused = true;
       renderPromptQueue();
       showError(new Error(event.text));
@@ -1996,7 +2174,7 @@ function openPermissions() {
   ).querySelectorAll<HTMLInputElement>('input[name="permission-preset"]'))
     node.checked = node.value === preset;
   const dialog = el<HTMLDialogElement>("permissions-dialog");
-  if (!dialog.open) dialog.showModal();
+  if (!dialog.open) void showDesktopDialog(dialog);
 }
 button("permissions-open").addEventListener("click", openPermissions, {
   signal,
@@ -2060,11 +2238,94 @@ prompt.addEventListener(
   { signal },
 );
 
+let previewSelected = false;
+let previewOpened = false;
+let previewAddressDirty = false;
+let previewRestoreGeneration = 0;
+function previewArea() {
+  const r = el("preview-surface").getBoundingClientRect();
+  return { x: r.x, y: r.y, width: r.width, height: r.height };
+}
+function renderPreview(value: DesktopPreviewState) {
+  button("preview-back").disabled = !value.canGoBack;
+  button("preview-forward").disabled = !value.canGoForward;
+  if (value.url && !previewAddressDirty && document.activeElement !== input("preview-url")) input("preview-url").value = value.url;
+  text("preview-status", value.error || (value.loading ? "Loading preview…" : value.url || "Enter the address of your running app."));
+}
+function previewCanShow() {
+  return previewSelected && previewOpened && !voiceActive && !pendingDialogs && !el("workbench").hidden && !document.querySelector("dialog[open]");
+}
+async function restorePreview() {
+  const generation = ++previewRestoreGeneration;
+  if (!previewCanShow()) { await bridge.preview({ action: "hide" }); return; }
+  const bounds = previewArea();
+  if (bounds.width <= 0 || bounds.height <= 0) return;
+  const result = await bridge.preview({ action: "show", bounds });
+  if (generation !== previewRestoreGeneration || !previewCanShow()) return;
+  renderPreview(result);
+}
+async function selectWorkbenchPreview(selected: boolean) {
+  previewSelected = selected;
+  el("workbench").classList.toggle("preview-selected", selected);
+  hide("preview-pane", !selected);
+  button("view-code").setAttribute("aria-pressed", String(!selected));
+  button("view-preview").setAttribute("aria-pressed", String(selected));
+  if (!selected) { previewRestoreGeneration++; await bridge.preview({ action: "hide" }); return; }
+  showWorkbench(true);
+  await restorePreview();
+}
+button("view-code").addEventListener("click", () => void selectWorkbenchPreview(false).catch(showError), { signal });
+button("view-preview").addEventListener("click", () => void selectWorkbenchPreview(true).catch(showError), { signal });
+async function openInteractivePanel() {
+  await selectWorkbenchPreview(false);
+  showWorkbench(true);
+  outputTab("interactive");
+  await terminalPanel.refresh();
+}
+button("interactive-tab").addEventListener("click", () => void openInteractivePanel().catch(showError), { signal });
+button("sidebar-terminal").addEventListener("click", () => void openInteractivePanel().catch(showError), { signal });
+el("preview-form").addEventListener("submit", event => {
+  event.preventDefault();
+  if (voiceActive || pendingDialogs || document.querySelector("dialog[open]")) return;
+  previewOpened = true; previewAddressDirty = false;
+  void bridge.preview({ action: "open", url: input("preview-url").value, bounds: previewArea() }).then(renderPreview).catch(showError);
+}, { signal });
+input("preview-url").addEventListener("input", () => { previewAddressDirty = true; }, { signal });
+for (const action of ["back", "forward", "reload"] as const) button(`preview-${action}`).addEventListener("click", () => {
+  void bridge.preview({ action }).then(renderPreview).catch(showError);
+}, { signal });
+const previewObserver = new ResizeObserver(() => {
+  if (previewCanShow()) void bridge.preview({ action: "resize", bounds: previewArea() }).catch(showError);
+});
+previewObserver.observe(el("preview-surface"));
+// Native web contents must never cover an approval or settings dialog.
+const modalObserver = new MutationObserver(() => {
+  if (document.querySelector("dialog[open]")) {
+    previewRestoreGeneration++;
+    void bridge.setNativeModalOpen(true).catch(showError);
+  } else if (!pendingDialogs) void releaseNativeModal().catch(showError);
+});
+modalObserver.observe(document.body, { subtree: true, attributes: true, attributeFilter: ["open"] });
+signal.addEventListener("abort", () => { previewObserver.disconnect(); modalObserver.disconnect(); }, { once: true });
 function showWorkbench(open: boolean) {
   hide("workbench", !open);
+  if (!open) void bridge.preview({ action: "hide" }).catch(() => {});
   el("app").classList.toggle("tools-open", open);
   button("toggle-workbench").setAttribute("aria-expanded", String(open));
+  if (open && previewSelected) void restorePreview().catch(showError);
 }
+button("voice-open").addEventListener("click", () => {
+  const open = el("voice-menu").hidden;
+  hide("voice-menu", !open);
+  button("voice-open").setAttribute("aria-expanded", String(open));
+  if (open) button(voiceActive ? "voice-stop" : "voice-dictate").focus();
+}, { signal });
+document.addEventListener("click", event => {
+  if (!(event.target as HTMLElement).closest(".composer-voice")) { hide("voice-menu"); button("voice-open").setAttribute("aria-expanded", "false"); }
+}, { signal });
+el("voice-menu").addEventListener("keydown", event => {
+  if (event.key === "Escape") { hide("voice-menu"); button("voice-open").setAttribute("aria-expanded", "false"); button("voice-open").focus(); }
+}, { signal });
 let showingArchived = false;
 for (const [id, voiceMode] of [["voice-dictate", "dictation"], ["voice-chat", "conversation"]] as const) {
   button(id).addEventListener("click", async () => {
@@ -2073,7 +2334,10 @@ for (const [id, voiceMode] of [["voice-dictate", "dictation"], ["voice-chat", "c
     updateControls();
     try {
       await draftAutosave?.flush();
+      await bridge.preview({ action: "hide" });
       await bridge.startVoice({ mode: voiceMode, agentMode: mode.value as AgentMode });
+      hide("voice-menu");
+      button("voice-open").setAttribute("aria-expanded", "false");
     } catch (error) { showError(error); }
     finally { actionBusy = false; updateControls(); }
   }, { signal });
@@ -2088,6 +2352,7 @@ button("refresh-chats").addEventListener("click", async () => {
   finally { actionBusy = false; updateControls(); }
 }, { signal });
 button("toggle-archived").addEventListener("click", () => {
+  el<HTMLDialogElement>("account-dialog").close();
   showingArchived = !showingArchived;
   button("toggle-archived").setAttribute("aria-pressed", String(showingArchived));
   text("toggle-archived", showingArchived ? "Back to chats" : "Archived chats");
@@ -2242,6 +2507,8 @@ async function loadSponsor() {
     text("sponsor-label", sponsor.label);
     text("sponsor-headline", sponsor.headline);
     text("sponsor-description", sponsor.description);
+    el("sponsor-placement").title = `${sponsor.label} · ${sponsor.headline} · ${sponsor.description}`;
+    el("sponsor-placement").setAttribute("aria-describedby", "sponsor-headline sponsor-description");
     el("sponsor-placement").setAttribute(
       "aria-label",
       sponsor.paid ? "Sponsored placement" : "Freecoda announcement",
@@ -2273,6 +2540,7 @@ async function loadSponsor() {
 }
 
 button("error-close").addEventListener("click", clearError, { signal });
+button("open-folder").addEventListener("click", () => { el<HTMLDetailsElement>("workspace-actions").open = false; }, { signal });
 for (const id of ["open-folder", "welcome-open"])
   button(id).addEventListener("click", () => void chooseFolder(), { signal });
 button("refresh-files").addEventListener("click", () => void refreshFiles(), {
@@ -2472,7 +2740,7 @@ if (!rawBridge) {
   void bridge.appInfo().then(({ version, packaged }) => {
     text("app-version", `v${version}${packaged ? "" : " · Local development"}`);
   }).catch(showError);
-  void bridge.getState().then(renderState).catch(showError);
+  void bridge.listSessions().then(sessionList.update).catch(showError);
   void loadSponsor();
 }
 

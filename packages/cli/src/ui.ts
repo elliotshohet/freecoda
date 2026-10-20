@@ -461,6 +461,11 @@ export class TerminalScreen {
       : [];
   }
   private onKey = (str: string, key: Key = {}) => {
+    // Never accept an approval while its evidence and category warning cannot fit.
+    if (this.question?.kind === "approval" && ((process.stdout.rows || 24) < 16 || (process.stdout.columns || 80) < ((process.stdout.rows || 24) < 24 ? 80 : 44))) {
+      if (key.name === "escape" || (key.ctrl && key.name === "c")) this.submit("n");
+      return;
+    }
     if (key.ctrl && key.name === "o") {
       this.onOpenSponsor?.(this.sponsor.href);
       return;
@@ -729,10 +734,17 @@ export class TerminalScreen {
   render() {
     if (this.closed) return;
     const palette = terminalPalette(this.theme);
-    const columns = Math.max(40, Math.min(240, process.stdout.columns || 80));
-    const rows = Math.max(16, process.stdout.rows || 24);
+    const columns = Math.max(1, Math.min(240, process.stdout.columns || 80));
+    const rows = Math.max(1, process.stdout.rows || 24);
+    const compact = rows < 24;
+    const minimumColumns = compact && this.question?.kind === "approval" ? 80 : 44;
+    if (columns < minimumColumns || rows < 16) {
+      const notice = wrapTerminalText(`Resize terminal to at least ${minimumColumns} columns and 16 rows. Your session is preserved.`, Math.max(1, columns - 1));
+      process.stdout.write("\x1b[?25l\x1b[H" + notice.slice(0, rows).map(line => line + "\x1b[K").join("\r\n") + "\x1b[J");
+      return;
+    }
     const inner = columns - 4;
-    const inputRowCount = rows < 20 ? 2 : 3;
+    const inputRowCount = compact ? 1 : 3;
     const lines: string[] = [];
     const cardWidth = Math.min(columns - 4, 76);
     const card = (text: string, accent = false) => {
@@ -744,25 +756,30 @@ export class TerminalScreen {
         palette.muted("│")
       );
     };
+    const brandLabel = "✳  FREECODA";
     const helpLabel = columns >= 72 ? "help /help   mode /mode   quit /exit" : columns >= 54 ? "/help · /mode" : "/help";
-    lines.push("  " + c.bold(palette.accent("✳  FREECODA")) + palette.muted("   " + helpLabel));
-    lines.push(palette.muted("  ╭" + "─".repeat(cardWidth - 2) + "╮"));
-    lines.push(card(this.mode === "chat" ? "GENERAL CHAT   No repository access" : `${this.mode === "build" ? "Build" : this.mode === "plan" ? "Plan" : "Review"} · ${this.permissions}`, true));
-    lines.push(card(`Location   ${this.root}`));
-    lines.push(palette.muted("  ╰" + "─".repeat(cardWidth - 2) + "╯"));
+    const headerGap = Math.max(2, columns - textWidth(brandLabel) - textWidth(helpLabel) - 4);
+    lines.push("  " + c.bold(palette.accent(brandLabel)) + " ".repeat(headerGap) + palette.muted(helpLabel));
+    if (!compact) lines.push(palette.muted("  ╭" + "─".repeat(cardWidth - 2) + "╮"));
+    lines.push(compact ? "  " + clip(`${this.mode} · ${this.permissions}`, inner) : card(this.mode === "chat" ? "GENERAL CHAT   No repository access" : `${this.mode === "build" ? "BUILD" : this.mode === "plan" ? "PLAN" : "REVIEW"}   ${this.permissions}`, true));
+    if (!compact) lines.push(card(`Location   ${this.root}`));
+    if (!compact) lines.push(palette.muted("  ╰" + "─".repeat(cardWidth - 2) + "╯"));
     const commands = this.commandMatches();
     const menuSize = Math.min(
       commands.length,
       Math.max(1, Math.min(5, rows - 22)),
     );
-    const menuRows =
-      this.question?.kind === "approval" && this.approvalCategory
-        ? 5
-        : this.question?.kind === "permissions"
-          ? 4
-          : commands.length
-            ? menuSize + 1
-            : 0;
+    const approvalCategoryLabel = this.approvalCategory === "shell" ? "commands and external tools" : "file edits";
+    const approvalLines = this.question?.kind === "approval" && this.approvalCategory
+      ? ["Approval required · review the action above", ...[
+          "Yes, allow once",
+          `Yes, allow ALL ${approvalCategoryLabel} for this session`,
+          "No, decline this action",
+        ].map((choice, index) => `${index === this.approvalIndex ? "›" : " "} ${index + 1}. ${choice}`),
+        "Session approval covers ALL commands/external tools or ALL file edits."]
+          .flatMap(line => wrapTerminalText(line, inner))
+      : [];
+    const menuRows = approvalLines.length || (this.question?.kind === "permissions" ? 4 : commands.length ? menuSize + 1 : 0);
     const transcript: string[] = [];
     for (const entry of this.entries) {
       const label = {
@@ -804,7 +821,7 @@ export class TerminalScreen {
       }
       transcript.push("");
     }
-    const contentRows = Math.max(0, rows - 12 - inputRowCount - menuRows);
+    const contentRows = Math.max(0, rows - (compact ? (approvalLines.length ? 6 : 7) : 12) - inputRowCount - menuRows);
     this.scroll = Math.min(
       this.scroll,
       Math.max(0, transcript.length - contentRows),
@@ -833,36 +850,7 @@ export class TerminalScreen {
         );
       }
     }
-    if (this.question?.kind === "approval" && this.approvalCategory) {
-      const category =
-        this.approvalCategory === "shell"
-          ? "commands and external tools"
-          : "file edits";
-      lines.push(
-        palette.warning("  Approval required · review the action above"),
-      );
-      for (const [index, choice] of [
-        "Yes, allow once",
-        `Yes, allow ALL ${category} for this session`,
-        "No, decline this action",
-      ].entries()) {
-        const text = clip(
-          `${index === this.approvalIndex ? "›" : " "} ${index + 1}. ${choice}`,
-          inner,
-        );
-        lines.push(
-          "  " +
-            (index === this.approvalIndex
-              ? c.bold(palette.accent(text))
-              : palette.muted(text)),
-        );
-      }
-      lines.push(
-        palette.muted(
-          "  Session approval covers ALL commands/external tools or ALL file edits.",
-        ),
-      );
-    }
+    for (const line of approvalLines) lines.push("  " + palette.warning(line));
     if (this.question?.kind === "permissions") {
       lines.push(
         palette.muted(
@@ -882,13 +870,13 @@ export class TerminalScreen {
         );
       }
     }
-    lines.push(
+    if (!compact || this.question?.kind !== "approval") lines.push(
       palette.muted(
         "  " + clip(this.sponsor.label + " · " + this.sponsor.headline, inner),
       ),
     );
-    lines.push(palette.muted("  " + clip(this.sponsor.description, inner)));
-    lines.push(
+    if (!compact) lines.push(palette.muted("  " + clip(this.sponsor.description, inner)));
+    if (!compact) lines.push(
       palette.muted(
         "  " + clip("Ctrl+O sponsor · " + this.sponsor.href, inner),
       ),
