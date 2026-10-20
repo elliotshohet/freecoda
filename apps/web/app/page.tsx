@@ -6,11 +6,14 @@ import { Install } from "@/components/install";
 import { GitHubIcon } from "@/components/github-icon";
 import { homeStructuredData, publicPageMetadata, SITE_DESCRIPTION } from "@/lib/seo";
 
-export const metadata = publicPageMetadata({
-  title: "Free, open-source AI coding agent",
-  description: SITE_DESCRIPTION,
-  path: "/",
-});
+export const metadata = {
+  ...publicPageMetadata({
+    title: "Free, open-source AI coding agent",
+    description: SITE_DESCRIPTION,
+    path: "/",
+  }),
+  title: { absolute: "Freecoda — Free, open-source AI coding agent" },
+};
 
 export default function Home() {
   return (
