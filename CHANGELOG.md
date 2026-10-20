@@ -7,22 +7,33 @@ remain under Unreleased until publication and artifact verification are complete
 
 ## Unreleased
 
-### Desktop 0.1.11 — publication pending
+No pending client feature releases.
+
+## Desktop 0.1.11 — 2026-10-20
+
+[Release](https://github.com/elliotshohet/freecoda/releases/tag/v0.1.11)
+
+Source: `dbc0a03f6902d9ae99d053c068906fb863b055c6`. Exact-source Checks and all four native Desktop packages jobs passed. All 16 downloaded release assets matched GitHub sizes and SHA-256 digests, the checksum manifest, and three SHA-512 updater feeds. Installed Windows and Linux AppImage updates from 0.1.10 passed verified download, normal quit and replacement, renderer relaunch, close-to-tray, and second-launch restoration.
 
 - Add independently owned sessions, background status and approval recovery, interrupted-session restoration without replay, and repository-wide execution serialization.
 - Add explicit macOS interactive shell, Codex, and Claude connections with separate-account consent and session-bound controls.
 - Improve stream hydration, draft and suggestion ownership, and native preview and voice dialog ordering.
-- Migration and limits: no local history migration is required. macOS interactive terminals are fixed-size plain-text sessions; Windows and Linux do not yet offer that transport. External Codex and Claude use their own sign-in and billing. Full terminal emulation and managed external-agent protocols remain incomplete. Unsigned macOS packages require manual installation; live microphone and external-agent TUI behavior remain unqualified.
+- Migration and limits: no local history migration is required. macOS interactive terminals are fixed-size plain-text sessions; Windows and Linux do not yet offer that transport. External Codex and Claude use their own sign-in and billing. Full terminal emulation and managed external-agent protocols remain incomplete. Unsigned macOS packages require manual installation; Linux DEB updates use the package manager. Tray-menu clicking, live microphone behavior, and external-agent TUI compatibility remain unqualified.
 
-### CLI 0.1.10 — publication pending
+## CLI 0.1.10 — 2026-10-20
+
+[Release](https://github.com/elliotshohet/freecoda/releases/tag/cli-v0.1.10)
+
+Source: `dbc0a03f6902d9ae99d053c068906fb863b055c6`. The exact-source CI archive and public downloaded bytes, size, SHA-256 checksum, and package identity were verified. The checksum-pinned public shell installer passed check-only verification. npm registry publication remains separate.
 
 - Improve compact terminal rendering and keep approval evidence visible before accepting a choice.
 - Correct first-party LICENSE ownership while retaining required upstream component notices.
 - Migration and limits: no local data migration is required.
 
-### Web — deployed
+## Web production — 2026-10-20
 
 - Deploy zero-cost-only concurrency admission and apply migration 0013 to production after isolated CI integration checks. At most three verified free requests can run for one account. Nonzero and uncertain reservations retain conservative admission.
+- Update the public download page and checksum-pinned shell installer to the verified desktop 0.1.11 and CLI 0.1.10 releases. The live production deployment and installer contents were verified.
 
 ## Desktop 0.1.10 — 2026-10-20
 
