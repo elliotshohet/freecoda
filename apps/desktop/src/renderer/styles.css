@@ -786,8 +786,18 @@ kbd {
   background: light-dark(#edf7f1, #1c3027);
   border: 1px solid light-dark(#cae3d2, #393143);
   color: light-dark(#57836b, #92c9ad);
-  pointer-events: none;
+  pointer-events: auto;
 }
+.notice button {
+  margin-left: 12px;
+  min-height: 32px;
+  padding: 4px 12px;
+  color: inherit;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  cursor: pointer;
+}
+#toggle-archived { min-height: 36px; margin: 4px 8px; }
 .error {
   background: light-dark(#fff3f5, #35212b);
   border: 1px solid light-dark(#e7c8d2, #393143);
@@ -2382,3 +2392,97 @@ dialog.settings-dialog .extension-actions { flex-wrap: wrap; justify-content: fl
 @media (max-width: 1100px) { .sidebar { padding-left: 48px; } .desktop-rail { width: 40px; } .desktop-rail button { width: 32px; height: 34px; } }
 @media (max-width: 680px) { .house-ad { width: calc(100% - 28px); } }
 @media (prefers-reduced-motion: reduce) { .desktop-rail button { transition: none; transform: none; } }
+
+/* The native textarea supplies editing, selection and accessibility; this layer only colors text. */
+.file-code-surface {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--white);
+}
+.file-code-highlight,
+.file-code-surface #editor {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 18px 20px 18px 12px;
+  font: 13px/22px var(--mono);
+  font-variant-ligatures: none;
+  letter-spacing: 0;
+  tab-size: 2;
+  white-space: pre;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.file-code-highlight {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--ink);
+  background: transparent;
+}
+.file-code-surface #editor,
+.file-code-surface #editor:disabled {
+  position: relative;
+  z-index: 1;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: var(--ink);
+  background: transparent;
+  opacity: 1;
+}
+.file-code-surface #editor::selection {
+  background: light-dark(#cfc6f280, #8066b080);
+}
+.editor-wrap > .line-numbers {
+  padding-top: 18px;
+  padding-bottom: 18px;
+  font: 12px/22px var(--mono);
+  font-variant-ligatures: none;
+  color: var(--muted);
+  border-right: 1px solid var(--line);
+}
+.file-token-comment { color: light-dark(#63736c, #91a898); }
+.file-token-string { color: light-dark(#876020, #d8bb83); }
+.file-token-keyword { color: light-dark(#7350b6, #c3a3f0); }
+.file-token-number { color: light-dark(#9c5142, #e3a18d); }
+.file-token-tag { color: light-dark(#326c88, #8bc6df); }
+.file-token-property { color: light-dark(#306e79, #91cbd3); }
+@media (forced-colors: active) {
+  .file-code-highlight { display: none; }
+  .file-code-surface #editor,
+  .file-code-surface #editor:disabled {
+    color: CanvasText;
+    -webkit-text-fill-color: CanvasText;
+    caret-color: CanvasText;
+  }
+}
+
+/* Sidebar destinations; titlebar contains only context and view controls. */
+.sidebar { padding-left: 12px; }
+.navigation-context { display: flex; align-items: baseline; gap: 12px; min-width: 0; -webkit-app-region: drag; }
+.navigation-context strong { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.navigation-context span { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.titlebar-actions { -webkit-app-region: no-drag; }
+.sidebar-settings .sidebar-action { text-align: left; min-height: 36px; }
+@media(max-width:1100px) { .sidebar { padding-left: 10px; } }
+@media(max-width:680px) { .navigation-context span { display: none; } }
+
+.workspace-folder-icon { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; flex-shrink: 0; }
+#toggle-archived { background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 6px; font: inherit; cursor: pointer; }
+#toggle-archived:hover, #toggle-archived[aria-pressed="true"] { color: var(--ink); background: var(--white); }
+
+/* Neutral draft focus, with a visible keyboard boundary. */
+.composer:hover, .composer:focus-within { border-color: light-dark(#929892, #858b85); box-shadow: none; }
+.composer > textarea:focus, .composer > textarea:focus-visible { outline: none; box-shadow: none; }
+.composer:has(> textarea:focus-visible) { outline: 1px solid light-dark(#666c66, #afb5af); outline-offset: 2px; }
+.composer-ghost { position: absolute; inset: 0 0 auto; pointer-events: none; margin: 0; padding: 15px 16px 4px; height: 104px; overflow: hidden; white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; color: light-dark(#737973, #a2aaa2); font: 15px/1.6 var(--sans); border: 0; }
+.composer-ghost-prefix { color: transparent; }
+.composer-suggestion-status { display: block; min-height: 0; padding: 0 16px 8px; font-size: 11px; color: var(--muted); }
+.composer-suggestion-status:empty { display: none; }
+.composer > textarea::selection { background: light-dark(#d8ddd8, #505750); color: var(--ink); }
+.composer button:focus-visible { outline: 2px solid light-dark(#666c66, #afb5af); outline-offset: 2px; }

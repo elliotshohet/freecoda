@@ -151,3 +151,9 @@ The bottom-left footer displays the version reported by Electron, with GitHub si
 Open the avatar or **Account & settings** for the current profile, local workspace, authenticated GitHub repository access and preferences, cloud workspaces, installed local integrations, daily allowance, and connected devices. Each section reports loading, empty, or failed requests separately. Repository and integration management reuse their existing dialogs. Email, privacy settings, and device revocation remain in **Open web account settings**. Device credentials do not gain administrator access.
 
 Building the desktop does not launch it. `bun run desktop:dev` is a one-time native launch; it does not watch or reopen a window after you close it. Web/API and PostgreSQL can run separately in Docker Compose; the macOS Electron GUI stays native.
+
+Archiving a conversation preserves its full history in this device’s private local cache. Use Archived chats to restore it later, or choose Undo in the brief archive notification to restore and reopen it immediately. Archive status is local to this device; it does not delete the cloud conversation or change other clients.
+
+The sidebar separates local workspace folders, cloud projects, and general chat. The top bar controls navigation/project-tool visibility and theme. Plugins bundle skills and MCP servers; skills provide instructions, while tools are callable actions. MCP servers can expose additional tools.
+
+When signed in, focusing and pausing in the composer requests a short AI draft suggestion through the existing approved hosted model and account allowance. Only bounded text from the current conversation and draft is used; no files or tools are read. Tab inserts a visible suggestion without sending it; Escape dismisses it. Requests are debounced, cancellable, and rate limited, and require hosted account access. No canned suggestion replaces a failed AI request.

@@ -37,7 +37,7 @@ export type DesktopState = {
   running: boolean;
   permissionPreset: DesktopPermissionPreset;
   conversationMode: "chat" | "coding";
-  threads?: { id: string; title: string; updatedAt: string }[];
+  threads?: { id: string; title: string; updatedAt: string; archived?: boolean }[];
   activeThreadId?: string;
   conversation?: { role: "user" | "assistant"; text: string }[];
 };
@@ -124,6 +124,8 @@ export interface DesktopBridge {
   runCommand(input: { command: string }): Promise<DesktopCommandResult>;
   runAgent(input: DesktopRunInput): Promise<{ runId: string }>;
   cancelRun(): Promise<void>;
+  suggestPrompt(input: { prefix: string }): Promise<{ suggestion: string }>;
+  cancelSuggestion(): Promise<void>;
   respondApproval(
     input: DesktopApprovalResponse,
   ): Promise<{ accepted: boolean }>;
@@ -133,6 +135,7 @@ export interface DesktopBridge {
   clearHistory(): Promise<void>;
   createThread(): Promise<DesktopState>;
   openThread(id: string): Promise<DesktopState>;
+  setThreadArchived(id: string, archived: boolean): Promise<DesktopState>;
   deleteThread(id: string): Promise<DesktopState>;
   copyText(value: string): Promise<void>;
   openCloud(): Promise<void>;

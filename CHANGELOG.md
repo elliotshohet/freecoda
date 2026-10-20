@@ -7,7 +7,17 @@ remain under Unreleased until publication and artifact verification are complete
 
 ## Unreleased
 
-No pending release changes.
+### Desktop 0.1.9 — publication pending
+
+[Planned release](https://github.com/elliotshohet/freecoda/releases/tag/v0.1.9)
+
+The changes below passed local checks; CI packaging and publication are pending.
+
+- Preserve archived conversations on this device, with a brief Undo action and an Archived chats view; keep cloud deletion separate.
+- Add theme-aware syntax colors to the existing file editor while preserving whitespace, native editing, approval checks, and scrolling.
+- Separate local workspace folders, cloud projects, and general chat; consolidate navigation and repair plugin-manager loading and Tools visibility.
+- Use a neutral composer focus treatment and contextual hosted AI draft suggestions that Tab inserts for review, without sending or executing them.
+- Limits: archive status remains device-local. AI suggestions require an eligible signed-in account and use its hosted allowance. Builds remain unsigned; macOS downloads require manual installation. Installed automatic updates to 0.1.9 are not yet qualified.
 
 ## Desktop 0.1.8 — 2026-10-19
 

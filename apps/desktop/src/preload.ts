@@ -40,6 +40,8 @@ const api: DesktopBridge = {
   saveFile: (input) => ipcRenderer.invoke("desktop:saveFile", input),
   runCommand: (input) => ipcRenderer.invoke("desktop:runCommand", input),
   runAgent: (input) => ipcRenderer.invoke("desktop:runAgent", input),
+  suggestPrompt: (input) => ipcRenderer.invoke("desktop:suggestPrompt", input),
+  cancelSuggestion: () => ipcRenderer.invoke("desktop:cancelSuggestion"),
   cancelRun: () => ipcRenderer.invoke("desktop:cancelRun"),
   respondApproval: (input) =>
     ipcRenderer.invoke("desktop:respondApproval", input),
@@ -52,6 +54,7 @@ const api: DesktopBridge = {
   setConversationMode: (mode) =>
     ipcRenderer.invoke("desktop:setConversationMode", mode),
   openThread: (id) => ipcRenderer.invoke("desktop:openThread", id),
+  setThreadArchived: (id, archived) => ipcRenderer.invoke("desktop:setThreadArchived", { id, archived }),
   deleteThread: (id) => ipcRenderer.invoke("desktop:deleteThread", id),
   copyText: (value) => ipcRenderer.invoke("desktop:copyText", value),
   clearHistory: () => ipcRenderer.invoke("desktop:clearHistory"),

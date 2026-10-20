@@ -15,34 +15,19 @@
   <body>
     <a class="skip" href="#prompt">Skip to conversation</a>
     <header class="titlebar">
-      <div class="workspace-switch" role="tablist" aria-label="Workspace type">
-        <button role="tab" aria-selected="true" id="local-tab">
-          On this computer</button
-        ><button
-          id="cloud-open"
-          title="Open the cloud workspace in your browser"
-        >
-          Cloud workspace <span aria-hidden="true">↗</span>
-        </button>
-      </div>
+      <div class="navigation-context"><strong id="navigation-context">General chat</strong><span>On this computer</span></div>
       <div class="titlebar-actions">
+        <button id="toggle-sidebar" class="titlebar-icon-button" aria-label="Toggle project sidebar" title="Show or hide navigation" aria-expanded="true"><svg class="titlebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18"/></svg></button>
+        <button id="toggle-workbench" class="titlebar-icon-button" aria-label="Toggle project tools" title="Show or hide project tools" aria-expanded="false" aria-controls="workbench"><svg class="titlebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m8 5-5 7 5 7m8-14 5 7-5 7m-3-16-2 18"/></svg></button>
         <button id="theme-toggle" type="button" class="theme-control" aria-label="Switch to dark mode" title="Switch to dark mode">
           <svg class="titlebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path id="theme-dark-icon" d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"/>
             <g id="theme-light-icon" hidden><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></g>
           </svg>
         </button>
-        <button class="account-button titlebar-icon-button" id="github-repos-open" aria-haspopup="dialog" aria-label="GitHub repositories" title="GitHub repositories">
-          <svg class="titlebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 3v18m4-13h4m-4 4h4m-4 4h2"/></svg>
-        </button>
-        <button class="account-button titlebar-icon-button" id="extensions-open" aria-haspopup="dialog" aria-label="Plugins" title="Plugins">
-          <svg class="titlebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v5m8-5v5M6 8h12v4a6 6 0 0 1-12 0V8Zm6 10v4"/></svg>
-        </button>
-        <button class="account-button titlebar-icon-button" id="account-open" title="Your account" aria-labelledby="account-label">
-          <svg class="titlebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg>
-          <span class="account-dot" aria-hidden="true"></span>
-          <span id="account-label" class="sr-only">Your account</span>
-        </button>
+
+
+
       </div>
     </header>
     <div id="notice" class="notice" role="status" hidden></div>
@@ -56,16 +41,10 @@
         aria-label="Projects and conversations"
         id="project-sidebar"
       >
-        <nav class="desktop-rail" aria-label="Quick navigation">
-          <button id="rail-chat" type="button" title="General chat" aria-label="General chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3V10Z"/><path d="M9 20v-7h6v7"/></svg></button>
-          <button id="rail-repositories" type="button" title="GitHub repositories" aria-label="GitHub repositories"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 10v10"/></svg></button>
-          <button id="rail-plugins" type="button" title="Plugins & MCP" aria-label="Plugins & MCP"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M8 3v5m8-5v5M6 8h12v4a6 6 0 0 1-12 0V8Zm6 10v4"/></svg></button>
-          <button id="rail-account" type="button" title="Account & settings" aria-label="Account & settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg></button>
-        </nav>
+
         <div class="sidebar-brand"><img src="./logo.svg" alt="" width="26" height="26" /><span>Freecoda</span></div>
         <nav class="sidebar-primary" aria-label="Conversation navigation">
-          <button id="sidebar-start-chat" type="button" class="sidebar-action"><span aria-hidden="true">＋</span> New chat</button>
-          <button id="sidebar-general-chat" class="sidebar-action"><span aria-hidden="true">◌</span> General chat</button>
+          <button id="new-chat" type="button" class="sidebar-action"><span aria-hidden="true">＋</span> New chat</button>
           <button id="open-folder" class="sidebar-action" title="Open a local folder"><span aria-hidden="true">＋</span> Open folder…</button>
         </nav>
         <div class="sidebar-heading"><span id="sidebar-heading-label">Workspaces</span></div>
@@ -81,21 +60,21 @@
           </div>
         </section>
         <section class="cloud-workspace-section" aria-labelledby="cloud-workspaces-title">
-          <div class="sidebar-heading"><span id="cloud-workspaces-title">Cloud workspaces</span><button id="cloud-workspaces-refresh" class="icon-button" aria-label="Refresh cloud workspaces" title="Refresh cloud workspaces">↻</button></div>
-          <p class="workspace-empty">Cloud environments open in your browser.</p>
+          <div class="sidebar-heading"><span id="cloud-workspaces-title">Cloud projects</span><button id="cloud-workspaces-refresh" class="icon-button" aria-label="Refresh cloud workspaces" title="Refresh cloud workspaces">↻</button></div>
+          <button id="cloud-open" class="sidebar-action" title="Open the cloud workspace in your browser">Open cloud workspace ↗</button>
           <div id="cloud-workspace-list" aria-live="polite"></div>
         </section>
-        <div id="general-conversations"></div>
+        <section id="general-conversations" aria-label="General chat"><div class="sidebar-heading">General chat</div><button id="sidebar-general-chat" class="sidebar-action"><span aria-hidden="true">◌</span> General chat</button><p id="general-chat-hint" class="workspace-empty">Chats without a project folder.</p></section>
         <section id="workspace-conversations" class="workspace-conversations" aria-labelledby="conversation-scope-label">
           <h2 id="conversation-scope-label" class="sidebar-section-label">General conversations</h2>
-          <button id="sidebar-new-task" class="sidebar-action"><span aria-hidden="true">＋</span> New conversation</button>
           <button id="current-thread" class="thread-link" aria-current="page"><span id="thread-title">New conversation</span></button>
           <label class="chat-history-search"><span class="sr-only">Search current conversations</span><input id="thread-search" type="search" placeholder="Search conversations…" /></label>
+          <button id="toggle-archived" class="text-button" aria-pressed="false">Archived chats</button>
           <div id="thread-history" class="thread-history" aria-label="Saved conversations"></div>
         </section>
         <nav class="sidebar-bottom sidebar-settings" aria-label="Settings and connections">
-          <button id="sidebar-plugins" class="sidebar-action"><span aria-hidden="true">◇</span> Plugins & MCP</button>
-          <button id="sidebar-account" class="sidebar-action"><span aria-hidden="true">⚙</span> Account & settings</button>
+          <button id="github-repos-open" class="sidebar-action" aria-haspopup="dialog">GitHub repositories</button>
+          <button id="extensions-open" class="sidebar-action" aria-haspopup="dialog">Plugins &amp; MCP</button>
         </nav>
       </aside>
       <section
@@ -244,32 +223,7 @@ Command output will appear here. Your permission preset controls local command e
             <span class="agent-star" aria-hidden="true">✳</span
             ><strong id="conversation-title">New task</strong>
           </div>
-          <div class="conversation-actions">
-            <button
-              id="toggle-sidebar"
-              class="icon-button"
-              aria-label="Toggle project sidebar"
-              aria-expanded="true"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18"/></svg></button
-            ><button
-              id="toggle-workbench"
-              class="icon-button"
-              aria-label="Toggle project tools"
-              title="Project tools"
-              aria-expanded="false"
-              aria-controls="workbench"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 5-5 7 5 7m8-14 5 7-5 7m-3-16-2 18"/></svg></button
-            ><button
-              id="new-chat"
-              class="icon-button"
-              aria-label="Start a new conversation"
-              title="New conversation"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5H5v14h14v-7M15 4l5 5m-9 4 8-8a2 2 0 0 1 3 3l-8 8-4 1z"/></svg>
-            </button>
-          </div>
+
         </div>
         <div class="agent-context">
           <span id="agent-context">Open a folder to start</span
@@ -516,10 +470,12 @@ Command output will appear here. Your permission preset controls local command e
       <p id="github-repos-status" role="status"></p>
     </dialog>
     <dialog id="extensions-dialog" class="settings-dialog" aria-labelledby="extensions-title" aria-describedby="extensions-description">
-      <button class="dialog-close" id="extensions-close" aria-label="Close plugins">×</button>
+      <button class="dialog-close" id="extensions-close" aria-label="Close plugins and tools">×</button>
       <span class="settings-eyebrow">Customization</span>
       <h2 id="extensions-title">Plugins &amp; tools</h2>
-      <p id="extensions-description">Add skills and MCP tool servers to your coding workspace. General chat stays tool-free.</p>
+      <p id="extensions-description">Customize coding tasks on this computer. Tools perform actions, MCP servers expose tools, skills supply instructions, and plugins bundle skills and servers. General chat stays tool-free.</p>
+      <p id="extensions-status" role="status" aria-live="polite"></p>
+      <p id="extensions-load-error" role="alert" hidden></p>
       <div class="settings-nav" role="group" aria-label="Plugin categories">
         <button type="button" data-extension-view="all" aria-pressed="true">All</button>
         <button type="button" data-extension-view="plugins" aria-pressed="false">Plugins</button>
@@ -548,7 +504,7 @@ Command output will appear here. Your permission preset controls local command e
         </section>
         <p id="plugin-error" role="alert" hidden></p>
       </section>
-      <section class="settings-section" aria-labelledby="add-extension-heading">
+      <section id="desktop-add-extension-section" class="settings-section" aria-labelledby="add-extension-heading">
         <h3 id="add-extension-heading">Add a skill or MCP server</h3>
         <p class="settings-help">Skills provide instructions for coding tasks. MCP servers provide tools available in Build mode.</p>
         <form id="extensions-form" class="extensions-form">
@@ -560,6 +516,11 @@ Command output will appear here. Your permission preset controls local command e
           <p class="settings-help">Only install sources you trust. MCP calls can share task context with the server. Tool actions still require approval.</p>
           <button id="extension-install" class="button secondary" type="submit">Install extension</button>
         </form>
+      </section>
+      <section id="desktop-tools-section" class="settings-section" aria-labelledby="tool-choices-title">
+        <h3 id="tool-choices-title">Available tools</h3>
+        <p class="settings-help">Choose which actions are available for this session. Built-in tools work with your trusted workspace; checked MCP servers can add more. Mode and approval restrictions still apply.</p>
+        <div id="tool-choices" aria-live="polite"></div>
       </section>
     </dialog>
     <dialog id="skill-reader" class="settings-dialog" aria-labelledby="skill-reader-title"><button id="skill-reader-close" class="dialog-close" aria-label="Close skill instructions">×</button><span class="settings-eyebrow">Installed skill</span><h2 id="skill-reader-title">Skill instructions</h2><p>Installed instructions are reference material. Reading them does not grant tool access.</p><pre id="skill-reader-content" tabindex="0" aria-label="Installed skill instructions"></pre></dialog>

@@ -231,7 +231,7 @@ try {
   assert.equal(navigation.modelHidden, true);
   assert.equal(navigation.generalHistorySeparate, true);
   assert.equal(navigation.scope, "Your chats");
-  assert.equal(navigation.controls.length, 4);
+  assert.equal(navigation.controls.length, 3);
   for (const control of navigation.controls) {
     assert(control.icon && control.label && control.centered, "Header icons must be centered and labelled.");
     assert.equal(control.width, control.height);
@@ -283,7 +283,7 @@ try {
     const mcp = document.getElementById('extensions-list-title').textContent;
     const kind = document.getElementById('extension-kind').value;
     document.querySelector('[data-extension-view="tools"]').click();
-    const tools = !document.getElementById('tool-choices').hidden && document.getElementById('extensions-form').hidden;
+    const tools = !document.getElementById('desktop-tools-section').hidden && document.getElementById('desktop-add-extension-section').hidden && getComputedStyle(document.getElementById('tool-choices')).display !== 'none';
     document.querySelector('[data-extension-view="plugins"]').click();
     const plugins = !document.getElementById('desktop-plugin-section').hidden && document.getElementById('desktop-extension-section').hidden;
     document.getElementById('extensions-close').click();

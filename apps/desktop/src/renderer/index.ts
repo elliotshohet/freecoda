@@ -1,3 +1,5 @@
+import { createComposerSuggestions } from "./composer-suggestions";
+import { createFileView } from "./file-view";
 import { filterConversationCommands, parseSkillInstallIntent, codexUnsupportedCommand } from "../../../../packages/contracts/src/conversation-commands";
 import { canDeliverQueuedPrompt, settleQueuedPrompt, type QueuedPrompt } from "./prompt-queue";
 import { parseMarkdownBlocks, safeMarkdownLink } from "./markdown";
@@ -67,6 +69,15 @@ let drainingPromptQueue = false;
 let promptQueuePaused = false;
 const abort = new AbortController();
 const signal = abort.signal;
+const fileView = createFileView(editor, { signal });
+const composerSuggestions = createComposerSuggestions(prompt, {
+  enabled: () => !!state?.auth.signedIn && !running && !actionBusy && !commandInFlight && !promptQueue.length,
+  contextKey: () => JSON.stringify([state?.conversationMode, state?.workspace?.root, state?.activeThreadId, state?.auth.signedIn, running, actionBusy, commandInFlight, promptQueue.length, mode.value]),
+  request: async prefix => ({ completion: (await bridge.suggestPrompt({ prefix })).suggestion }),
+  cancel: () => bridge.cancelSuggestion(),
+  describeError: message,
+  signal,
+});
 const modifier = /Mac/i.test(navigator.platform) ? "⌘" : "Ctrl";
 text("save-shortcut", `${modifier}S`);
 document
@@ -128,8 +139,9 @@ function renderWorkspaceNavigation() {
   sidebar.append(context, conversations);
   list.replaceChildren();
   hide("selected-workspace", chat || !workspace);
+  hide("general-chat-hint", chat);
   button("sidebar-general-chat").setAttribute("aria-current", chat ? "page" : "false");
-  button("rail-chat").setAttribute("aria-current", chat ? "page" : "false");
+  text("navigation-context", chat ? "General chat" : workspace?.name || "Local workspace");
   text("folder-name", workspace?.name || "");
   text("folder-path", workspace?.root || "");
   text("workspace-details", workspace?.trusted ? `Trusted folder · ${workspace.files.length} files in explorer` : "Trust this folder before accessing its files.");
@@ -148,8 +160,13 @@ function renderWorkspaceNavigation() {
     if (active) control.setAttribute("aria-current", "page");
     control.title = folder.root;
     const icon = document.createElement("span"); icon.setAttribute("aria-hidden", "true"); icon.textContent = active ? "⌄" : "›";
+    const folderIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    folderIcon.setAttribute("viewBox", "0 0 24 24"); folderIcon.setAttribute("aria-hidden", "true");
+    const outline = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    outline.setAttribute("d", "M3 6h7l2 2h9v11H3V6Z"); folderIcon.append(outline);
+    folderIcon.classList.add("workspace-folder-icon");
     const name = document.createElement("span"); name.textContent = folder.name;
-    control.append(icon, name);
+    control.append(icon, folderIcon, name);
     control.addEventListener("click", () => { if (!active) void openRecentWorkspace(folder.root); }, { signal });
     group.append(control);
     if (active) group.append(context, conversations);
@@ -176,11 +193,12 @@ async function openRecentWorkspace(root: string) {
   finally { actionBusy = false; updateControls(); }
 }
 function updateControls() {
+  composerSuggestions.update();
   const chat = isChat();
   text("sidebar-heading-label", "Workspaces");
   hide("workspace-tools", chat);
   renderWorkspaceNavigation();
-  text("sidebar-new-task", "＋ New conversation");
+  text("new-chat", chat ? "＋ New chat" : "＋ New workspace chat");
   const ready = (chat || trusted()) && !running && !actionBusy;
   const safe = !chat && trusted() && !running && !actionBusy;
   const readOnly = state?.permissionPreset === "read-only";
@@ -204,11 +222,9 @@ function updateControls() {
   hide("stop", !running);
   button("stop").disabled = actionBusy;
   button("new-chat").disabled = !ready;
-  button("sidebar-start-chat").disabled = !ready;
-  button("sidebar-new-task").disabled = !ready;
   el("thread-history")
     .querySelectorAll<HTMLButtonElement>("button")
-    .forEach((node) => (node.disabled = !ready));
+    .forEach((node) => (node.disabled = !ready || node.dataset.archived === "true"));
   input("file-filter").disabled = !safe;
   input("command").disabled = !safe || readOnly;
   hide("run-command", commandInFlight);
@@ -283,7 +299,15 @@ function updateControls() {
 }
 const conversationDrafts = new Map<string, string>();
 function draftScope(value: DesktopState | null | undefined) { return `${value?.conversationMode === "coding" ? value.workspace?.root || "none" : "chat"}:${value?.activeThreadId || "new"}`; }
+let archiveScopeGeneration = 0;
 function renderState(next: DesktopState) {
+  if (state && (state.conversationMode !== next.conversationMode || state.workspace?.root !== next.workspace?.root || state.auth.signedIn !== next.auth.signedIn)) {
+    archiveScopeGeneration++;
+    hide("notice");
+    showingArchived = false;
+    button("toggle-archived").setAttribute("aria-pressed", "false");
+    text("toggle-archived", "Archived chats");
+  }
   document.querySelector(".agent-pane")?.classList.toggle("general-chat", next.conversationMode === "chat");
   const previousScope = draftScope(state);
   const nextScope = draftScope(next);
@@ -363,11 +387,6 @@ function renderState(next: DesktopState) {
         ? `Local · ${next.workspace.name}`
         : "Choose a project with /project",
   );
-  text(
-    "account-label",
-    next.auth.signedIn ? "Connected · free plan" : "Your account",
-  );
-  button("account-open").classList.toggle("connected", next.auth.signedIn);
   const scope =
     next.conversationMode === "chat" ? "chat" : next.workspace?.root;
   const conversationKey = `${scope}:${next.activeThreadId || "current"}`;
@@ -586,6 +605,7 @@ async function saveFile() {
     if (root === state?.workspace?.root) {
       file = saved;
       editor.value = saved.content;
+      updateLineNumbers();
       notify(`Saved ${saved.path}.`);
       await refreshFiles();
     }
@@ -606,6 +626,7 @@ function updateLineNumbers() {
     Array.from({ length: count }, (_, i) => String(i + 1)).join("\n"),
   );
   el("line-numbers").scrollTop = editor.scrollTop;
+  fileView.update(file?.path || "");
 }
 function updateCursor() {
   const before = editor.value.slice(0, editor.selectionStart);
@@ -968,18 +989,38 @@ button("commands-open").addEventListener("click", () => {
 }, { signal });
 prompt.addEventListener("blur", () => closeSlashMenu(), { signal });
 prompt.addEventListener("focus", renderSlashMenu, { signal });
+let extensionLoadRequest = 0;
 async function openExtensions(kind?: "skill" | "mcp", source?: string | null) {
   if (running || promptQueue.length) { notify("Finish or remove queued messages before changing tools or skills."); return; }
+  const request = ++extensionLoadRequest;
   hide("extension-error");
+  hide("extensions-load-error");
+  text("extensions-status", "Loading installed plugins, skills and tools…");
+  installedExtensions = [];
   setExtensionView(kind === "mcp" ? "mcp" : kind === "skill" ? "skills" : "all");
-  renderExtensions(await bridge.listExtensions());
-  renderPluginBundles(await bridge.listPlugins());
-  await renderToolChoices();
+  text("extensions-list", "Loading skills and MCP servers…");
+  text("plugin-bundles", "Loading plugin bundles…");
+  text("tool-choices", "Loading available tools…");
   if (kind) el<HTMLSelectElement>("extension-kind").value = kind;
   if (source) input("extension-url").value = source;
   const dialog = el<HTMLDialogElement>("extensions-dialog");
   if (!dialog.open) dialog.showModal();
   if (kind) input("extension-url").focus();
+  const results = await Promise.allSettled([bridge.listExtensions(), bridge.listPlugins(), bridge.toolChoices()]);
+  if (request !== extensionLoadRequest || !dialog.open) return;
+  const [extensions, plugins, tools] = results;
+  if (extensions.status === "fulfilled") renderExtensions(extensions.value);
+  else text("extensions-list", "Skills and MCP servers could not be loaded. Close and reopen to retry.");
+  if (plugins.status === "fulfilled") renderPluginBundles(plugins.value);
+  else text("plugin-bundles", "Plugin bundles could not be loaded. Close and reopen to retry.");
+  if (tools.status === "fulfilled") await renderToolChoices(tools.value);
+  else text("tool-choices", "Available tools could not be loaded. Close and reopen to retry.");
+  const failures = results.filter(result => result.status === "rejected");
+  text("extensions-status", failures.length ? "Some customization details could not be loaded." : "Installed on this computer. Changes apply to coding tasks.");
+  if (failures.length) {
+    text("extensions-load-error", failures.map(result => result.status === "rejected" ? message(result.reason) : "").join(" "));
+    hide("extensions-load-error", false);
+  }
 }
 async function runSlashCommand(value: string): Promise<boolean> {
   const installIntent = parseSkillInstallIntent(value);
@@ -1364,10 +1405,9 @@ function setExtensionView(view: ExtensionView) {
   }
   hide("desktop-plugin-section", view !== "all" && view !== "plugins");
   hide("desktop-extension-section", view === "plugins" || view === "tools");
-  hide("extensions-form", view === "plugins" || view === "tools");
+  hide("desktop-add-extension-section", view === "plugins" || view === "tools");
   text("extensions-list-title", view === "mcp" ? "Installed MCP connections" : view === "skills" ? "Installed skills" : "Skills and MCP connections");
-  const tools = document.getElementById("tool-choices");
-  if (tools) tools.hidden = view !== "all" && view !== "tools";
+  hide("desktop-tools-section", view !== "all" && view !== "tools");
   if (view === "mcp" || view === "skills") el<HTMLSelectElement>("extension-kind").value = view === "mcp" ? "mcp" : "skill";
   renderExtensions(installedExtensions);
 }
@@ -1379,7 +1419,7 @@ function renderExtensions(items: import("../shared").DesktopExtension[]) {
   installedExtensions = items;
   const list = el("extensions-list"); list.replaceChildren();
   const visible = items.filter(item => extensionView === "mcp" ? item.kind === "mcp" : extensionView === "skills" ? item.kind === "skill" : true);
-  if (!visible.length) { const empty = document.createElement("p"); empty.className = "settings-empty"; empty.textContent = extensionView === "mcp" ? "No MCP connections installed. Add a trusted HTTPS endpoint below." : extensionView === "skills" ? "No skills installed. Add a SKILL.md source below." : "No tools or skills installed."; list.append(empty); }
+  if (!visible.length) { const empty = document.createElement("p"); empty.className = "settings-empty"; empty.textContent = extensionView === "mcp" ? "No MCP connections installed. Add a trusted HTTPS endpoint below." : extensionView === "skills" ? "No skills installed. Add a SKILL.md source below." : "No skills or MCP servers installed on this computer."; list.append(empty); }
   for (const item of visible) {
     const row = document.createElement("div"); row.className = "extension-row";
     const info = document.createElement("div");
@@ -1970,6 +2010,13 @@ function showWorkbench(open: boolean) {
   el("app").classList.toggle("tools-open", open);
   button("toggle-workbench").setAttribute("aria-expanded", String(open));
 }
+let showingArchived = false;
+button("toggle-archived").addEventListener("click", () => {
+  showingArchived = !showingArchived;
+  button("toggle-archived").setAttribute("aria-pressed", String(showingArchived));
+  text("toggle-archived", showingArchived ? "Back to chats" : "Archived chats");
+  renderThreads();
+}, { signal });
 function renderThreads() {
   const threads = state?.threads || [];
   const search = input("thread-search").value.toLowerCase();
@@ -1985,11 +2032,11 @@ function renderThreads() {
   text("thread-title", title);
   const history = el("thread-history");
   history.replaceChildren();
-  const matches = threads.filter((thread) => thread.title.toLowerCase().includes(search));
+  const matches = threads.filter((thread) => !!thread.archived === showingArchived && thread.title.toLowerCase().includes(search));
   if (!matches.length) {
     const empty = document.createElement("p");
     empty.className = "workspace-empty";
-    empty.textContent = search ? "No matching conversations." : "New conversations will appear here.";
+    empty.textContent = search ? "No matching conversations." : showingArchived ? "No archived chats." : "New conversations will appear here.";
     history.append(empty);
   }
   for (const thread of matches) {
@@ -2000,11 +2047,12 @@ function renderThreads() {
     node.title = `${thread.title || "New task"}${Number.isNaN(updated.getTime()) ? "" : ` · Updated ${updated.toLocaleString()}`}`;
     if (thread.id === state?.activeThreadId)
       node.setAttribute("aria-current", "page");
-    node.disabled = running || actionBusy;
+    node.dataset.archived = String(!!thread.archived);
+    node.disabled = running || actionBusy || !!thread.archived;
     node.addEventListener(
       "click",
       async () => {
-        if (running || actionBusy || thread.id === state?.activeThreadId)
+        if (running || actionBusy || thread.archived || thread.id === state?.activeThreadId)
           return;
         actionBusy = true;
         updateControls();
@@ -2024,22 +2072,40 @@ function renderThreads() {
     row.className = "chat-history-row";
     const remove = document.createElement("button");
     remove.className = "chat-history-delete";
-    remove.textContent = "×";
-    remove.setAttribute("aria-label", `Delete ${thread.title}`);
-    remove.disabled = running || actionBusy;
+    remove.textContent = thread.archived ? "↶" : "↓";
+    remove.setAttribute("aria-label", `${thread.archived ? "Restore" : "Archive"} ${thread.title}`);
+    remove.disabled = running || actionBusy || promptQueue.length > 0;
     remove.addEventListener(
       "click",
       async () => {
         if (
           running ||
-          actionBusy ||
-          !window.confirm("Delete this conversation from this computer?")
+          actionBusy || promptQueue.length > 0
         )
           return;
         actionBusy = true;
         updateControls();
         try {
-          renderState(await bridge.deleteThread(thread.id));
+          renderState(await bridge.setThreadArchived(thread.id, !thread.archived));
+          if (thread.archived) renderState(await bridge.openThread(thread.id));
+          notify(thread.archived ? "Chat restored." : "Chat archived.");
+          if (!thread.archived) {
+            const generation = archiveScopeGeneration;
+            const undo = document.createElement("button");
+            undo.textContent = "Undo";
+            undo.addEventListener("click", async () => {
+              if (generation !== archiveScopeGeneration || running || actionBusy || promptQueue.length) return;
+              actionBusy = true;
+              updateControls();
+              try {
+                renderState(await bridge.setThreadArchived(thread.id, false));
+                renderState(await bridge.openThread(thread.id));
+                notify("Chat restored.");
+              } catch (error) { showError(error); }
+              finally { actionBusy = false; updateControls(); }
+            }, { signal });
+            el("notice").append(" ", undo);
+          }
         } catch (error) {
           showError(error);
         } finally {
@@ -2085,18 +2151,7 @@ button("toggle-sidebar").addEventListener(
   },
   { signal },
 );
-button("sidebar-start-chat").addEventListener("click", () => button("new-chat").click(), { signal });
-for (const [rail, target] of [["rail-chat", "sidebar-general-chat"], ["rail-repositories", "github-repos-open"], ["rail-plugins", "extensions-open"], ["rail-account", "account-avatar-open"]]) {
-  button(rail!).addEventListener("click", () => button(target!).click(), { signal });
-}
 button("sidebar-general-chat").addEventListener("click", () => void switchAgentMode("chat"), { signal });
-button("sidebar-plugins").addEventListener("click", () => void openExtensions().catch(showError), { signal });
-button("sidebar-account").addEventListener("click", openAccount, { signal });
-button("sidebar-new-task").addEventListener(
-  "click",
-  () => void newConversation(),
-  { signal },
-);
 button("current-thread").addEventListener("click", () => prompt.focus(), {
   signal,
 });
@@ -2266,7 +2321,6 @@ button("stop-command").addEventListener(
   },
   { signal },
 );
-button("account-open").addEventListener("click", openAccount, { signal });
 button("account-close").addEventListener(
   "click",
   () => el<HTMLDialogElement>("account-dialog").close(),
@@ -2346,13 +2400,15 @@ if (!bridge) {
   void loadSponsor();
 }
 
-async function renderToolChoices() {
-  let list = document.getElementById("tool-choices");
-  if (!list) { list = document.createElement("div"); list.id = "tool-choices"; el("extensions-list").after(list); }
+async function renderToolChoices(loaded?: { name: string; enabled: boolean }[]) {
+  const tools = loaded ?? await bridge.toolChoices();
+  const list = el("tool-choices");
   list.replaceChildren();
-  list.hidden = extensionView !== "all" && extensionView !== "tools";
-  const title = document.createElement("p"); title.textContent = "Tools for the next task · session only. Mode and approval restrictions still apply. MCP tools appear after an explicit check."; list.append(title);
-  for (const tool of await bridge.toolChoices()) {
+  hide("desktop-tools-section", extensionView !== "all" && extensionView !== "tools");
+  if (!tools.length) {
+    const empty = document.createElement("p"); empty.className = "settings-empty"; empty.textContent = "No tools available. Check an enabled MCP server to discover its tools."; list.append(empty);
+  }
+  for (const tool of tools) {
     const label = document.createElement("label"); const box = document.createElement("input");
     box.type = "checkbox"; box.checked = tool.enabled; box.disabled = running;
     box.addEventListener("change", async () => {

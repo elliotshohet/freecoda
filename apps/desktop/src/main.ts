@@ -224,6 +224,8 @@ function installIPC() {
     runAgent: (input: Parameters<LocalAgentService["runAgent"]>[0]) =>
       service.runAgent(input),
     cancelRun: () => service.cancelRun(),
+    suggestPrompt: (input: { prefix: string }) => service.suggestPrompt(input),
+    cancelSuggestion: () => service.cancelSuggestion(),
     respondApproval: (
       input: Parameters<LocalAgentService["respondApproval"]>[0],
     ) => service.respondApproval(input),
@@ -237,6 +239,7 @@ function installIPC() {
     setConversationMode: (mode: "chat" | "coding") =>
       service.setConversationMode(mode),
     openThread: (id: string) => service.openThread(id),
+    setThreadArchived: (input: { id: string; archived: boolean }) => service.setThreadArchived(input?.id, input?.archived),
     deleteThread: (id: string) => service.deleteThread(id),
     copyText: (value: string) => {
       if (typeof value !== "string" || value.length > 128_000)

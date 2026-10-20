@@ -467,6 +467,20 @@ test("desktop threads migrate legacy history, persist selection and isolate trus
     await expect(service.openThread("../desktop.json")).rejects.toThrow(
       "Invalid",
     );
+    const archived = await service.setThreadArchived(oldId, true);
+    expect(archived.threads?.find(t => t.id === oldId)?.archived).toBe(true);
+    expect(archived.activeThreadId).not.toBe(oldId);
+    await expect(service.openThread(oldId)).rejects.toThrow("does not belong");
+    await service.dispose();
+    service = new LocalAgentService(options);
+    await service.selectWorkspace(f.repository);
+    const reloadedArchive = await service.getState();
+    expect(reloadedArchive.threads?.find(t => t.id === oldId)?.archived).toBe(true);
+    expect(reloadedArchive.activeThreadId).not.toBe(oldId);
+    await service.setThreadArchived(oldId, false);
+    const undone = await service.openThread(oldId);
+    expect(undone.conversation?.map(item => item.text)).toEqual(["Existing local task", "Preserved answer"]);
+    await expect(service.setThreadArchived("../desktop.json", true)).rejects.toThrow("Invalid");
     const other = path.join(f.root, "other");
     await mkdir(other);
     await service.selectWorkspace(other);
@@ -763,6 +777,15 @@ test("desktop cloud conversations sync structured history, preserve optimistic c
     cloud.get(id)!.messages = [{ role: "user", content: "Shared structured message" }, { role: "assistant", content: [{ type: "text", text: "Across devices" }] }];
     cloud.get(id)!.version++;
     const imported = await second.getState(); expect(imported.threads?.some(thread => thread.id === id)).toBe(true);
+    expect((await second.openThread(id)).conversation?.map(message => message.text)).toEqual(["Shared structured message", "Across devices"]);
+    const cloudBeforeArchive = JSON.stringify(cloud.get(id));
+    await second.setThreadArchived(id, true);
+    expect(JSON.stringify(cloud.get(id))).toBe(cloudBeforeArchive);
+    cloud.get(id)!.version++;
+    const refreshedArchive = await second.refreshConversations();
+    expect(refreshedArchive.threads?.find(thread => thread.id === id)?.archived).toBe(true);
+    expect(cloud.get(id)!.messages).toHaveLength(2);
+    await second.setThreadArchived(id, false);
     expect((await second.openThread(id)).conversation?.map(message => message.text)).toEqual(["Shared structured message", "Across devices"]);
     cloud.get(id)!.version++;
     await second.clearHistory();
