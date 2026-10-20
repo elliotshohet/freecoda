@@ -7,7 +7,7 @@ remain under Unreleased until publication and artifact verification are complete
 
 ## Unreleased
 
-- Windows/Linux installed update qualification from 0.1.8 to 0.1.9 is pending.
+No pending release changes.
 
 ## Desktop 0.1.9 — 2026-10-20
 
@@ -21,7 +21,7 @@ All 187 curated tests, typechecking, native smoke and packaging passed. All 16 d
 - Add theme-aware syntax colors to the existing file editor while preserving whitespace, native editing, approval checks, and scrolling.
 - Separate local workspace folders, cloud projects, and general chat; consolidate navigation and repair plugin-manager loading and Tools visibility.
 - Use a neutral composer focus treatment and contextual hosted AI draft suggestions that Tab inserts for review, without sending or executing them.
-- Limits: archive status remains device-local. AI suggestions require an eligible signed-in account and use its hosted allowance. Builds remain unsigned; macOS downloads require manual installation. Installed automatic updates to 0.1.9 are not yet qualified.
+- Limits: archive status remains device-local. AI suggestions require an eligible signed-in account and use its hosted allowance. Builds remain unsigned; macOS downloads require manual installation. Installed Windows/Linux updates from 0.1.8 to 0.1.9 passed CI, including verified replacement, renderer relaunch, close-to-tray, second-launch restoration and normal Quit. Tray-menu clicking and macOS automatic installation remain unqualified.
 
 ## Desktop 0.1.8 — 2026-10-19
 
