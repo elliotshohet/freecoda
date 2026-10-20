@@ -14,6 +14,7 @@ apps/desktop/release/
 *.tgz
 
 apps/desktop/.dev/
+__pycache__/
 
 # Local agent tooling and machine-specific hook state.
 .agents/skills/openui/

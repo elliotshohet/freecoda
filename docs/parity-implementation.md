@@ -43,6 +43,10 @@ The guarded command `bun --env-file=.env.test.local test tests/parallel-usage-db
 4. Modal/voice/preview ordering, preview history, suggestion acceptance without submission, archive/Undo, dirty editor navigation and restart-without-replay recovery.
 5. Transactional migration/admission behavior on an isolated test database before any later deployment. No production migration is authorized by this checklist.
 
+## Production rollout addendum — 2026-10-20
+
+After the local implementation review, commit `6b9aab3` passed GitHub Checks and Desktop packages on every configured platform. Vercel deployment `dpl_DGzkDgaaEBNyFtD3oNiCo5eCag2f` served that exact commit on `freecoda.com`. The production direct Neon connection identified database `neondb`, no active reservations, and the existing `one_active_reservation` index. The checked-in migration runner applied `0013_parallel_zero_cost_reservations.sql` in a transaction. A read-only recheck found the migration ledger entry and both replacement indexes, with the old index absent. The temporary pulled environment file was deleted. This addendum supersedes the earlier pending-production statements above; desktop and CLI publication remain separate until their versioned artifacts are verified.
+
 ## Exact focused verification command
 
 ```sh

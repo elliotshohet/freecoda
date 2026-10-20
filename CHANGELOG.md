@@ -7,13 +7,22 @@ remain under Unreleased until publication and artifact verification are complete
 
 ## Unreleased
 
-Local implementation; publication pending.
+### Desktop 0.1.11 — publication pending
 
-- Add independently owned desktop sessions, background status/approval recovery, interrupted-session restoration without replay, and repository-wide execution serialization.
-- Add explicit macOS interactive shell/Codex/Claude connections with separate-account consent and session-bound controls. Full terminal emulation and managed external-agent protocols remain incomplete.
-- Improve stream hydration, draft/suggestion ownership, and native preview/voice dialog ordering.
-- Prepare a zero-cost-only concurrency admission migration; it has not been applied or deployed. Hosted admission limits remain unchanged.
+- Add independently owned sessions, background status and approval recovery, interrupted-session restoration without replay, and repository-wide execution serialization.
+- Add explicit macOS interactive shell, Codex, and Claude connections with separate-account consent and session-bound controls.
+- Improve stream hydration, draft and suggestion ownership, and native preview and voice dialog ordering.
+- Migration and limits: no local history migration is required. macOS interactive terminals are fixed-size plain-text sessions; Windows and Linux do not yet offer that transport. External Codex and Claude use their own sign-in and billing. Full terminal emulation and managed external-agent protocols remain incomplete. Unsigned macOS packages require manual installation; live microphone and external-agent TUI behavior remain unqualified.
+
+### CLI 0.1.10 — publication pending
+
+- Improve compact terminal rendering and keep approval evidence visible before accepting a choice.
 - Correct first-party LICENSE ownership while retaining required upstream component notices.
+- Migration and limits: no local data migration is required.
+
+### Web — deployed
+
+- Deploy zero-cost-only concurrency admission and apply migration 0013 to production after isolated CI integration checks. At most three verified free requests can run for one account. Nonzero and uncertain reservations retain conservative admission.
 
 ## Desktop 0.1.10 — 2026-10-20
 
