@@ -7,11 +7,15 @@ remain under Unreleased until publication and artifact verification are complete
 
 ## Unreleased
 
-### Desktop 0.1.9 — publication pending
+- Windows/Linux installed update qualification from 0.1.8 to 0.1.9 is pending.
 
-[Planned release](https://github.com/elliotshohet/freecoda/releases/tag/v0.1.9)
+## Desktop 0.1.9 — 2026-10-20
 
-The changes below passed local checks; CI packaging and publication are pending.
+[Release](https://github.com/elliotshohet/freecoda/releases/tag/v0.1.9)
+
+Source: `c18c1d559bce69c14312c98376f94d1c57f44194`.
+
+All 187 curated tests, typechecking, native smoke and packaging passed. All 16 downloaded asset bytes, SHA-256 checksums, sizes and three SHA-512 updater feeds were independently verified before publication. Fresh hosted AI generation and native Tab insertion were verified without changing saved conversation history.
 
 - Preserve archived conversations on this device, with a brief Undo action and an Archived chats view; keep cloud deletion separate.
 - Add theme-aware syntax colors to the existing file editor while preserving whitespace, native editing, approval checks, and scrolling.
