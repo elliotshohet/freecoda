@@ -4,10 +4,21 @@ import { ArrowDownToLine, ArrowUpRight, Terminal } from "lucide-react";
 import { FeatureOverview } from "@/components/feature-overview";
 import { Install } from "@/components/install";
 import { GitHubIcon } from "@/components/github-icon";
+import { homeStructuredData, publicPageMetadata, SITE_DESCRIPTION } from "@/lib/seo";
+
+export const metadata = publicPageMetadata({
+  title: "Free, open-source AI coding agent",
+  description: SITE_DESCRIPTION,
+  path: "/",
+});
 
 export default function Home() {
   return (
     <main id="main" className="product-home marketing-home">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(homeStructuredData).replace(/</g, "\\u003c") }}
+      />
       <section className="marketing-welcome" aria-labelledby="welcome-title">
         <div className="marketing-hero">
           <div className="marketing-intro">

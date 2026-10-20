@@ -1,4 +1,9 @@
-export const metadata = { title: "Privacy" };
+import { publicPageMetadata } from "@/lib/seo";
+export const metadata = publicPageMetadata({
+  title: "Privacy Policy & Data Use",
+  description: "Read how Freecoda handles conversations, source code, account sync, cloud workspaces, provider data use, and deletion.",
+  path: "/privacy",
+});
 export default function Privacy() {
   return (
     <main className="page-shell" id="main">

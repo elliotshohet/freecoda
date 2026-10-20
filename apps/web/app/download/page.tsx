@@ -1,12 +1,13 @@
-import type { Metadata } from "next";
+import { publicPageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import { DesktopDownloads } from "@/components/desktop-downloads";
 
-export const metadata: Metadata = {
-  title: "Download Freecoda",
-  description: "Download the published Freecoda desktop beta for macOS, Windows, or Linux, with platform instructions and verified release checksums.",
-};
+export const metadata = publicPageMetadata({
+  title: "Download for macOS, Windows & Linux",
+  description: "Download the Freecoda desktop beta for macOS, Windows, or Linux, with installation instructions and release checksums.",
+  path: "/download",
+});
 
 export default function DownloadPage() {
   return (

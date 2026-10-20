@@ -5,14 +5,15 @@ import "@fontsource-variable/manrope";
 import "@fontsource/ibm-plex-mono/400.css";
 import "./globals.css";
 import { Header, Footer } from "@/components/chrome";
+import { SITE_DESCRIPTION, SITE_URL } from "@/lib/seo";
 export const metadata: Metadata = {
-  metadataBase: new URL("https://freecoda.com"),
+  metadataBase: new URL(SITE_URL),
+  applicationName: "Freecoda",
   title: {
-    default: "Freecoda — A little room to think.",
+    default: "Freecoda — Free, open-source AI coding agent",
     template: "%s · Freecoda",
   },
-  description:
-    "Chat, write, learn, and build with Freecoda. Free forever, supported by clearly labeled sponsors, with clear usage limits.",
+  description: SITE_DESCRIPTION,
 };
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (

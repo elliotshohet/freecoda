@@ -1,4 +1,9 @@
-export const metadata = { title: "Terms" };
+import { publicPageMetadata } from "@/lib/seo";
+export const metadata = publicPageMetadata({
+  title: "Terms of Service",
+  description: "Review Freecoda’s terms for the free coding agent, including beta access, usage limits, sponsor placements, content rights, and account controls.",
+  path: "/terms",
+});
 export default function Terms() {
   return (
     <main className="page-shell" id="main">

@@ -1,8 +1,13 @@
+import { publicPageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { ArrowUpRight, Check } from "lucide-react";
 import s from "@/components/product-page.module.css";
 
-export const metadata = { title: "Pricing — Freecoda" };
+export const metadata = publicPageMetadata({
+  title: "Pricing: Free AI Coding Agent",
+  description: "Explore Freecoda’s free plan for desktop, web, and terminal. Learn about sponsor support, invite-only beta access, and hosted usage limits.",
+  path: "/pricing",
+});
 
 export default function Pricing() {
   return (

@@ -1,10 +1,15 @@
+import { publicPageMetadata } from "@/lib/seo";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowDown, ArrowUpRight } from "lucide-react";
 import { AdvertiserForm } from "@/components/advertiser-form";
 import s from "@/components/product-page.module.css";
 
-export const metadata = { title: "Advertise with Freecoda" };
+export const metadata = publicPageMetadata({
+  title: "Developer Sponsorship & Advertising",
+  description: "Reach developers through reviewed Freecoda sponsor placements on desktop, terminal, and web. Learn how placements work and submit a sponsorship inquiry.",
+  path: "/advertise",
+});
 
 export default function Advertise() {
   return (

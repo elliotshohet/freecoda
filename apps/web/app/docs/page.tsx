@@ -1,9 +1,14 @@
+import { publicPageMetadata } from "@/lib/seo";
 import { FeatureOverview } from "@/components/feature-overview";
 import { DesktopDownloads } from "@/components/desktop-downloads";
 import { Install } from "@/components/install";
 import { CLI_PUBLISHED, CLI_RELEASE_URL, CLI_CHECKSUMS_URL } from "@/lib/releases";
 import Link from "next/link";
-export const metadata = { title: "Documentation" };
+export const metadata = publicPageMetadata({
+  title: "Documentation & Installation Guide",
+  description: "Get started with Freecoda on desktop, web, or CLI. Find installation instructions, commands, workspace guidance, and project permission controls.",
+  path: "/docs",
+});
 export default function Docs() {
   return (
     <main className="page-shell docs-layout" id="main">
