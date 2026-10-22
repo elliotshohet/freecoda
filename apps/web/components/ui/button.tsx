@@ -42,11 +42,29 @@ function Button({
   variant = "default",
   size = "default",
   asChild = false,
+  render,
+  nativeButton: _nativeButton,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
+    render?: React.ReactElement
+    nativeButton?: boolean
   }) {
+  if (render) {
+    return (
+      <Slot.Root
+        data-slot="button"
+        data-variant={variant}
+        data-size={size}
+        className={cn(buttonVariants({ variant, size, className }))}
+        {...props}
+      >
+        {render}
+      </Slot.Root>
+    )
+  }
+
   const Comp = asChild ? Slot.Root : "button"
 
   return (
