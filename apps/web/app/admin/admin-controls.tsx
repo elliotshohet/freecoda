@@ -13,6 +13,7 @@ export function AdminControls({ days }: { days: number }) {
     <div className="flex flex-wrap items-center gap-3" aria-busy={pending}>
       <ToggleGroup
         aria-label="Observation period"
+        data-horizontal=""
         variant="outline"
         size="lg"
         spacing={0}

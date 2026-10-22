@@ -69,7 +69,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between gap-3 border-b bg-background px-4 md:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <SidebarTrigger />
-            <Separator orientation="vertical" className="h-4" />
+            <Separator data-vertical="" orientation="vertical" className="h-4" />
             <span className="text-sm text-muted-foreground">Administration</span>
           </div>
           <div className="flex items-center gap-3">
@@ -131,7 +131,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
                   <div><dt className="text-xs text-muted-foreground">Settled sandbox seconds</dt><dd className="mt-1 text-2xl font-semibold tabular-nums">{count(data.compute.settled_seconds)}</dd></div>
                   <div><dt className="text-xs text-muted-foreground">Retained conversations updated</dt><dd className="mt-1 text-2xl font-semibold tabular-nums">{count(data.conversations.updated)}</dd></div>
                 </dl>
-                <Separator />
+                <Separator data-horizontal="" />
                 <div className="flex flex-wrap gap-2" aria-label="Coding run outcomes"><Badge variant="secondary">{count(data.runs.completed)} completed</Badge><Badge variant={Number(data.runs.failed) ? "destructive" : "outline"}>{count(data.runs.failed)} failed</Badge><Badge variant="outline">{count(data.runs.cancelled)} canceled</Badge></div>
                 <p className="text-sm text-muted-foreground">Sandbox seconds come from reservations created in this period; {count(data.compute.unresolved)} unresolved reservations. This is usage, not a Vercel invoice.</p>
               </CardContent>
