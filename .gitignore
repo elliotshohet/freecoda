@@ -22,3 +22,4 @@ __pycache__/
 .github/hooks/
 .impeccable/config.local.json
 .impeccable/hook.cache.json
+vendor/
