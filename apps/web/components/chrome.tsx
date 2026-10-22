@@ -1,13 +1,18 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import styles from "./chrome.module.css";
 import { createAuthClient } from "better-auth/react";
 import { GitHubSignIn } from "./github-sign-in";
 import { UserAvatar } from "./user-avatar";
 import { usePathname } from "next/navigation";
 import { ThemeControl } from "./theme-control";
-import { ArrowUpRight, Command, Menu, X } from "lucide-react";
+import { ArrowDownToLine, ArrowUpRight, Command, Menu } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { NavigationMenu, NavigationMenuItem, NavigationMenuLink, NavigationMenuList } from "@/components/ui/navigation-menu";
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+
 export function Mark() {
   return (
     <span className="brand-symbol" aria-hidden="true">
@@ -47,9 +52,13 @@ function PublicAccountAction() {
 export function Header() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const navigationId = useId();
-  const toggle = useRef<HTMLButtonElement>(null);
   useEffect(() => { setOpen(false); }, [pathname]);
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 1101px)");
+    const closeOnDesktop = () => { if (desktop.matches) setOpen(false); };
+    desktop.addEventListener("change", closeOnDesktop);
+    return () => desktop.removeEventListener("change", closeOnDesktop);
+  }, []);
   if (
     pathname === "/chat" ||
     pathname === "/settings" ||
@@ -66,40 +75,67 @@ export function Header() {
     { href: "/advertise", label: "Advertise" },
   ];
   return (
-    <header className={styles.header} onKeyDown={event => {
-      if (event.key === "Escape" && open) {
-        event.preventDefault();
-        setOpen(false);
-        toggle.current?.focus();
-      }
-    }}>
+    <header className={styles.header}>
       <Link href="/" className={styles.brand} onClick={() => setOpen(false)} aria-label="Freecoda home">
         <img src="/brand/freecoda-mark.svg" alt="" width="30" height="30" />
         <span>Freecoda</span>
       </Link>
-      <nav id={navigationId} className={styles.navigation} data-open={open} aria-label="Main navigation">
-        {links.map(link => <Link
-          key={link.href}
-          href={link.href}
-          aria-current={pathname === link.href ? "page" : undefined}
-          onClick={() => setOpen(false)}
-        >{link.label}</Link>)}
-      </nav>
+      <div className={styles.desktopNavigation}>
+        <NavigationMenu aria-label="Main navigation" viewport={false}>
+          <NavigationMenuList className="m-0 p-0">
+            {links.map(link => (
+              <NavigationMenuItem key={link.href}>
+                <NavigationMenuLink asChild active={pathname === link.href} className="min-h-11 justify-center">
+                  <Link href={link.href}>{link.label}</Link>
+                </NavigationMenuLink>
+              </NavigationMenuItem>
+            ))}
+          </NavigationMenuList>
+        </NavigationMenu>
+      </div>
       <div className={styles.actions}>
         <ThemeControl />
         {pathname !== "/sign-in" && <PublicAccountAction />}
-        <Link className={styles.downloadLink} href="/download" onClick={() => setOpen(false)}>Download</Link>
-        <button
-          ref={toggle}
-          type="button"
-          className={styles.toggle}
-          aria-label={open ? "Close navigation" : "Open navigation"}
-          aria-controls={navigationId}
-          aria-expanded={open}
-          onClick={() => setOpen(value => !value)}
-        >
-          {open ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
-        </button>
+        <Button asChild className={styles.downloadAction}>
+          <Link href="/download">Download</Link>
+        </Button>
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetTrigger asChild>
+            <Button type="button" variant="outline" size="icon" className={styles.toggle} aria-label="Open navigation">
+              <Menu aria-hidden="true" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="shadcn-surface overflow-y-auto" side="right">
+            <SheetHeader className="pr-14">
+              <SheetTitle>Explore Freecoda</SheetTitle>
+              <SheetDescription>Your assistant, wherever you work.</SheetDescription>
+            </SheetHeader>
+            <nav aria-label="Mobile navigation" className="flex flex-col gap-1 px-4">
+              {links.map(link => (
+                <SheetClose asChild key={link.href}>
+                  <Button asChild variant="ghost" className="min-h-11 justify-start">
+                    <Link href={link.href} aria-current={pathname === link.href ? "page" : undefined}>{link.label}</Link>
+                  </Button>
+                </SheetClose>
+              ))}
+            </nav>
+            <SheetFooter>
+              <Card>
+                <CardHeader>
+                  <CardTitle role="heading" aria-level={3}>Make room for your next idea.</CardTitle>
+                  <CardDescription>Local folders, files, and conversations together on desktop.</CardDescription>
+                </CardHeader>
+                <CardFooter>
+                  <SheetClose asChild>
+                    <Button asChild className="min-h-11 w-full">
+                      <Link href="/download"><ArrowDownToLine data-icon="inline-start" aria-hidden="true" />Download desktop</Link>
+                    </Button>
+                  </SheetClose>
+                </CardFooter>
+              </Card>
+            </SheetFooter>
+          </SheetContent>
+        </Sheet>
       </div>
     </header>
   );
