@@ -26,6 +26,25 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { AgentMessage } from "@/components/agent-message";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
+import { MessageScroller, MessageScrollerProvider, MessageScrollerViewport, MessageScrollerContent, MessageScrollerItem, MessageScrollerButton } from "@/components/ui/message-scroller";
+import { Trace, TraceLine, TraceIcon, TraceTitle, TraceCollapsible, TraceCollapsibleTrigger, TraceCollapsibleContent } from "@/components/ui/trace";
+import { CodeBlock, CodeBlockContent, CodeBlockHeader, CodeBlockTitle, CodeBlockActions, CodeBlockCopyButton, CodeBlockLine } from "@/components/ui/code-block";
+import { Marker, MarkerContent } from "@/components/ui/marker";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { FieldGroup, Field, FieldLabel } from "@/components/ui/field";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertTitle, AlertDescription, AlertAction } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Badge } from "@/components/ui/badge";
 import styles from "./workspace.module.css";
 import { Mark } from "@/components/chrome";
 import { UserAvatar } from "@/components/user-avatar";
@@ -122,7 +141,7 @@ type Changes = {
   files?: { path: string }[];
   reviewHash?: string;
 };
-type Message = { id?: string; runId?: string; status?: "accepted"; role: "user" | "assistant" | "system"; text: string };
+type WorkspaceMessage = { id?: string; runId?: string; status?: "accepted"; role: "user" | "assistant" | "system"; text: string };
 
 function allowedPreview(url: string) {
   const candidate = new URL(url);
@@ -176,7 +195,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
     hash: string;
   } | null>(null);
   const [draft, setDraft] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<WorkspaceMessage[]>([]);
   const [prompt, setPrompt] = useState("");
   const promptInputRef = useRef("");
   type QueuedPrompt = { id: string; text: string; mode: string; model?: string; extensionConsent?: boolean; failed?: boolean };
@@ -231,8 +250,6 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
   const [prUrl, setPrUrl] = useState<string | null>(null);
   const projectRef = useRef<string | null>(null);
   const eventCursor = useRef<string | number>(0);
-  const endOfChat = useRef<HTMLDivElement>(null);
-  const dialogRef = useRef<HTMLElement>(null);
   const publishKey = useRef<string | null>(null);
   const dirty = !!file && draft !== file.content;
   const available =
@@ -297,21 +314,6 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
     return () => abort.abort();
   }, [load]);
   useEffect(() => {
-    if (!dialog) return;
-    const previous = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    (
-      dialogRef.current?.querySelector<HTMLElement>(
-        "input:not([type=checkbox]),textarea,select",
-      ) || dialogRef.current?.querySelector<HTMLElement>("button,a[href]")
-    )?.focus();
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      previous?.focus();
-    };
-  }, [dialog]);
-  useEffect(() => {
     if (!project || project.status !== "creating") return;
     const id = project.id;
     const abort = new AbortController();
@@ -348,12 +350,6 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
       clearTimeout(timer);
     };
   }, [project?.id, project?.status]);
-  useEffect(() => {
-    endOfChat.current?.scrollIntoView({
-      block: "nearest",
-      behavior: "instant",
-    });
-  }, [messages, queuedPrompts]);
   useEffect(() => {
     const next = queuedRef.current[0];
     if (!next || runId || activeRunRef.current || busy || submittingRef.current || queuePausedRef.current) return;
@@ -1154,28 +1150,28 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
     <div className={styles.shell} data-conversation-mode={conversationMode}>
       <h1 className="sr-only">Freecoda coding workspace</h1>
       {error && (
-        <div className={styles.error} role="alert">
-          <span>{aiServiceText(error, status?.models)}</span>
+        <Alert className={styles.error} variant="destructive">
+          <AlertTitle>Workspace error</AlertTitle>
+          <AlertDescription>{aiServiceText(error, status?.models)}</AlertDescription>
           {error.includes("Cloud compute is busy") && activeWorkspace && (
-            <button className={styles.errorAction} type="button" onClick={() => void selectProject(activeWorkspace)}>
+            <Button className={styles.errorAction} type="button" onClick={() => void selectProject(activeWorkspace)}>
               Open active workspace: {activeWorkspace.name}
-            </button>
+            </Button>
           )}
-          <button aria-label="Dismiss error" onClick={() => setError("")}>
-            <X size={16} />
-          </button>
-        </div>
+          <AlertAction><Button variant="ghost" size="icon-sm" aria-label="Dismiss error" onClick={() => setError("")}><X /></Button></AlertAction>
+        </Alert>
       )}
       {notice && (
-        <p className={styles.notice} role="status">
+        <Alert className={styles.notice} role="status">
           <Check size={15} />
-          {aiServiceText(notice, status?.models)}
+          <AlertDescription>{aiServiceText(notice, status?.models)}
           {prUrl && (
             <a href={prUrl} target="_blank" rel="noopener noreferrer">
               View draft pull request <ArrowUpRight size={13} />
             </a>
           )}
-        </p>
+          </AlertDescription>
+        </Alert>
       )}
       {loading ? (
         <div className={styles.empty} role="status">
@@ -1223,21 +1219,21 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                   : "Cloud execution is not enabled on this instance yet. You can keep building with the local CLI while the cloud service is configured."), status?.models)}
             </p>
             <div className={styles.actions}>
-              <Link className="button purple" href="/dashboard">
+              <Link className={buttonVariants()} href="/dashboard">
                 {status?.authenticated === false
                   ? "Continue with GitHub"
                   : "View account & allowance"}
               </Link>
-              <Link className="button secondary" href="/docs">
+              <Link className={buttonVariants({ variant: "outline" })} href="/docs">
                 Use the local CLI
               </Link>
-              <button
-                className={styles.iconButton}
+              <Button
+                variant="ghost"
                 onClick={() => void load()}
                 aria-label="Refresh service availability"
               >
                 <RefreshCw size={17} />
-              </button>
+              </Button>
             </div>
             <p className={styles.footnote}>
               One free plan, shared capacity, no paid upgrades. No cloud project
@@ -1248,38 +1244,33 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
       ) : (
         <>
           <div className={styles.workspaceSettings} data-open={controlsOpen || !consent}>
-            <button type="button" className={styles.settingsToggle} aria-expanded={controlsOpen || !consent} onClick={() => setControlsOpen(open => !open)}>
+            <Button type="button" className={styles.settingsToggle} aria-expanded={controlsOpen || !consent} onClick={() => setControlsOpen(open => !open)}>
               <ShieldCheck size={14} /> Cloud settings · {consent ? "consent saved" : "consent required"}
-            </button>
+            </Button>
             <div className={styles.settingsBody}>
           <div className={styles.capacity}>
             <ShieldCheck size={16} />
             <span>{limitText}</span>
             <Link href="/privacy#cloud-workspaces">Cloud privacy</Link>
           </div>
-          <label className={styles.consent}>
-            <input
-              type="checkbox"
-              checked={consent}
-              disabled={!consentLoaded || consentSaving || consent}
-              onChange={(e) => void acceptCloudConsent(e.target.checked)}
-            />
-            <span>
+          <Field orientation="horizontal" className={styles.consent}>
+            <Checkbox id="cloud-consent" checked={consent} disabled={!consentLoaded || consentSaving || consent} onCheckedChange={checked => void acceptCloudConsent(checked === true)} />
+            <FieldLabel htmlFor="cloud-consent">
               {consent
                 ? "Cloud storage consent is saved for this account. Files, chat, diffs, and command output are retained for up to seven days after activity; material changes to these terms will ask again."
                 : "I agree to store this project’s files, chat, diffs, and command output in Freecoda’s cloud for up to seven days after last activity. Delete the project at any time. Avoid secrets and private customer data."}
-            </span>
-          </label>
+            </FieldLabel>
+          </Field>
           {project && <div id="cloud-project-extensions"><ProjectExtensions key={project.id} projectId={project.id} disabled={busy || running || !consent} onToolsChanged={extensionsChanged} requestedView={extensionsView} openSignal={extensionsOpenSignal} skillSource={skillSource} mode={mode} /></div>}
-          {project && hasExternalTools && mode === "build" && <label className={styles.consent}>
-            <input type="checkbox" checked={extensionConsent} disabled={running} onChange={event => setExtensionConsent(event.target.checked)} />
-            <span>Allow enabled MCP tools for this run. They may send project context to external servers and perform actions outside this workspace.</span>
-          </label>}
+          {project && hasExternalTools && mode === "build" && <Field orientation="horizontal" className={styles.consent}>
+            <Checkbox id="external-tools-consent" checked={extensionConsent} disabled={running} onCheckedChange={checked => setExtensionConsent(checked === true)} />
+            <FieldLabel htmlFor="external-tools-consent">Allow enabled MCP tools for this run. They may send project context to external servers and perform actions outside this workspace.</FieldLabel>
+          </Field>}
             </div>
           </div>
           <div className={styles.workbench}>
             <aside className={styles.projects} data-mobile-open={projectsOpen} aria-label="Cloud workspaces">
-              <button
+              <Button
                 className={styles.mobileProjectsToggle}
                 aria-expanded={projectsOpen}
                 onClick={() => setProjectsOpen((open) => !open)}
@@ -1287,18 +1278,18 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                 <FolderGit2 size={15} />
                 <span>{project?.name || "Workspaces"}</span>
                 <ChevronRight size={14} />
-              </button>
+              </Button>
               <div className={styles.sectionHead}>
                 <strong>Your workspaces</strong>
-                <button
+                <Button
                   aria-label="Create project"
                   disabled={!consent || busy || running}
                   onClick={() => setDialog("create")}
                 >
                   <Plus size={17} />
-                </button>
+                </Button>
               </div>
-              <label className={styles.projectSearch}>Find a workspace<input type="search" value={projectSearch} onChange={event => setProjectSearch(event.target.value)} placeholder="Name or repository…" /></label>
+              <label className={styles.projectSearch}>Find a workspace<Input type="search" value={projectSearch} onChange={event => setProjectSearch(event.target.value)} placeholder="Name or repository…" /></label>
               <div className={styles.projectList}>
                 {visibleProjects.map((p) => {
                   const selected = project?.id === p.id;
@@ -1306,7 +1297,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                   const repository = details.repo ? `${details.repo.owner}/${details.repo.name}` : details.repository;
                   return (
                     <div key={p.id} className={styles.workspaceGroup}>
-                      <button
+                      <Button
                         className={`${styles.workspaceButton} ${selected ? styles.selected : ""}`}
                         onClick={() => selectProject(p)}
                         disabled={running || busy}
@@ -1322,10 +1313,10 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                           <small>{details.status === "ready" && details.sandboxId ? "Active · uses your compute slot" : details.status}</small>
                         </span>
                         <ChevronRight size={13} aria-hidden="true" />
-                      </button>
+                      </Button>
                       {selected && (
                         <div className={styles.workspaceConversation}>
-                          <button
+                          <Button
                             aria-label={`Continue conversation in ${p.name}`}
                             onClick={() => {
                               onOpenProject?.();
@@ -1336,7 +1327,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                             <MessageSquare size={14} aria-hidden="true" />
                             <span>{messages.find((message) => message.role === "user")?.text || "Workspace conversation"}</span>
                             {running && <span className={styles.runningDot} aria-label="Running" />}
-                          </button>
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -1344,18 +1335,22 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                 })}
                 {projectSearch && !visibleProjects.length && <p className={styles.smallEmpty}>No matching workspaces.</p>}
                 {!projects.length && (
-                  <p className={styles.smallEmpty}>
-                    Create a cloud workspace or import a GitHub repository.
-                  </p>
+                  <Empty className={styles.projectListEmpty}>
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon"><FolderGit2 /></EmptyMedia>
+                      <EmptyTitle>No workspaces yet</EmptyTitle>
+                      <EmptyDescription>Create a project or import a GitHub repository.</EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
                 )}
               </div>
-              <button
-                className={styles.importButton}
+              <Button
+                variant="outline"
                 disabled={!consent || busy || running}
                 onClick={showImport}
               >
                 <GitBranch size={15} /> Import from GitHub
-              </button>
+              </Button>
               <nav
                 className={styles.railLinks}
                 aria-label="Workspace resources"
@@ -1381,12 +1376,25 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
             </aside>
             {!project ? (
               <section className={styles.welcomeStart} data-conversation-slot aria-label="Start a workspace">
-                <WelcomeSurface title="What do you want to build?" description="Start with a cloud project or bring a repository. You choose what the agent can access." hint={null} actions={[
-                  { label: "Start a project", description: "Create a blank Next.js or Vite workspace", disabled: !consent || busy || running, onClick: () => setDialog("create") },
-                  { label: "Bring a repository", description: "Choose a GitHub repository to work on", disabled: !consent || busy || running, onClick: () => { void showImport(); } },
-                  { label: "Talk it through", description: "Think or write without repository access", ...(onOpenChat ? { onClick: onOpenChat } : { href: "/app?view=chat" }) },
-                  { label: "Work in your own folder", description: "Get the desktop app or terminal client", href: "/docs#desktop" },
-                ]} />
+                <div className={styles.codingWelcome}>
+                  <Badge variant="outline">YOUR NEXT PROJECT STARTS HERE</Badge>
+                  <h2>A little spark.<br /><span>A whole new build.</span></h2>
+                  <p>Your code, your agent, one workspace. Open a repository or start fresh, then build alongside Freecoda.</p>
+                  <div className="my-8 grid gap-4 sm:grid-cols-2">
+                    <Card size="sm">
+                      <CardHeader><CardTitle>New project</CardTitle><CardDescription>A clean starting point for your next idea.</CardDescription></CardHeader>
+                      <CardContent>Start with Next.js or Vite in a cloud workspace.</CardContent>
+                      <CardFooter><Button disabled={!consent || busy || running} onClick={() => setDialog("create")}><Plus data-icon="inline-start" />Create project</Button></CardFooter>
+                    </Card>
+                    <Card size="sm">
+                      <CardHeader><CardTitle>Open repository</CardTitle><CardDescription>Pick up where you left off on GitHub.</CardDescription></CardHeader>
+                      <CardContent>Choose a repository you have granted access to.</CardContent>
+                      <CardFooter><Button variant="outline" disabled={!consent || busy || running} onClick={() => void showImport()}><FolderGit2 data-icon="inline-start" />Browse repositories</Button></CardFooter>
+                    </Card>
+                  </div>
+                  <div className={styles.workflowSteps} aria-label="How it works"><span><b>01</b> Open a project</span><span><b>02</b> Build with your agent</span><span><b>03</b> Review every change</span></div>
+                  <div className={styles.welcomeLinks}>{onOpenChat ? <Button type="button" onClick={onOpenChat}>Just want to chat? <ArrowUpRight size={13} aria-hidden="true" /></Button> : <Link href="/app?view=chat">Just want to chat? <ArrowUpRight size={13} aria-hidden="true" /></Link>}<Link href="/docs#desktop">Work in a local folder <ArrowUpRight size={13} aria-hidden="true" /></Link></div>
+                </div>
                 <p className={styles.welcomeNote}>{!consent ? "Accept cloud storage consent above to create or import a workspace." : "Review every change before sharing it."}</p>
               </section>
             ) : (
@@ -1401,36 +1409,38 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                   </div>
                   <div className={styles.projectTools}>
                     {project.repo && <>
-                      <button disabled={busy || running || dirty} onClick={() => syncRepository("status")}><GitBranch size={14} /> Check GitHub</button>
-                      <button disabled={busy || running || dirty || !consent} onClick={() => syncRepository("pull")}><RefreshCw size={14} /> Pull from GitHub</button>
+                      <Button disabled={busy || running || dirty} onClick={() => syncRepository("status")}><GitBranch size={14} /> Check GitHub</Button>
+                      <Button disabled={busy || running || dirty || !consent} onClick={() => syncRepository("pull")}><RefreshCw size={14} /> Pull from GitHub</Button>
                     </>}
                     {paused ? (
-                      <button
+                      <Button
                         disabled={busy || running || !consent || inactive}
                         onClick={() => lifecycle("resume")}
                       >
                         <Play size={14} /> Resume
-                      </button>
+                      </Button>
                     ) : (
-                      <button
+                      <Button
                         disabled={busy || running || dirty || inactive}
                         onClick={() => lifecycle("suspend")}
                       >
                         <Pause size={14} /> Suspend
-                      </button>
+                      </Button>
                     )}
-                    <button
+                    <Button
                       disabled={busy || running}
                       onClick={() => setDialog("delete")}
                       aria-label="Delete cloud project"
                     >
                       <Trash2 size={15} />
-                    </button>
+                    </Button>
                   </div>
                 </div>
-                <div className={styles.mobilePaneToggle} role="group" aria-label="Workspace view">
-                  <button type="button" aria-pressed={mobilePane === "chat"} onClick={() => setMobilePane("chat")}>Conversation</button>
-                  <button type="button" aria-pressed={mobilePane === "inspect"} onClick={() => setMobilePane("inspect")}>Files & output</button>
+                <div className={styles.mobilePaneToggle}>
+                  <ToggleGroup size="sm" value={[mobilePane]} onValueChange={values => { if (values[0] === "chat" || values[0] === "inspect") setMobilePane(values[0]); }} aria-label="Workspace view">
+                    <ToggleGroupItem value="chat">Conversation</ToggleGroupItem>
+                    <ToggleGroupItem value="inspect">Files & output</ToggleGroupItem>
+                  </ToggleGroup>
                 </div>
                 <div className={styles.taskLayout} data-mobile-pane={mobilePane}>
                   <section
@@ -1438,13 +1448,12 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                     data-conversation-slot
                     aria-label="Agent conversation"
                   >
-                    <div
-                      className={styles.conversation}
-                      aria-live="polite"
-                      aria-relevant="additions text"
-                    >
+                    <MessageScrollerProvider key={project.id} autoScroll defaultScrollPosition="end">
+                    <MessageScroller className={styles.conversation}>
+                      <MessageScrollerViewport aria-label="Agent conversation">
+                      <MessageScrollerContent aria-busy={running} className="p-4">
                       {!messages.length && (
-                        <div className={styles.workspaceWelcome}>
+                        <MessageScrollerItem messageId="welcome" className={styles.workspaceWelcome}>
                           <WelcomeSurface heading="h3" description={`A plan, a question, or a change for ${project.name}. You review the work before sharing it.`} actions={[
                             { label: "Explore this project", description: "Understand the code and where to start", prompt: "Explain how this project is organized and where I should start.", mode: "plan" },
                             { label: "Plan a feature", description: "Work out the next steps before editing", prompt: "Help me plan a new feature. Ask what I want to build first.", mode: "plan" },
@@ -1456,56 +1465,59 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                             setPrompt(action.prompt);
                             document.getElementById("cloud-prompt")?.focus();
                           } }))} />
-                        </div>
+                        </MessageScrollerItem>
                       )}
                       {messages.map((m, i) => (
-                        <div key={m.id || i} className={`${styles.messageRow} ${m.role === "user" ? styles.userRow : styles.agentRow}`}>
-                          {m.role === "user" ? <UserAvatar image={status?.userImage} name={status?.userName} className={`${styles.messageAvatar} ${styles.userAvatar}`} /> : <span className={`${styles.messageAvatar} ${styles.agentAvatar}`} role="img" aria-label="Coda"><Mark /></span>}
-                          <div className={m.role === "user" ? styles.userMessage : styles.agentMessage} aria-label={m.role === "user" ? "Your message" : "Coda response"}>
-                          <span>{m.role === "user" ? "You" : m.role === "assistant" ? "Coda" : "Workspace"}</span>
-                          {m.role === "assistant" ? <MarkdownMessage text={m.text} /> : <p>{m.text}</p>}
-                          {m.status === "accepted" && <small>Sent · waiting for the agent</small>}
-                          </div>
-                        </div>
+                        <MessageScrollerItem key={m.id || i} messageId={m.id || `message-${i}`} scrollAnchor={m.role === "user"}>
+                          <AgentMessage role={m.role} image={status?.userImage} name={status?.userName} footer={m.status === "accepted" ? "Sent · waiting for the agent" : undefined}>
+                            {m.role === "assistant" ? <MarkdownMessage text={m.text} /> : <p>{m.text}</p>}
+                          </AgentMessage>
+                        </MessageScrollerItem>
                       ))}
-                      {running && (
-                        <p className={styles.working}>
-                          <Loader2 size={14} className={styles.spin} /> Working
-                          in your project…
-                        </p>
-                      )}
+                      {(running || output) && <MessageScrollerItem messageId="run-activity">
+                        <Trace>
+                          {output && <TraceCollapsible>
+                            <TraceCollapsibleTrigger><TraceLine><TraceIcon><Terminal /></TraceIcon><TraceTitle>Command output from this run</TraceTitle></TraceLine></TraceCollapsibleTrigger>
+                            <TraceCollapsibleContent><CodeBlock size="sm"><CodeBlockContent wrap className="max-h-64">{output}</CodeBlockContent></CodeBlock></TraceCollapsibleContent>
+                          </TraceCollapsible>}
+                          {running && <TraceLine status="running"><TraceIcon><Loader2 /></TraceIcon><TraceTitle>Working in your project…</TraceTitle></TraceLine>}
+                        </Trace>
+                      </MessageScrollerItem>}
                       {queuedPrompts.length > 0 && (
-                        <div className={styles.queuedPrompts} aria-label="Queued messages">
+                        <MessageScrollerItem messageId="queue" className={styles.queuedPrompts} aria-label="Queued messages">
                           <strong>{queuedPrompts.length} queued{queuePaused ? " · paused" : ""}</strong>
-                          {queuePaused && <button type="button" disabled={busy || running} onClick={() => { setError(""); pauseQueue(false); }}>Retry queue</button>}
+                          {queuePaused && <Button type="button" disabled={busy || running} onClick={() => { setError(""); pauseQueue(false); }}>Retry queue</Button>}
                           {hasExternalTools && queuedPrompts[0]?.mode === "build" && queuedPrompts[0]?.extensionConsent === undefined && !extensionConsent && <p>Approve external tools for the next run before this queue continues.</p>}
                           {queuedPrompts.map((queued, index) => (
-                            <div key={queued.id} className={styles.userMessage}>
-                              <UserAvatar image={status?.userImage} name={status?.userName} />
+                            <AgentMessage key={queued.id} role="user" image={status?.userImage} name={status?.userName}>
                               <span>You · {submittingRef.current && index === 0 ? "Sending…" : queued.failed ? "Failed · retry available" : queuePaused ? "Paused" : "Queued"}</span>
                               <p>{queued.text}</p>
                               <small>{queued.mode}</small>
-                              <button
+                              <Button
                                 type="button"
                                 aria-label={`Remove queued message ${index + 1}`}
                                 disabled={submittingRef.current && index === 0}
                                 onClick={() => updateQueue(queuedRef.current.filter((entry) => entry.id !== queued.id))}
                               >
                                 <X size={13} />
-                              </button>
-                            </div>
+                              </Button>
+                            </AgentMessage>
                           ))}
-                        </div>
+                        </MessageScrollerItem>
                       )}
-                      <div ref={endOfChat} />
-                    </div>
+                      </MessageScrollerContent>
+                      </MessageScrollerViewport>
+                      <MessageScrollerButton />
+                    </MessageScroller>
+                    </MessageScrollerProvider>
                     <form className={styles.composer} onSubmit={sendPrompt}>
                       <VoiceControls visible={conversationMode === "project" && consent && !inactive} scopeKey={project?.id || "no-project"} disabled={busy || !project || !consent || inactive} onDictation={text => { const next = (promptInputRef.current + (promptInputRef.current && !/\s$/.test(promptInputRef.current) ? " " : "") + text).slice(0, 12000); promptInputRef.current = next; setPrompt(next); }} />
                       {commands.list}
                       <label className="sr-only" htmlFor="cloud-prompt">
                         Message the coding agent
                       </label>
-                      <textarea
+                      <InputGroup>
+                      <InputGroupTextarea
                         {...commands.attributes}
                         id="cloud-prompt"
                         value={prompt}
@@ -1522,29 +1534,29 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                         placeholder="Ask Coda about this project, or / for commands"
                         disabled={!consent || inactive}
                       />
-                      <div>
-                        <button type="button" onClick={() => { promptInputRef.current = "/"; setPrompt("/"); document.getElementById("cloud-prompt")?.focus(); }}>Commands</button>
-                        <button type="button" title="Use /build, /plan or /review" onClick={() => { promptInputRef.current = "/"; setPrompt("/"); document.getElementById("cloud-prompt")?.focus(); }}>{mode === "build" ? "Build" : mode === "plan" ? "Plan · read only" : "Review · read only"}</button>
-                        <button type="button" onClick={() => onOpenChat?.()} title="Continue without repository context · /chat">Leave project</button>
-                        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("freecoda:extensions", { detail: { view: "tools" } }))}>Tools</button>
+                      <InputGroupAddon align="block-end" className="flex-wrap">
+                        <InputGroupButton type="button" onClick={() => { promptInputRef.current = "/"; setPrompt("/"); document.getElementById("cloud-prompt")?.focus(); }}>Commands</InputGroupButton>
+                        <InputGroupButton type="button" title="Use /build, /plan or /review" onClick={() => { promptInputRef.current = "/"; setPrompt("/"); document.getElementById("cloud-prompt")?.focus(); }}>{mode === "build" ? "Build" : mode === "plan" ? "Plan · read only" : "Review · read only"}</InputGroupButton>
+                        <InputGroupButton type="button" onClick={() => onOpenChat?.()} title="Continue without repository context · /chat">Leave project</InputGroupButton>
+                        <InputGroupButton type="button" onClick={() => window.dispatchEvent(new CustomEvent("freecoda:extensions", { detail: { view: "tools" } }))}>Tools</InputGroupButton>
                         <span>
                           {dirty
                             ? "Save your file before starting a run."
                             : "Enter sends · Ctrl+Enter queues · Shift+Enter adds a line."}
                         </span>
                         {running ? (
-                          <button
+                          <InputGroupButton
                             type="button"
-                            className={styles.send}
+                            variant="default"
                             disabled={busy}
                             onClick={stopRun}
                           >
-                            <Square size={13} /> Stop
-                          </button>
+                            <Square /> Stop
+                          </InputGroupButton>
                         ) : (
-                          <button
+                          <InputGroupButton
                             type="submit"
-                            className={styles.send}
+                            variant="default"
                             disabled={
                               busy ||
                               !consent ||
@@ -1554,74 +1566,20 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                               inactive
                             }
                           >
-                            <Send size={14} /> Send
-                          </button>
+                            <Send /> Send
+                          </InputGroupButton>
                         )}
-                      </div>
+                      </InputGroupAddon>
+                      </InputGroup>
                     </form>
                   </section>
-                  <div className={styles.bottom}>
-                    <div
-                      className={styles.tabs}
-                      role="tablist"
-                      aria-label="Workspace panels"
-                    >
-                      {(
-                        [
-                          ["files", FileCode2, "Files"],
-                          ["changes", GitBranch, "Changes"],
-                          ["preview", Play, "Preview"],
-                          ["output", Terminal, "Output"],
-                        ] as const
-                      ).map(([key, Icon, label]) => (
-                        <button
-                          key={key}
-                          id={`tab-${key}`}
-                          role="tab"
-                          aria-selected={tab === key}
-                          aria-controls={`panel-${key}`}
-                          tabIndex={tab === key ? 0 : -1}
-                          onKeyDown={(e) => {
-                            if (e.key !== "ArrowRight" && e.key !== "ArrowLeft")
-                              return;
-                            const tabs = [
-                              "files",
-                              "changes",
-                              "preview",
-                              "output",
-                            ] as const;
-                            const next =
-                              tabs[
-                                (tabs.indexOf(tab) +
-                                  (e.key === "ArrowRight" ? 1 : 3)) %
-                                  4
-                              ];
-                            e.preventDefault();
-                            if (next === "changes") void reviewChanges();
-                            else setTab(next);
-                            document.getElementById(`tab-${next}`)?.focus();
-                          }}
-                          onClick={() => {
-                            if (key === "changes") void reviewChanges();
-                            else if (key === "preview") setTab("preview");
-                            else setTab(key);
-                          }}
-                        >
-                          <Icon size={15} />
-                          {label}
-                          {key === "output" && running && (
-                            <span className={styles.runningDot} />
-                          )}
-                        </button>
+                  <Tabs value={tab} onValueChange={value => { const next = value as typeof tab; if (next === "changes") void reviewChanges(); else setTab(next); }} className={styles.bottom}>
+                    <TabsList variant="line" aria-label="Workspace panels" className="w-full shrink-0 justify-start">
+                      {([["files", FileCode2, "Files"], ["changes", GitBranch, "Changes"], ["preview", Play, "Preview"], ["output", Terminal, "Output"]] as const).map(([key, Icon, label]) => (
+                        <TabsTrigger key={key} value={key}><Icon data-icon="inline-start" />{label}{key === "output" && running && <Badge variant="secondary">Running</Badge>}</TabsTrigger>
                       ))}
-                    </div>
-                    <section
-                      className={styles.panel}
-                      role="tabpanel"
-                      tabIndex={0}
-                      id={`panel-${tab}`}
-                      aria-labelledby={`tab-${tab}`}
-                    >
+                    </TabsList>
+                    <TabsContent value={tab} className={styles.panel}>
                       {tab === "files" && (
                         <>
                           <form
@@ -1631,7 +1589,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                           >
                             <label>
                               App folder{" "}
-                              <input
+                              <Input
                                 name="appDirectory"
                                 aria-label="App folder relative to repository root"
                                 defaultValue={
@@ -1648,13 +1606,13 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                                 placeholder=". or apps/web"
                               />
                             </label>
-                            <button
+                            <Button
                               disabled={
                                 busy || running || inactive || dirty || !consent
                               }
                             >
                               Set app folder
-                            </button>
+                            </Button>
                             <span>
                               The folder containing your app’s package.json.
                             </span>
@@ -1663,7 +1621,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                             <div className={styles.files} role="region" aria-label="Project files" tabIndex={0}>
                               <div className={styles.sectionHead}>
                                 <strong>Files</strong>
-                                <button
+                                <Button
                                   aria-label="Refresh files"
                                   disabled={busy || running || inactive}
                                   onClick={async () => {
@@ -1675,9 +1633,9 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                                   }}
                                 >
                                   <RefreshCw size={13} />
-                                </button>
+                                </Button>
                               </div>
-                              <input
+                              <Input
                                 className={styles.fileFilter}
                                 aria-label="Filter project files"
                                 placeholder="Find a file…"
@@ -1685,7 +1643,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                                 onChange={(e) => setFileFilter(e.target.value)}
                               />
                               {visibleFiles.map((f) => (
-                                <button
+                                <Button
                                   key={f.path}
                                   disabled={busy || running || inactive}
                                   className={
@@ -1698,7 +1656,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                                 >
                                   <FileCode2 size={13} />
                                   <span>{f.path}</span>
-                                </button>
+                                </Button>
                               ))}
                               {matchingFiles.length > 250 && (
                                 <p className={styles.smallEmpty}>
@@ -1725,7 +1683,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                                   {dirty && <b> · unsaved</b>}
                                 </span>
                                 {file && (
-                                  <button
+                                  <Button
                                     disabled={
                                       busy ||
                                       running ||
@@ -1736,11 +1694,11 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                                     onClick={saveFile}
                                   >
                                     Save file
-                                  </button>
+                                  </Button>
                                 )}
                               </div>
                               {file ? (
-                                <textarea
+                                <Textarea
                                   aria-label={`Edit ${file.path}`}
                                   className={styles.codeEditor}
                                   spellCheck={false}
@@ -1773,7 +1731,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                               <h3>Review your changes.</h3>
                               <p>Nothing has been pushed to GitHub.</p>
                             </div>
-                            <button
+                            <Button
                               disabled={
                                 busy ||
                                 running ||
@@ -1787,27 +1745,10 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                               }}
                             >
                               <GitPullRequest size={15} /> Create draft PR
-                            </button>
+                            </Button>
                           </div>
                           {changes?.diff ? (
-                            <pre className={styles.diff}>
-                              {changes.diff.split("\n").map((line, i) => (
-                                <span
-                                  key={i}
-                                  className={
-                                    line.startsWith("+") &&
-                                    !line.startsWith("+++")
-                                      ? styles.added
-                                      : line.startsWith("-") &&
-                                          !line.startsWith("---")
-                                        ? styles.removed
-                                        : undefined
-                                  }
-                                >
-                                  {line}
-                                </span>
-                              ))}
-                            </pre>
+                            <CodeBlock><CodeBlockContent>{changes.diff.split("\n").map((line, i) => <CodeBlockLine key={i} variant={line.startsWith("+") && !line.startsWith("+++") ? "added" : line.startsWith("-") && !line.startsWith("---") ? "removed" : undefined}>{line}</CodeBlockLine>)}</CodeBlockContent></CodeBlock>
                           ) : (
                             <div className={styles.smallEmpty}>
                               {busy
@@ -1816,15 +1757,10 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                             </div>
                           )}
                           {changes?.diff && (
-                            <label className={styles.reviewCheck}>
-                              <input
-                                type="checkbox"
-                                checked={reviewed}
-                                onChange={(e) => setReviewed(e.target.checked)}
-                              />
-                              I reviewed this diff and confirm it contains no
-                              secrets or workflow changes.
-                            </label>
+                            <Field orientation="horizontal" className={styles.reviewCheck}>
+                              <Checkbox id="reviewed-diff" checked={reviewed} onCheckedChange={checked => setReviewed(checked === true)} />
+                              <FieldLabel htmlFor="reviewed-diff">I reviewed this diff and confirm it contains no secrets or workflow changes.</FieldLabel>
+                            </Field>
                           )}
                           <p className={styles.footnote}>
                             Publishing creates a branch and a draft pull request
@@ -1837,7 +1773,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                         <div className={styles.output}>
                           <p>Command output from this run</p>
                           {output ? (
-                            <pre>{output}</pre>
+                            <CodeBlock><CodeBlockHeader><CodeBlockTitle>Output</CodeBlockTitle><CodeBlockActions><CodeBlockCopyButton value={output} /></CodeBlockActions></CodeBlockHeader><CodeBlockContent wrap>{output}</CodeBlockContent></CodeBlock>
                           ) : (
                             <span>No command output yet.</span>
                           )}
@@ -1858,12 +1794,12 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                                 <a href={preview.url} target="_blank" rel="noopener noreferrer">
                                   <ExternalLink size={13} /> Open link
                                 </a>
-                                <button onClick={() => void copyPreviewUrl()}>
+                                <Button onClick={() => void copyPreviewUrl()}>
                                   <Copy size={13} /> Copy link
-                                </button>
-                                <button disabled={busy} onClick={openPreview}>
+                                </Button>
+                                <Button disabled={busy} onClick={openPreview}>
                                   <RefreshCw size={14} /> Refresh access
-                                </button>
+                                </Button>
                               </div>
                               <iframe
                                 title={`${project.name} private preview`}
@@ -1885,110 +1821,60 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                                 workspace when needed. Preview access is private
                                 and expires automatically.
                               </span>
-                              <button
+                              <Button
                                 disabled={
                                   busy || inactive || running || !consent
                                 }
                                 onClick={openPreview}
                               >
                                 Install dependencies & open preview
-                              </button>
+                              </Button>
                             </div>
                           )}
                         </div>
                       )}
-                    </section>
-                  </div>
+                    </TabsContent>
+                  </Tabs>
                 </div>
               </section>
             )}
           </div>
         </>
       )}
-      {dialog && (
-        <div
-          className={styles.overlay}
-          onClick={(e) => {
-            if (e.target === e.currentTarget && !busy) setDialog(null);
-          }}
-        >
-          <section
-            className={styles.dialog}
-            ref={dialogRef}
-            role="dialog"
-            tabIndex={-1}
-            aria-modal="true"
-            aria-labelledby="cloud-dialog-title"
-            onKeyDown={(e) => {
-              if (e.key === "Escape" && !busy) setDialog(null);
-              if (e.key === "Tab") {
-                const nodes = Array.from(
-                  dialogRef.current?.querySelectorAll<HTMLElement>(
-                    "button:not(:disabled),input:not(:disabled),textarea:not(:disabled),a[href],select:not(:disabled)",
-                  ) || [],
-                );
-                if (!nodes.length) {
-                  e.preventDefault();
-                  dialogRef.current?.focus();
-                  return;
-                }
-                const first = nodes[0],
-                  last = nodes.at(-1);
-                if (e.shiftKey && document.activeElement === first) {
-                  e.preventDefault();
-                  last?.focus();
-                } else if (!e.shiftKey && document.activeElement === last) {
-                  e.preventDefault();
-                  first?.focus();
-                }
-              }
-            }}
-          >
-            <button
-              className={styles.close}
-              disabled={busy}
-              onClick={() => setDialog(null)}
-              aria-label="Close dialog"
-            >
-              <X size={20} />
-            </button>
+      <Dialog open={!!dialog} onOpenChange={open => { if (!open && !busy) setDialog(null); }}>
+        {dialog && <DialogContent showCloseButton={!busy} className="max-h-[85dvh] overflow-y-auto sm:max-w-xl">
+          <DialogTitle>{dialog === "create" ? "A fresh place to start." : dialog === "import" ? "Open a GitHub repository" : dialog === "publish" ? "Create a draft pull request" : "Delete cloud project"}</DialogTitle>
             {dialog === "create" && (
-              <form onSubmit={createProject}>
-                <h2 id="cloud-dialog-title">A fresh place to start.</h2>
+              <form onSubmit={createProject}><FieldGroup>
                 <p>
                   Give your project a name. You can ask the agent to create its
                   first files.
                 </p>
-                <label className="field">
-                  Project name
-                  <input
-                    name="name"
+                <Field><FieldLabel htmlFor="cloud-name">Project name</FieldLabel><Input
+                    id="cloud-name" name="name"
                     required
                     minLength={1}
                     maxLength={80}
                     autoFocus
                     placeholder="my-next-idea"
                   />
-                </label>
-                <label className="field">
-                  Starting point
-                  <select name="template" defaultValue="nextjs">
-                    <option value="nextjs">Next.js app</option>
-                    <option value="vite">Vite app</option>
-                  </select>
-                </label>
+                </Field>
+                <Field><FieldLabel htmlFor="cloud-template">Starting point</FieldLabel><NativeSelect id="cloud-template" name="template" defaultValue="nextjs">
+                    <NativeSelectOption value="nextjs">Next.js app</NativeSelectOption>
+                    <NativeSelectOption value="vite">Vite app</NativeSelectOption>
+                  </NativeSelect>
+                </Field>
                 <p className={styles.footnote}>
                   Cloud files, chat, diffs, and output are kept for up to seven
                   days after last activity. Your daily free capacity applies.
                 </p>
-                <button className="button purple" disabled={busy || !consent}>
+                <Button  disabled={busy || !consent}>
                   {busy ? "Creating…" : "Create cloud project"}
-                </button>
-              </form>
+                </Button>
+              </FieldGroup></form>
             )}
             {dialog === "import" && (
               <>
-                <h2 id="cloud-dialog-title">Bring your own starting point.</h2>
                 <p>
                   GitHub controls which repositories the Freecoda GitHub App
                   can access. Your Freecoda selections and working preferences
@@ -1996,24 +1882,24 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                   a cloud copy and leaves your original repository unchanged.
                 </p>
                 <div className={styles.repoAccessActions}>
-                  <Link className="button secondary" href="/settings#connections" target="_blank" rel="noopener noreferrer">
+                  <Link className={buttonVariants({ variant: "outline" })} href="/settings#connections" target="_blank" rel="noopener noreferrer">
                     Manage Freecoda selections <ArrowUpRight size={14} aria-hidden="true" />
                   </Link>
-                  {installUrl && <a className="button secondary" href={installUrl} target="_blank" rel="noopener noreferrer">
+                  {installUrl && <a className={buttonVariants({ variant: "outline" })} href={installUrl} target="_blank" rel="noopener noreferrer">
                     Manage GitHub App access <ArrowUpRight size={14} aria-hidden="true" />
                   </a>}
-                  <button className={styles.linkButton} disabled={busy} onClick={showImport}>Refresh repository access</button>
+                  <Button variant="link" disabled={busy} onClick={showImport}>Refresh repository access</Button>
                 </div>
                 <p className={styles.footnote}>Management opens in a new tab. After changing repository access or selections, return here and refresh. GitHub organization approval may be required for additional repositories.</p>
                 {repoLoadError && <p className={styles.repoAccessError} role="alert">{repoLoadError} Refresh access to retry, or manage your connections in settings.</p>}
                 <h3 className={styles.repoSectionTitle}>Repositories granted by GitHub</h3>
                 {repos.length ? (
                   <div className={styles.repoList}>
-                    <label className={styles.projectSearch}>Find a repository<input type="search" value={repoSearch} onChange={event => setRepoSearch(event.target.value)} placeholder="owner/repository" /></label>
+                    <label className={styles.projectSearch}>Find a repository<Input type="search" value={repoSearch} onChange={event => setRepoSearch(event.target.value)} placeholder="owner/repository" /></label>
                     {repoSearch && !repos.some(repo => `${repo.owner}/${repo.name}`.toLowerCase().includes(repoSearch.toLowerCase())) && <p className={styles.smallEmpty}>No matching repositories.</p>}
                     {repos.length > 8 && <p className={styles.smallEmpty}>{repos.length} repositories · search to narrow the list.</p>}
                     {repos.filter(repo => `${repo.owner}/${repo.name}`.toLowerCase().includes(repoSearch.toLowerCase())).slice(0, 8).map((repo) => (
-                      <button
+                      <Button
                         key={`${repo.installationId}/${repo.owner}/${repo.name}`}
                         type="button"
                         disabled={busy}
@@ -2034,7 +1920,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                           </small>
                         </span>
                         <ChevronRight size={15} />
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 ) : (
@@ -2052,14 +1938,13 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                     Selected: <strong>{selectedRepo.owner}/{selectedRepo.name}</strong>
                   </p>
                 )}
-                <button
+                <Button
                   type="button"
-                  className="button purple"
                   disabled={!selectedRepo || busy || !consent}
                   onClick={() => selectedRepo && void importRepo(selectedRepo)}
                 >
                   {busy ? "Importing…" : "Import selected repository"}
-                </button>
+                </Button>
                 {repoPreferences.some(preference => !repos.some(repo => repo.repositoryId === preference.repositoryId)) && !busy && <div className={styles.unavailableRepos}>
                   <h3 className={styles.repoSectionTitle}>Saved selections without current access</h3>
                   <p>These repositories cannot be imported until GitHub access is restored. Manage GitHub App access or remove their saved configuration in Freecoda settings.</p>
@@ -2069,8 +1954,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
               </>
             )}
             {dialog === "publish" && (
-              <form onSubmit={publish}>
-                <h2 id="cloud-dialog-title">Share a draft for review.</h2>
+              <form onSubmit={publish}><FieldGroup>
                 <p>
                   Create a branch and a draft pull request in{" "}
                   {project?.repo
@@ -2078,72 +1962,59 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                     : project?.repository || "your selected repository"}
                   . Review the Changes panel first.
                 </p>
-                <label className="field">
-                  Pull request title
-                  <input
-                    name="title"
+                <Field><FieldLabel htmlFor="cloud-title">Pull request title</FieldLabel><Input
+                    id="cloud-title" name="title"
                     required
                     maxLength={150}
                     defaultValue="Changes from Freecoda"
                     autoFocus
                   />
-                </label>
-                <label className="field">
-                  Description
-                  <textarea
-                    name="body"
+                </Field>
+                <Field><FieldLabel htmlFor="cloud-body">Description</FieldLabel><Textarea
+                    id="cloud-body" name="body"
                     rows={4}
                     maxLength={10000}
                     defaultValue="Created in Freecoda. Please review these changes before merging."
                   />
-                </label>
-                <label className={styles.reviewCheck}>
-                  <input
-                    type="checkbox"
-                    checked={reviewed}
-                    onChange={(e) => setReviewed(e.target.checked)}
-                  />
-                  I reviewed the full diff and authorize publishing these
-                  changes as a draft pull request. No secrets or workflow files
-                  are included.
-                </label>
-                <button
-                  className="button purple"
+                </Field>
+                <Field orientation="horizontal" className={styles.reviewCheck}>
+                  <Checkbox id="authorize-pr" checked={reviewed} onCheckedChange={checked => setReviewed(checked === true)} />
+                  <FieldLabel htmlFor="authorize-pr">I reviewed the full diff and authorize publishing these changes as a draft pull request. No secrets or workflow files are included.</FieldLabel>
+                </Field>
+                <Button
                   disabled={busy || !reviewed || !changes?.diff}
                 >
                   {busy ? "Creating draft…" : "Publish branch & draft PR"}
-                </button>
-              </form>
+                </Button>
+              </FieldGroup></form>
             )}
             {dialog === "delete" && (
               <>
-                <h2 id="cloud-dialog-title">Delete {project?.name}?</h2>
                 <p>
                   This removes the cloud project, its files, chat, and output,
                   and stops its preview. Your GitHub repository and existing
                   pull requests stay as they are.
                 </p>
                 <div className={styles.actions}>
-                  <button
-                    className="button secondary"
+                  <Button
+                    variant="outline"
                     disabled={busy}
                     onClick={() => setDialog(null)}
                   >
                     Keep project
-                  </button>
-                  <button
-                    className={styles.deleteButton}
+                  </Button>
+                  <Button
+                    variant="destructive"
                     disabled={busy || running}
                     onClick={() => lifecycle("delete")}
                   >
                     {busy ? "Deleting…" : "Delete cloud project"}
-                  </button>
+                  </Button>
                 </div>
               </>
             )}
-          </section>
-        </div>
-      )}
+        </DialogContent>}
+      </Dialog>
     </div>
   );
 }
