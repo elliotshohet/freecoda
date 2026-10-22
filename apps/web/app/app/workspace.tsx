@@ -1381,12 +1381,17 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
             </aside>
             {!project ? (
               <section className={styles.welcomeStart} data-conversation-slot aria-label="Start a workspace">
-                <WelcomeSurface title="What do you want to build?" description="Start with a cloud project or bring a repository. You choose what the agent can access." hint={null} actions={[
-                  { label: "Start a project", description: "Create a blank Next.js or Vite workspace", disabled: !consent || busy || running, onClick: () => setDialog("create") },
-                  { label: "Bring a repository", description: "Choose a GitHub repository to work on", disabled: !consent || busy || running, onClick: () => { void showImport(); } },
-                  { label: "Talk it through", description: "Think or write without repository access", ...(onOpenChat ? { onClick: onOpenChat } : { href: "/app?view=chat" }) },
-                  { label: "Work in your own folder", description: "Get the desktop app or terminal client", href: "/docs#desktop" },
-                ]} />
+                <div className={styles.codingWelcome}>
+                  <span className={styles.welcomeEyebrow}>YOUR NEXT PROJECT STARTS HERE</span>
+                  <h2>A little spark.<br /><span>A whole new build.</span></h2>
+                  <p>Your code, your agent, one workspace. Open a repository or start fresh, then build alongside Freecoda.</p>
+                  <div className={styles.startActions}>
+                    <button type="button" disabled={!consent || busy || running} onClick={() => setDialog("create")}><Plus size={20} aria-hidden="true" /><strong>New project</strong><span>Start with Next.js or Vite</span><ArrowUpRight size={17} aria-hidden="true" /></button>
+                    <button type="button" disabled={!consent || busy || running} onClick={() => { void showImport(); }}><FolderGit2 size={20} aria-hidden="true" /><strong>Open repository</strong><span>Bring your code from GitHub</span><ArrowUpRight size={17} aria-hidden="true" /></button>
+                  </div>
+                  <div className={styles.workflowSteps} aria-label="How it works"><span><b>01</b> Open a project</span><span><b>02</b> Build with your agent</span><span><b>03</b> Review every change</span></div>
+                  <div className={styles.welcomeLinks}>{onOpenChat ? <button type="button" onClick={onOpenChat}>Just want to chat? <ArrowUpRight size={13} aria-hidden="true" /></button> : <Link href="/app?view=chat">Just want to chat? <ArrowUpRight size={13} aria-hidden="true" /></Link>}<Link href="/docs#desktop">Work in a local folder <ArrowUpRight size={13} aria-hidden="true" /></Link></div>
+                </div>
                 <p className={styles.welcomeNote}>{!consent ? "Accept cloud storage consent above to create or import a workspace." : "Review every change before sharing it."}</p>
               </section>
             ) : (
