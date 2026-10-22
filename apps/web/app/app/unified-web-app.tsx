@@ -7,6 +7,9 @@ import { GitHubStars } from "@/components/github-stars";
 import { ThemeControl } from "@/components/theme-control";
 import { UserAvatar } from "@/components/user-avatar";
 import { Code2, Files, MessageSquare, PanelLeft, Settings2, BookOpen, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Sidebar, SidebarContent, SidebarGroup, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider } from "@/components/ui/sidebar";
 import Chat from "../chat/chat";
 import { CloudWorkspace } from "./workspace";
 import styles from "./unified-web-app.module.css";
@@ -85,24 +88,35 @@ export function UnifiedWebApp({ initialView, initialThreadId, user }: { initialV
         <Link href="/" className={styles.brand} aria-label="Freecoda home">
           <Mark /><span className={styles.wordmark}>Freecoda</span>
         </Link>
-        <nav className={styles.views} aria-label="Workspace views">
-          <button type="button" className={view === "chat" ? styles.selected : undefined} aria-pressed={view === "chat"} onClick={() => selectView("chat")}><MessageSquare size={14} aria-hidden="true" /> Chat</button>
-          <button type="button" className={view === "workspace" ? styles.selected : undefined} aria-pressed={view === "workspace"} onClick={() => selectView("workspace")}><Code2 size={15} aria-hidden="true" /> Workspace</button>
-        </nav>
+        <ToggleGroup value={[view]} onValueChange={values => { if (values[0] === "chat" || values[0] === "workspace") selectView(values[0]); }} size="sm" aria-label="Workspace views">
+          <ToggleGroupItem value="workspace"><Code2 data-icon="inline-start" /> Workspace</ToggleGroupItem>
+          <ToggleGroupItem value="chat"><MessageSquare data-icon="inline-start" /> Chat</ToggleGroupItem>
+        </ToggleGroup>
         <div className={styles.headerActions}>
           <div className={styles.githubControl}><GitHubStars /></div>
-          {view === "chat" && <button type="button" className={styles.headerButton} aria-label="Open chat history" title="Chat history" onClick={() => window.dispatchEvent(new CustomEvent("freecoda:chat-sidebar"))}><PanelLeft size={18} aria-hidden="true" /></button>}
+          {view === "chat" && <Button type="button" size="icon-sm" variant="ghost" aria-label="Open chat history" title="Chat history" onClick={() => window.dispatchEvent(new CustomEvent("freecoda:chat-sidebar"))}><PanelLeft aria-hidden="true" /></Button>}
           <ThemeControl />
           <Link className={styles.account} href="/settings" aria-label="Account & settings" title="Account & settings"><UserAvatar image={user.image} name={user.name} /></Link>
         </div>
       </header>
-      <nav className={styles.activityRail} aria-label="Application navigation">
-        <button type="button" aria-label="Coding workspace" title="Coding workspace" aria-pressed={view === "workspace"} onClick={() => selectView("workspace")}><Files size={21} /></button>
-        <button type="button" aria-label="General chat" title="General chat" aria-pressed={view === "chat"} onClick={() => selectView("chat")}><MessageSquare size={21} /></button>
-        <div className={styles.railSpacer} />
-        <Link href="/docs" aria-label="Documentation" title="Documentation"><BookOpen size={20} /></Link>
-        <Link href="/settings" aria-label="Settings" title="Settings"><Settings2 size={20} /></Link>
-      </nav>
+      <SidebarProvider className={styles.railProvider}>
+        <Sidebar collapsible="none" className={styles.activityRail}>
+          <SidebarContent>
+            <SidebarGroup>
+              <SidebarMenu>
+                <SidebarMenuItem><SidebarMenuButton isActive={view === "workspace"} aria-label="Coding workspace" title="Coding workspace" onClick={() => selectView("workspace")}><Files /></SidebarMenuButton></SidebarMenuItem>
+                <SidebarMenuItem><SidebarMenuButton isActive={view === "chat"} aria-label="General chat" title="General chat" onClick={() => selectView("chat")}><MessageSquare /></SidebarMenuButton></SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+            <SidebarGroup className="mt-auto">
+              <SidebarMenu>
+                <SidebarMenuItem><SidebarMenuButton render={<Link href="/docs" />} aria-label="Documentation" title="Documentation"><BookOpen /></SidebarMenuButton></SidebarMenuItem>
+                <SidebarMenuItem><SidebarMenuButton render={<Link href="/settings" />} aria-label="Settings" title="Settings"><Settings2 /></SidebarMenuButton></SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+          </SidebarContent>
+        </Sidebar>
+      </SidebarProvider>
       <footer className={styles.statusbar}>
         <span><Code2 size={12} aria-hidden="true" />{view === "workspace" ? "Cloud workspace" : "General chat"}</span>
         <span><ShieldCheck size={12} aria-hidden="true" />{view === "workspace" ? "Review before sharing" : "No repository access"}</span>

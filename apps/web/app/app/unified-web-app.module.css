@@ -1,184 +1,56 @@
 .shell {
-  display: grid;
-  grid-template-rows: 58px minmax(0, 1fr);
   position: fixed;
   inset: 0;
   z-index: 40;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-rows: 52px minmax(0, 1fr) 27px;
   height: var(--app-height, 100dvh);
   min-height: 0;
   overflow: hidden;
-  background: light-dark(#fff, #17161b);
-  color: light-dark(#26242c, #eceaf0);
+  background: var(--background);
+  color: var(--foreground);
 }
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 0 22px;
-  border-bottom: 1px solid var(--line);
-  background: light-dark(#fff, #1d1b22);
-  z-index: 5;
-}
-.brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: inherit;
-  text-decoration: none;
-  font-size: 15px;
-  font-weight: 720;
-  letter-spacing: -0.35px;
-}
-.brand :global(.brand-symbol) {
-  width: 20px;
-  height: 22px;
-}
-.views {
-  display: flex;
-  align-items: center;
-  height: 100%;
-  gap: 4px;
-}
-.views button {
-  height: 100%;
-  min-width: 94px;
-  padding: 0 16px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  cursor: pointer;
-}
-.views button:hover,
-.views button:focus-visible {
-  color: inherit;
-}
-.views button:focus-visible,
-.account:focus-visible {
-  outline: 2px solid var(--purple);
-  outline-offset: -3px;
-}
-.views .selected {
-  color: inherit;
-  border-bottom-color: var(--purple);
-  font-weight: 650;
-}
-.account {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 12px;
-  text-decoration: none;
-}
-.headerActions { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.headerButton { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--line); border-radius: 7px; background: transparent; color: inherit; padding: 7px 9px; cursor: pointer; font-size: 12px; }
-.headerButton:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
-.account:hover {
-  color: inherit;
-}
-.panels,
-.panel {
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-}
-.panels { overflow: hidden; }
-.panel[hidden] {
-  display: none;
-}
-.panel:not([hidden]) {
-  display: block;
-  overflow: hidden;
-  overscroll-behavior: contain;
-}
-@media (max-width: 560px) {
-  .topbar {
-    padding: 0 12px;
-    gap: 7px;
-  }
-  .views button {
-    min-width: 78px;
-    padding: 0 9px;
-  }
-  .account {
-    font-size: 10px;
-  }
-  .headerActions { gap: 6px; }
-  .headerButton { padding: 7px; }
-  .headerButton span, .accountLabel { display: none; }
-  .views button { min-width: 64px; padding: 0 6px; font-size: 12px; }
-}
-.roomTitle { color: var(--muted); font-size: 12px; }
+.topbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 28px; padding: 0 16px; border-bottom: 1px solid var(--border); background: var(--sidebar); }
+.brand { display: inline-flex; align-items: center; gap: 9px; flex-shrink: 0; }
+.brand :global(.brand-symbol) { width: 20px; height: 22px; }
+.wordmark { font-size: 14px; font-weight: 750; letter-spacing: -.5px; }
+.headerActions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.account { display: inline-flex; align-items: center; justify-content: center; }
+.githubControl { display: flex; }
+.githubControl > a { min-height: 32px; padding: 6px 8px; }
+.githubControl > a > span { display: none; }
+.railProvider { display: contents; }
+.activityRail { grid-column: 1; grid-row: 2; width: 52px; min-width: 52px; border-right: 1px solid var(--border); background: var(--sidebar); }
+.activityRail :global([data-slot="sidebar-content"]) { display: flex; min-height: 0; flex: 1; flex-direction: column; justify-content: space-between; overflow: visible; padding-block: 8px; }
+.activityRail :global([data-slot="sidebar-group"]) { padding: 0 8px; }
+.activityRail :global([data-slot="sidebar-menu"]) { align-items: center; gap: 6px; }
+.activityRail :global([data-slot="sidebar-menu-button"]) { justify-content: center; padding: 0; }
+.railSpacer { flex: 1; }
+.panels { grid-column: 2; grid-row: 2; height: 100%; min-width: 0; min-height: 0; overflow: hidden; }
+.statusbar { grid-column: 1 / -1; grid-row: 3; display: flex; align-items: center; gap: 24px; padding: 0 14px; border-top: 1px solid var(--border); background: var(--sidebar); color: var(--muted-foreground); font-size: 10px; }
+.statusbar span { display: inline-flex; align-items: center; gap: 6px; }
+.statusbar a { margin-left: auto; }
 .conversationSurface { position: absolute; display: flex; flex-direction: column; min-width: 0; min-height: 0; pointer-events: none; z-index: 3; }
-.conversationSurface[hidden] { display: none; }
-.conversationModes { display: flex; flex-shrink: 0; gap: 4px; padding: 8px 20px; background: light-dark(#fff, #17161b); pointer-events: auto; }
-.conversationModes button { border: 1px solid var(--line); border-radius: 7px; padding: 7px 10px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
-.conversationModes button[aria-pressed="true"] { color: inherit; background: light-dark(#f1eef7, #322d3d); border-color: var(--purple); }
-.chatSurface { flex: 1; min-height: 0; pointer-events: auto; background: light-dark(#fff, #212024); }
-.chatSurface[hidden] { display: none; }
+.conversationSurface[hidden], .chatSurface[hidden] { display: none; }
+.chatSurface { flex: 1; min-height: 0; pointer-events: auto; background: var(--background); }
 .chatSurface > main { grid-template-columns: minmax(0, 1fr); }
 .chatSurface > main > aside { display: none; }
 .chatSurface > main > aside[data-open="true"] { display: flex; position: absolute; inset: 0 auto 0 0; z-index: 8; width: min(260px, 85%); }
 .panels :global([data-conversation-slot]) { padding-top: 0; }
 .panels :global([data-conversation-mode="ask"] [data-conversation-slot]) > * { visibility: hidden; }
-@media (max-width: 560px) { .roomTitle { display: none; } .conversationModes { padding: 7px 12px; } }
 @media (max-width: 900px) {
   .panels :global([data-conversation-mode] [data-conversation-slot]) { display: flex; grid-row: 1 / -1; min-height: 0; }
   .panels :global([data-conversation-mode="project"] [data-conversation-slot]) { display: contents; }
-  .panels :global([data-conversation-mode="project"] [data-conversation-slot]) > :first-child { padding-top: 8px; }
   .shell:has([data-mobile-pane="inspect"]) .conversationSurface { display: none; }
 }
-
-/* Every header action uses the same centered icon target at every width. */
-.brand, .headerButton, .account, .githubControl > a {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  flex: 0 0 36px;
-  padding: 0;
-  box-sizing: border-box;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-}
-.headerActions { margin-left: auto; gap: 8px; }
-.githubControl { display: flex; }
-.githubControl > a > span { display: none; }
-.brand:hover, .headerButton:hover, .account:hover, .githubControl > a:hover, .themeControl:hover { background: var(--pale); }
-.brand:focus-visible, .themeControl:focus-within { outline: 2px solid var(--purple); outline-offset: 2px; }
-@media (max-width: 560px) { .headerActions { gap: 6px; } }
-
-.githubControl > a { min-height: 36px; }
-
-/* A compact application frame, with a persistent editor activity rail. */
-.shell { grid-template-columns: 52px minmax(0, 1fr); grid-template-rows: 48px minmax(0, 1fr) 26px; background: light-dark(#f8f9fc, #15171c); }
-.topbar { grid-column: 1 / -1; grid-row: 1; padding: 0 16px; gap: 28px; background: light-dark(#f8f9fc, #191c23); }
-.topbar .brand { width: auto; flex: 0 0 auto; border: 0; gap: 10px; }
-.wordmark { font-size: 14px; letter-spacing: -.5px; }
-.views { gap: 6px; }
-.views button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-size: 12px; min-width: 100px; }
-.views .selected { background: color-mix(in srgb, var(--purple) 7%, transparent); }
-.activityRail { grid-column: 1; grid-row: 2; display: flex; align-items: center; flex-direction: column; gap: 6px; padding: 12px 0; border-right: 1px solid var(--line); background: light-dark(#f0f2f7, #191c23); }
-.activityRail button, .activityRail a { display: grid; place-items: center; width: 40px; height: 42px; border: 0; border-left: 2px solid transparent; border-radius: 5px; background: transparent; color: var(--muted); cursor: pointer; }
-.activityRail button[aria-pressed="true"] { color: var(--purple); border-left-color: var(--purple); background: color-mix(in srgb, var(--purple) 9%, transparent); }
-.activityRail button:hover, .activityRail a:hover { color: var(--purple); background: var(--pale); }
-.activityRail :focus-visible { outline: 2px solid var(--purple); outline-offset: -2px; }
-.railSpacer { flex: 1; }
-.panels { grid-column: 2; grid-row: 2; }
-.statusbar { grid-column: 1 / -1; grid-row: 3; display: flex; align-items: center; gap: 24px; padding: 0 14px; border-top: 1px solid var(--line); background: light-dark(#f0f2f7, #191c23); color: var(--muted); font-size: 10px; }
-.statusbar span { display: inline-flex; align-items: center; gap: 6px; }
-.statusbar a { margin-left: auto; color: inherit; text-decoration: none; }
 @media (max-width: 650px) {
-  .shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: 48px minmax(0, 1fr) 26px; }
-  .activityRail { display: none; }
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .railProvider { display: none; }
   .panels { grid-column: 1; }
   .topbar { padding: 0 10px; gap: 10px; }
   .wordmark, .githubControl { display: none; }
-  .views button { min-width: 60px; gap: 5px; padding-inline: 6px; }
+  .headerActions { gap: 6px; }
   .statusbar { gap: 12px; padding-inline: 10px; }
   .statusbar a { display: none; }
 }
