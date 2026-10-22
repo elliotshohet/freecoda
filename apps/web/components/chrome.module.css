@@ -17,6 +17,8 @@
 .accountLink { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font-size: 12px; text-decoration: none; white-space: nowrap; }
 .accountLink > svg { flex-shrink: 0; }
 .accountLink:hover { background: light-dark(#f3f3f3, #2c2c2c); }
+.downloadLink { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 14px; border-radius: 8px; background: var(--ink); color: var(--paper); font-size: 12px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.downloadLink:hover { opacity: .85; }
 .avatar { width: 27px; height: 27px; flex: 0 0 27px; }
 .toggle { display: none; align-items: center; justify-content: center; width: 44px; height: 44px; flex: 0 0 44px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); }
 .toggle:hover { background: light-dark(#f1f1f1, #2b2b2b); }
@@ -34,6 +36,7 @@
   .brand { gap: 7px; font-size: 19px; }
   .brand img { width: 27px; height: 27px; flex-basis: 27px; }
   .actions { gap: 4px; }
+  .downloadLink { display: none; }
   .signIn :global(.entry-sign-in .button) { width: 44px; height: 44px; min-width: 44px; padding: 0; gap: 0; font-size: 0; }
   .accountLink { width: 44px; height: 44px; padding: 0; }
   .accountLink > span:not(.avatar), .accountLink > svg { display: none; }

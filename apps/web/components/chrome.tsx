@@ -58,12 +58,11 @@ export function Header() {
     pathname.startsWith("/app/")
   ) return null;
   const links = [
-    { href: "https://github.com/elliotshohet/freecoda", label: "Source" },
-    { href: "/download", label: "Download" },
-    { href: "/#install", label: "CLI" },
-    { href: "/app", label: "Web" },
+    { href: "/download", label: "Desktop" },
+    { href: "/docs#installation", label: "CLI" },
+    { href: "/app?view=chat", label: "Chat" },
+    { href: "/app?view=workspace", label: "Web" },
     { href: "/pricing", label: "Pricing" },
-    { href: "/docs", label: "Docs" },
     { href: "/advertise", label: "Advertise" },
   ];
   return (
@@ -89,6 +88,7 @@ export function Header() {
       <div className={styles.actions}>
         <ThemeControl />
         {pathname !== "/sign-in" && <PublicAccountAction />}
+        <Link className={styles.downloadLink} href="/download" onClick={() => setOpen(false)}>Download</Link>
         <button
           ref={toggle}
           type="button"
