@@ -724,8 +724,8 @@ export default function Chat({ embedded = false, voiceVisible = true, initialThr
           ) : (
             <div className={s.welcomeContainer}>
               <WelcomeSurface heading="h1" actions={[
-                { label: "Understand something", description: "Find a clear way through a tricky idea", onClick: () => { setDraft("Explain a tricky idea in simple terms. Ask me what I want to understand first."); input.current?.focus(); } },
-                { label: "Find the right words", description: "Shape a thought into a useful first draft", onClick: () => { setDraft("Help me write something. Ask what I need first."); input.current?.focus(); } },
+                { label: "Understand code", description: "Make sense of a function or a tricky concept", onClick: () => { setDraft("Help me understand a piece of code. Ask me to share the code or concept first."); input.current?.focus(); } },
+                { label: "Plan a feature", description: "Turn a rough idea into a clear next step", onClick: () => { setDraft("Help me plan a software feature. Ask what I want to build first."); input.current?.focus(); } },
                 { label: "Explore a project", description: "Choose a repository to get to know its code", ...(onOpenWorkspace ? { onClick: () => onOpenWorkspace("/plan") } : { href: "/app?view=workspace" }) },
                 { label: "Review a project", description: "Look for a concrete bug before making changes", ...(onOpenWorkspace ? { onClick: () => onOpenWorkspace("/review") } : { href: "/app?view=workspace" }) },
               ]} />

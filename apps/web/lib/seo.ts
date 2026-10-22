@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const SITE_URL = "https://freecoda.com";
 export const SITE_DESCRIPTION =
-  "Free, open-source AI coding agent for desktop, web, and terminal. Build with explicit permissions and sponsor-supported AI. Hosted beta is invite-only.";
+  "Free, open-source AI coding agent for desktop, web, and terminal. Supported by ads. Build with explicit permissions. Hosted beta is invite-only.";
 
 export function publicPageMetadata({ title, description, path }: {
   title: string;

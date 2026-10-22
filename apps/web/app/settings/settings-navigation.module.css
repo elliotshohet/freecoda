@@ -1,0 +1,15 @@
+.navigation { padding: 30px 16px; display: flex; flex-direction: column; align-items: stretch; gap: 8px; border-right: 1px solid var(--line); background: light-dark(#fff, #1d1b22); overflow: auto; }
+.navLabel { color: var(--muted); font-size: 11px; font-weight: 650; padding: 0 10px 4px; }
+.search { display: flex; align-items: center; gap: 8px; min-height: 42px; margin-bottom: 4px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); background: var(--paper); }
+.search:focus-within { outline: 2px solid var(--purple); outline-offset: 1px; }
+.search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font: inherit; font-size: 12px; }
+.search input::placeholder { color: var(--muted); opacity: .8; }
+.search button { padding: 4px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 11px; cursor: pointer; }
+.links { display: grid; gap: 4px; }
+.links a { display: flex; align-items: center; min-height: 42px; padding: 10px; border-radius: 7px; color: var(--ink); font-size: 13px; line-height: 1.5; text-decoration: none; }
+.links a:hover { background: var(--pale); }
+.links a:focus-visible, .search button:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+.empty { margin: 6px 10px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.visuallyHidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 900px) { .navigation { padding: 24px 12px; } }
+@media (max-width: 640px) { .navigation { display: grid; grid-template-columns: minmax(130px, .8fr) minmax(220px, 1.2fr); align-items: center; gap: 8px; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); } .navLabel { display: none; } .search { grid-column: 1 / -1; margin: 0; } .links { display: flex; gap: 3px; overflow-x: auto; grid-column: 1 / -1; } .links a { flex: 0 0 auto; min-height: 40px; white-space: nowrap; padding: 8px 10px; } .empty { flex: 0 0 auto; } }

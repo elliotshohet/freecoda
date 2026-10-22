@@ -1,0 +1,10 @@
+.frame { grid-template-columns: minmax(0, 1fr); grid-template-rows: 52px minmax(0, 1fr); background: var(--paper); }
+.frame > header { grid-column: 1; grid-row: 1; padding: 0 18px; gap: 14px; background: var(--paper); }
+.frame > :global(#workspace-panel) { grid-column: 1; grid-row: 2; }
+.wordmark { color: var(--ink); font-size: 15px; font-weight: 650; letter-spacing: -.5px; }
+.frame[data-sidebar-visible="false"] :global([data-workspace-sidebar]) { display: none; }
+.frame[data-sidebar-visible="false"] :global([data-workspace-bench]) { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 700px) {
+  .frame > header { padding: 0 10px; gap: 8px; }
+  .wordmark { display: none; }
+}

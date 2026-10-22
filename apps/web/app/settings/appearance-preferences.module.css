@@ -1,0 +1,9 @@
+.controls { display: grid; gap: 4px; }
+.control { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 13px 0; }
+.control + .control { border-top: 1px solid var(--line); }
+.control span { display: grid; gap: 4px; }
+.control strong { color: var(--ink); font-size: 13px; font-weight: 600; }
+.control small { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.control select { min-width: 132px; min-height: 40px; padding: 8px 30px 8px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); color: var(--ink); font: inherit; }
+.control select:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+@media (max-width: 520px) { .control { align-items: flex-start; flex-direction: column; gap: 10px; } .control select { width: 100%; } }

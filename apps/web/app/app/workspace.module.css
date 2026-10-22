@@ -1974,3 +1974,21 @@
 .railLinks a { min-height: 34px; box-sizing: border-box; font-size: 11px; }
 .composer { border-radius: 16px; }
 .composer:focus-within { border-color: var(--muted); }
+
+/* The browser workspace shares the same semantic theme as the public entry. */
+.shell {
+  --paper: light-dark(#fafbfe, #17151f);
+  --ink: light-dark(#262536, #eee8f5);
+  --muted: light-dark(#666779, #b1a6c0);
+  --line: light-dark(#e4e5ee, #393143);
+  --pale: light-dark(#efedfb, #30263f);
+}
+.projects { background: var(--paper); }
+.workspaceButton { border-radius: 8px; min-height: 48px; }
+.workspaceButton.selected { background: var(--surface); border-color: var(--line); box-shadow: 0 1px 3px light-dark(#26253606,#00000010); }
+.workspaceButton:hover { background: var(--surface-muted); }
+.workspaceConversation button { border-radius: 6px; }
+.projectSearch input { background: var(--surface-muted); border: 1px solid transparent; border-radius: 7px; }
+.projectSearch input:focus-visible { outline-color: var(--focus-ring); }
+.projectTop { background: var(--surface); }
+.welcomeStart { background: var(--surface); }

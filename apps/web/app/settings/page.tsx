@@ -10,6 +10,8 @@ import { ConnectedRepositories } from "@/components/connected-repositories";
 import { ThemeControl } from "@/components/theme-control";
 import { Mark } from "@/components/chrome";
 import styles from "./settings.module.css";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const metadata = { title: "Account & settings", robots: { index: false, follow: false } };
 export default async function Settings() {
@@ -36,16 +38,15 @@ export default async function Settings() {
             <h1>Account & settings</h1>
             <p>Your preferences and connections, shared across Freecoda.</p>
           </div>
-          <section className={styles.card} id="profile" aria-labelledby="profile-title">
-            <div className={styles.sectionHeading}><h2 id="profile-title">Profile</h2><span className={styles.badge}>GitHub account</span></div>
-            <dl className={styles.profile}><div><dt>Name</dt><dd>{user.name}</dd></div><div><dt>Email</dt><dd>{user.email}</dd></div></dl>
-            <p className={styles.note}>Your name and email come from GitHub. Manage your profile on GitHub.</p>
-          </section>
-          <section className={styles.card} id="preferences" aria-labelledby="preferences-title">
-            <h2 id="preferences-title">Appearance & conversations</h2>
+          <Card className="mb-5" id="profile" aria-labelledby="profile-title">
+            <CardHeader><CardTitle role="heading" aria-level={2} id="profile-title">Profile</CardTitle><CardDescription>Your connected identity and account details.</CardDescription></CardHeader>
+            <CardContent><Badge variant="secondary">GitHub account</Badge><dl className={styles.profile}><div><dt>Name</dt><dd>{user.name}</dd></div><div><dt>Email</dt><dd>{user.email}</dd></div></dl><p className={styles.note}>Your name and email come from GitHub. Manage your profile on GitHub.</p></CardContent>
+          </Card>
+          <Card className="mb-5" id="preferences" aria-labelledby="preferences-title">
+            <CardHeader><CardTitle role="heading" aria-level={2} id="preferences-title">Appearance & conversations</CardTitle><CardDescription>Make your workspace feel like yours.</CardDescription></CardHeader><CardContent>
             <div className={styles.preference}><div><h3>Appearance</h3><p>Choose the theme that works for you.</p></div><ThemeControl /></div>
             <details className={styles.disclosure}><summary>How conversation sync works</summary><p>Signed-in conversations sync across the web, CLI, and desktop, with an offline copy on each device. Search and delete them in the chat sidebar. Deletions reach other clients on their next sync.</p><p>Repository settings do not upload a local folder. Cloud workspaces require their own storage consent.</p></details>
-          </section>
+          </CardContent></Card>
           <div className={styles.repositories}><ConnectedRepositories /></div>
           <section className={styles.usage} id="usage" aria-labelledby="usage-title">
             <div className={styles.usageHeading}><h2 id="usage-title">Usage & devices</h2><p>One free plan, supported by labeled sponsors. No paid credits or subscription.</p></div>

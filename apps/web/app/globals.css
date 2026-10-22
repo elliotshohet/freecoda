@@ -1,3 +1,45 @@
+@layer theme, base, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@layer base {
+  *, ::before, ::after { border-color: var(--line); }
+  a { color: inherit; text-decoration: none; }
+  button { color: inherit; }
+  button, input, textarea, select { background-color: transparent; }
+  button { border-style: solid; border-width: 0; }
+
+}
+@source "../components";
+@source "./";
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+@theme inline {
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--ink);
+  --color-primary: var(--action-bg);
+  --color-primary-foreground: var(--action-fg);
+  --color-secondary: var(--surface-muted);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--surface-muted);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--pale);
+  --color-accent-foreground: var(--ink);
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--focus-ring);
+  --color-destructive: var(--danger);
+  --radius-sm: .375rem;
+  --radius-md: .5rem;
+  --radius-lg: .625rem;
+  --radius-xl: .875rem;
+}
+:root {
+  --surface: light-dark(#ffffff, #1c1b20);
+  --surface-muted: light-dark(#f1f0f4, #27262c);
+  --danger: light-dark(#b42335, #ff8996);
+  --radius: .625rem;
+}
 :root {
   color-scheme: light dark;
   --action-bg: light-dark(#6853d8, #7255c6);
@@ -29,10 +71,6 @@ body {
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
 }
-a {
-  color: inherit;
-  text-decoration: none;
-}
 button,
 input {
   font: inherit;
@@ -56,9 +94,6 @@ textarea:focus-visible,
 summary:focus-visible {
   outline: 3px solid var(--focus-ring);
   outline-offset: 4px;
-}
-button {
-  color: inherit;
 }
 p {
   line-height: 1.8;

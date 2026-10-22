@@ -1,66 +1,62 @@
 import Link from "next/link";
-import Image from "next/image";
-import { ArrowDownToLine, ArrowUpRight, Globe2, Laptop2, Terminal } from "lucide-react";
-import { FeatureOverview } from "@/components/feature-overview";
+import { ArrowDownToLine, ArrowRight, ArrowUpRight, Code2, FolderGit2, Globe2, Laptop2, ShieldCheck, Terminal } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button-variants";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { Install } from "@/components/install";
 import { GitHubIcon } from "@/components/github-icon";
 import { homeStructuredData, publicPageMetadata, SITE_DESCRIPTION } from "@/lib/seo";
+import styles from "./landing-v2.module.css";
 
 export const metadata = {
-  ...publicPageMetadata({
-    title: "Free, open-source AI coding agent",
-    description: SITE_DESCRIPTION,
-    path: "/",
-  }),
-  title: { absolute: "Freecoda — Free, open-source AI coding agent" },
+  ...publicPageMetadata({ title: "Free, open-source AI coding agent", description: SITE_DESCRIPTION, path: "/" }),
+  title: { absolute: "Freecoda — Free, open-source coding agent. Supported by ads." },
 };
+
+const clients = [
+  { icon: Globe2, title: "In your browser", description: "Go from a question to a cloud project. Your conversations come with you.", href: "/app", action: "Open web app", detail: "Nothing to install" },
+  { icon: Laptop2, title: "On your desktop", description: "Work alongside your local folders, files, and tools in a dedicated workspace.", href: "/download", action: "Get the desktop app", detail: "Your local workspace" },
+  { icon: Terminal, title: "In your terminal", description: "Bring a coding agent into the command line. Stay close to your code.", href: "/docs#installation", action: "Install the CLI", detail: "Built for your workflow" },
+];
 
 export default function Home() {
   return (
-    <main id="main" className="product-home marketing-home">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(homeStructuredData).replace(/</g, "\\u003c") }}
-      />
-      <section className="marketing-welcome" aria-labelledby="welcome-title">
-        <div className="marketing-hero">
-          <div className="marketing-intro">
-            <h1 id="welcome-title">Make room for<br /><span>your next idea.</span></h1>
-            <p className="marketing-subtitle">Think it through, build it, and keep moving. Freecoda gives every idea a place to start.</p>
-            <div className="marketing-primary-actions">
-              <Link className="marketing-download-button" href="/download"><ArrowDownToLine size={17} aria-hidden="true" />Download desktop</Link>
-              <Link className="marketing-web-button" href="/app">Use web version <ArrowUpRight size={16} aria-hidden="true" /></Link>
-            </div>
-            <p className="marketing-availability">Free, supported by ethical ads. Hosted access is invite-only during beta.</p>
+    <main id="main" className={styles.page}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(homeStructuredData).replace(/</g, "\\u003c") }} />
+      <section className={styles.hero} aria-labelledby="welcome-title">
+        <div className={styles.intro}>
+          <Badge variant="outline"><Code2 data-icon="inline-start" /> Open source. Open possibilities.</Badge>
+          <h1 id="welcome-title">Your next idea.<br /><span>Let’s build it.</span></h1>
+          <p className={styles.lead}>A free, open-source coding agent.<br />Supported by ads. Built for you.</p>
+          <p className={styles.description}>Ask questions, explore a codebase, and turn ideas into working software. One agent, wherever you like to code.</p>
+          <div className={styles.actions}>
+            <Link className={buttonVariants({ size: "lg" })} href="/app">Start building <ArrowRight data-icon="inline-end" /></Link>
+            <Link className={buttonVariants({ size: "lg", variant: "outline" })} href="/download"><ArrowDownToLine data-icon="inline-start" /> Download desktop</Link>
           </div>
-          <section className="marketing-cli" id="install" aria-labelledby="install-title">
-            <div className="marketing-cli-heading"><Terminal size={16} aria-hidden="true" /><h2 id="install-title">More at home in a terminal?</h2><Link href="/docs#installation">CLI guide <ArrowUpRight size={12} aria-hidden="true" /></Link></div>
-            <Install compact />
-            <p className="marketing-cli-requirements">Requires Node.js 22+ and npm. Follow the installer’s PATH instructions, then run <code>freecoda</code>.</p>
-          </section>
+          <div className={styles.heroNote}><span className={styles.statusDot} /> Free to use <span>·</span> Apache 2.0 <span>·</span> Hosted beta is invite-only</div>
         </div>
-        <section className="marketing-clients" aria-label="Choose how to use Freecoda">
-          <h2>One assistant. Your choice of workspace.</h2>
-          <div className="marketing-client-list">
-            <Link href="/app"><Globe2 size={21} aria-hidden="true" /><strong>Browser</strong><span>Conversations and cloud projects, wherever you sign in.</span><ArrowUpRight size={16} aria-hidden="true" /></Link>
-            <Link href="/download"><Laptop2 size={21} aria-hidden="true" /><strong>Desktop</strong><span>Local folders, files, and conversations together.</span><ArrowUpRight size={16} aria-hidden="true" /></Link>
-            <Link href="/docs#installation"><Terminal size={21} aria-hidden="true" /><strong>Terminal</strong><span>A focused coding companion for the command line.</span><ArrowUpRight size={16} aria-hidden="true" /></Link>
+        <div className={styles.visual} aria-label="Freecoda workspace illustration">
+          <div className={styles.visualTop}><span className={styles.windowDots}>● ● ●</span><span>your-next-idea</span><Code2 size={15} /></div>
+          <div className={styles.visualBody}>
+            <div className={styles.visualRail}><img src="/brand/freecoda-mark.svg" alt="" width="25" height="25" /><FolderGit2 size={19} /><Code2 size={19} /><Terminal size={19} /></div>
+            <div className={styles.visualContent}>
+              <div className={styles.visualHeading}><img src="/brand/freecoda-mark.svg" alt="" width="22" height="22" /><span>Freecoda</span><Badge variant="secondary">Workspace</Badge></div>
+              <p className={styles.visualPrompt}>Let’s turn this idea into something real.</p>
+              <div className={styles.code}><span>01</span><code><em>const</em> idea = <b>"something great"</b>;</code><span>02</span><code><em>await</em> freecoda.build(idea);</code><span>03</span><code className={styles.comment}>// Make it yours.</code></div>
+              <div className={styles.visualSteps}><span><ShieldCheck size={15} /> You review the changes</span><span><FolderGit2 size={15} /> You choose the repository</span></div>
+              <div className={styles.visualComposer}><span>What do you want to build?</span><ArrowUpRight size={18} /></div>
+              <div className={styles.visualSponsor}><span>AD SUPPORTED</span> More room to build. No subscription required.</div>
+            </div>
           </div>
-        </section>
-        <FeatureOverview />
-        <figure className="marketing-product">
-          <div className="marketing-product-frame">
-            <Image src="/images/freecoda-desktop-0.1.8-preview.webp" alt="Freecoda desktop interface with workspace navigation and a conversation composer." width={1480} height={950} priority sizes="(max-width: 1120px) 100vw, 1040px" />
-          </div>
-          <figcaption><span>Desktop interface preview</span><span>Built for your next idea.</span></figcaption>
-        </figure>
-        <a className="open-source-banner" href="https://github.com/elliotshohet/freecoda">
-          <span className="open-source-icon"><GitHubIcon size={22} /></span>
-          <span><strong>Open source on GitHub</strong><small>Read the code. Report a bug. Help shape Freecoda.</small></span>
-          <span className="open-source-license">Apache 2.0</span>
-          <ArrowUpRight size={19} aria-hidden="true" />
-        </a>
+          <div className={styles.visualBottom}><span className={styles.statusDot} /> Your code. Your direction.<span>Freecoda / preview</span></div>
+        </div>
       </section>
+      <section className={styles.manifesto} aria-label="Why Freecoda"><span>Good tools should be<br /><strong>within everyone’s reach.</strong></span><p>Ads help keep Freecoda free. Open source keeps the code open to inspect, improve, and make your own.</p><Link href="/pricing">How it stays free <ArrowUpRight size={16} /></Link></section>
+      <section className={styles.clients} aria-labelledby="clients-title"><div className={styles.sectionHead}><div><span className={styles.eyebrow}>MEET YOUR WORKSPACE</span><h2 id="clients-title">Same agent. Your kind of setup.</h2></div><p>Start where you’re comfortable.<br />Keep moving wherever you work.</p></div><div className={styles.clientGrid}>{clients.map(({ icon: Icon, ...client })=><Card key={client.title}><CardHeader><div className={styles.clientIcon}><Icon size={22} /></div><CardTitle>{client.title}</CardTitle><CardDescription>{client.description}</CardDescription></CardHeader><CardContent><span className={styles.clientDetail}>{client.detail}</span></CardContent><CardFooter><Link className={buttonVariants({variant:"ghost"})} href={client.href}>{client.action}<ArrowUpRight data-icon="inline-end" /></Link></CardFooter></Card>)}</div></section>
+      <section id="install" className={styles.install}><div><Badge variant="outline"><Terminal data-icon="inline-start" /> THE COMMAND LINE, TOO</Badge><h2>Less setup.<br />More shipping.</h2><p>Install the CLI, open your project, and start a conversation with your code.</p><Link className={buttonVariants({variant:"link"})} href="/docs#installation">Read the installation guide <ArrowRight data-icon="inline-end" /></Link></div><div className={styles.installCommand}><Install compact /><p>Requires Node.js 22+ and npm. Follow the installer’s PATH instructions, then run <code>freecoda</code>.</p></div></section>
+      <Separator />
+      <section className={styles.source}><div><GitHubIcon size={27} /><h2>Open by design.</h2><p>Read the code. Share an idea. Make it better.</p></div><a className={buttonVariants({variant:"outline",size:"lg"})} href="https://github.com/elliotshohet/freecoda">Explore the source <ArrowUpRight data-icon="inline-end" /></a></section>
     </main>
   );
 }

@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Mark } from "@/components/chrome";
 import { GitHubStars } from "@/components/github-stars";
 import { ThemeControl } from "@/components/theme-control";
 import { UserAvatar } from "@/components/user-avatar";
-import { PanelLeft } from "lucide-react";
+import { Code2, MessageSquare, PanelLeft } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import Chat from "../chat/chat";
 import { CloudWorkspace } from "./workspace";
 import styles from "./unified-web-app.module.css";
@@ -80,15 +82,18 @@ export function UnifiedWebApp({ initialView, initialThreadId, user }: { initialV
     <div ref={shell} className={styles.shell}>
       <header className={styles.topbar}>
         <Link href="/" className={styles.brand} aria-label="Freecoda home">
-          <Mark />
+          <img src="/brand/freecoda-mark.svg" width="25" height="25" alt="" /><span>Freecoda</span>
         </Link>
         <nav className={styles.views} aria-label="Workspace views">
-          <button type="button" className={view === "chat" ? styles.selected : undefined} aria-pressed={view === "chat"} onClick={() => selectView("chat")}>Chat</button>
-          <button type="button" className={view === "workspace" ? styles.selected : undefined} aria-pressed={view === "workspace"} onClick={() => selectView("workspace")}>Workspace</button>
+          <ToggleGroup value={[view]} onValueChange={(values) => { if (values[0] === "chat" || values[0] === "workspace") selectView(values[0]); }} aria-label="Conversation mode">
+            <ToggleGroupItem value="chat"><MessageSquare data-icon="inline-start" /> Chat</ToggleGroupItem>
+            <ToggleGroupItem value="workspace"><Code2 data-icon="inline-start" /> Workspace</ToggleGroupItem>
+          </ToggleGroup>
         </nav>
+        <div className={styles.accessState}><Badge variant="outline">{view === "chat" ? "No repository access" : "Project workspace"}</Badge></div>
         <div className={styles.headerActions}>
           <div className={styles.githubControl}><GitHubStars /></div>
-          {view === "chat" && <button type="button" className={styles.headerButton} aria-label="Open chat history" title="Chat history" onClick={() => window.dispatchEvent(new CustomEvent("freecoda:chat-sidebar"))}><PanelLeft size={18} aria-hidden="true" /></button>}
+          {view === "chat" && <Button variant="ghost" size="icon" aria-label="Open chat history" title="Chat history" onClick={() => window.dispatchEvent(new CustomEvent("freecoda:chat-sidebar"))}><PanelLeft aria-hidden="true" /></Button>}
           <ThemeControl />
           <Link className={styles.account} href="/settings" aria-label="Account & settings" title="Account & settings"><UserAvatar image={user.image} name={user.name} /></Link>
         </div>

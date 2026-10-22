@@ -1,0 +1,62 @@
+.page { max-width: 1200px; margin: auto; padding: 0 40px; }
+.hero { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 64px; padding: 92px 0 76px; }
+.intro h1 { margin: 26px 0 24px; font-size: clamp(46px,5.2vw,72px); line-height: 1.06; letter-spacing: -.065em; font-weight: 650; }
+.intro h1 span { color: var(--purple); }
+.lead { margin: 0; font-size: 21px; line-height: 1.5; letter-spacing: -.5px; font-weight: 550; }
+.description { max-width: 410px; color: var(--muted); margin: 17px 0 27px; font-size: 14px; line-height: 1.85; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.heroNote { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin-top: 23px; font-size: 10px; color: var(--muted); }
+.statusDot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--purple); flex-shrink: 0; }
+.visual { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--surface); box-shadow: 0 24px 70px light-dark(#29213f12,#00000030); transform: rotate(-1deg); }
+.visualTop { display: flex; justify-content: space-between; align-items: center; padding: 13px 16px; background: var(--surface-muted); color: var(--muted); font: 10px var(--mono); border-bottom: 1px solid var(--line); }
+.windowDots { letter-spacing: 3px; opacity: .5; }
+.visualBody { display: flex; }
+.visualRail { display: flex; flex-direction: column; align-items: center; gap: 26px; padding: 23px 15px; background: var(--surface-muted); border-right: 1px solid var(--line); color: var(--muted); }
+.visualContent { padding: 28px 23px 18px; flex: 1; min-width: 0; }
+.visualHeading { display: flex; align-items: center; gap: 9px; font-weight: 650; }
+.visualHeading > :last-child { margin-left: auto; }
+.visualPrompt { font-size: 19px; line-height: 1.45; letter-spacing: -.6px; margin: 30px 0 22px; max-width: 260px; }
+.code { display: grid; grid-template-columns: 18px 1fr; gap: 10px; padding: 17px 13px; border: 1px solid var(--line); border-radius: 8px; font-size: 10px; background: var(--surface-muted); }
+.code > span { color: var(--muted); opacity: .5; }
+.code em { color: var(--purple); font-style: normal; }
+.code b { font-weight: 400; color: var(--muted); }
+.comment { color: var(--muted); }
+.visualSteps { display: flex; flex-direction: column; gap: 11px; padding: 23px 0 28px; color: var(--muted); font-size: 11px; }
+.visualSteps > span { display: flex; align-items: center; gap: 8px; }
+.visualComposer { display: flex; justify-content: space-between; gap: 10px; padding: 16px 12px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); font-size: 11px; }
+.visualComposer svg { color: var(--purple); }
+.visualSponsor { font-size: 8px; color: var(--muted); line-height: 1.6; margin-top: 16px; }
+.visualSponsor > span { font-size: 7px; letter-spacing: .08em; margin-right: 6px; }
+.visualBottom { display: flex; align-items: center; gap: 7px; padding: 9px 14px; border-top: 1px solid var(--line); font-size: 8px; color: var(--muted); }
+.visualBottom > :last-child { margin-left: auto; }
+.manifesto { display: grid; grid-template-columns: 1fr 1.2fr auto; align-items: center; gap: 40px; padding: 30px 0; border-block: 1px solid var(--line); }
+.manifesto > span { font-size: 16px; line-height: 1.6; letter-spacing: -.4px; }
+.manifesto strong { font-weight: 600; }
+.manifesto p { font-size: 12px; color: var(--muted); margin: 0; }
+.manifesto a { display: flex; align-items: center; gap: 8px; white-space: nowrap; font-size: 12px; }
+.clients { padding: 76px 0; }
+.sectionHead { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 30px; }
+.eyebrow { font: 10px var(--mono); letter-spacing: .12em; color: var(--muted); }
+.sectionHead h2, .install h2 { font-size: 31px; letter-spacing: -1.3px; font-weight: 550; line-height: 1.2; margin: 14px 0 0; }
+.sectionHead p { font-size: 12px; color: var(--muted); margin: 0; }
+.clientGrid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; }
+.clientGrid > div { justify-content: space-between; }
+.clientIcon { display: flex; width: 40px; height: 40px; align-items: center; color: var(--purple); margin-bottom: 14px; }
+.clientDetail { font: 10px var(--mono); color: var(--muted); }
+.install { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; padding: 42px 0 76px; align-items: center; }
+.install h2 { font-size: 42px; margin: 20px 0 12px; }
+.install p { color: var(--muted); max-width: 340px; font-size: 13px; }
+.installCommand { padding: 25px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.installCommand p { font-size: 10px; margin: 16px 0 0; }
+.source { display: flex; align-items: center; justify-content: space-between; padding: 48px 0; gap: 20px; }
+.source > div { display: grid; grid-template-columns: auto 1fr; gap: 4px 18px; align-items: center; }
+.source svg { grid-row: span 2; }
+.source h2 { font-size: 21px; font-weight: 550; letter-spacing: -.6px; margin: 0; }
+.source p { margin: 0; color: var(--muted); font-size: 12px; }
+@media(max-width: 1000px) { .hero { gap: 30px; padding-top: 60px; } .visualContent { padding: 24px 16px 16px; } .visualRail { padding-inline: 10px; } .code { font-size: 8px; } .manifesto { grid-template-columns: 1fr 1.3fr; gap: 20px; } .manifesto a { grid-column: 2; } }
+@media(max-width: 720px) { .page { padding: 0 22px; } .hero { grid-template-columns: 1fr; padding: 42px 0; gap: 40px; } .intro h1 { font-size: clamp(48px,10vw,68px); } .description { max-width: 100%; } .visual { transform: none; } .visualContent { padding: 26px 20px 18px; } .code { font-size: 11px; } .manifesto { grid-template-columns: 1fr; } .manifesto a { grid-column: 1; } .clients { padding: 48px 0; } .sectionHead { align-items: start; flex-direction: column; gap: 16px; } .sectionHead h2 { font-size: 29px; } .clientGrid { grid-template-columns: 1fr; } .install { grid-template-columns: 1fr; gap: 24px; padding: 20px 0 48px; } .source { flex-direction: column; align-items: start; } }
+@media(prefers-reduced-motion: reduce) { .visual { transform: none; } }
+.install > div { min-width: 0; }
+.installCommand :global(.install) { max-width: 100%; }
+.installCommand :global(.install-command) { min-width: 0; }
+.installCommand :global(.install-command code) { white-space: normal; overflow-wrap: anywhere; }

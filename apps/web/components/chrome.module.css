@@ -41,3 +41,7 @@
   .navigation { padding-top: 9px; }
 }
 @media (prefers-reduced-motion: reduce) { .navigation > a { transition: none; } }
+
+/* The public frame shares the app's quiet surfaces. */
+.header { width: min(100%, 1200px); min-height: 78px; border-inline: 0; padding-inline: 40px; }
+@media(max-width:600px) { .header { padding-inline: 22px; min-height:72px; } }

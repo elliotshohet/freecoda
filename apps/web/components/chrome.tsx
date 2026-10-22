@@ -121,7 +121,7 @@ export function Footer() {
           <img src="/brand/freecoda-mark.svg" width="28" height="28" alt="" />
           Freecoda
         </Link>
-        <p>More room for what you want to build.</p>
+        <p>Free, open-source coding agent. Supported by ads.</p>
       </div>
       <div className="footer-links">
         <Link href="/docs">Documentation</Link>
