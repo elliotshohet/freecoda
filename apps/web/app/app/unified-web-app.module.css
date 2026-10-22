@@ -153,3 +153,32 @@
 @media (max-width: 560px) { .headerActions { gap: 6px; } }
 
 .githubControl > a { min-height: 36px; }
+
+/* A compact application frame, with a persistent editor activity rail. */
+.shell { grid-template-columns: 52px minmax(0, 1fr); grid-template-rows: 48px minmax(0, 1fr) 26px; background: light-dark(#f8f9fc, #15171c); }
+.topbar { grid-column: 1 / -1; grid-row: 1; padding: 0 16px; gap: 28px; background: light-dark(#f8f9fc, #191c23); }
+.topbar .brand { width: auto; flex: 0 0 auto; border: 0; gap: 10px; }
+.wordmark { font-size: 14px; letter-spacing: -.5px; }
+.views { gap: 6px; }
+.views button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-size: 12px; min-width: 100px; }
+.views .selected { background: color-mix(in srgb, var(--purple) 7%, transparent); }
+.activityRail { grid-column: 1; grid-row: 2; display: flex; align-items: center; flex-direction: column; gap: 6px; padding: 12px 0; border-right: 1px solid var(--line); background: light-dark(#f0f2f7, #191c23); }
+.activityRail button, .activityRail a { display: grid; place-items: center; width: 40px; height: 42px; border: 0; border-left: 2px solid transparent; border-radius: 5px; background: transparent; color: var(--muted); cursor: pointer; }
+.activityRail button[aria-pressed="true"] { color: var(--purple); border-left-color: var(--purple); background: color-mix(in srgb, var(--purple) 9%, transparent); }
+.activityRail button:hover, .activityRail a:hover { color: var(--purple); background: var(--pale); }
+.activityRail :focus-visible { outline: 2px solid var(--purple); outline-offset: -2px; }
+.railSpacer { flex: 1; }
+.panels { grid-column: 2; grid-row: 2; }
+.statusbar { grid-column: 1 / -1; grid-row: 3; display: flex; align-items: center; gap: 24px; padding: 0 14px; border-top: 1px solid var(--line); background: light-dark(#f0f2f7, #191c23); color: var(--muted); font-size: 10px; }
+.statusbar span { display: inline-flex; align-items: center; gap: 6px; }
+.statusbar a { margin-left: auto; color: inherit; text-decoration: none; }
+@media (max-width: 650px) {
+  .shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: 48px minmax(0, 1fr) 26px; }
+  .activityRail { display: none; }
+  .panels { grid-column: 1; }
+  .topbar { padding: 0 10px; gap: 10px; }
+  .wordmark, .githubControl { display: none; }
+  .views button { min-width: 60px; gap: 5px; padding-inline: 6px; }
+  .statusbar { gap: 12px; padding-inline: 10px; }
+  .statusbar a { display: none; }
+}

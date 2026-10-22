@@ -6,7 +6,7 @@ import { Mark } from "@/components/chrome";
 import { GitHubStars } from "@/components/github-stars";
 import { ThemeControl } from "@/components/theme-control";
 import { UserAvatar } from "@/components/user-avatar";
-import { PanelLeft } from "lucide-react";
+import { Code2, Files, MessageSquare, PanelLeft, Settings2, BookOpen, ShieldCheck } from "lucide-react";
 import Chat from "../chat/chat";
 import { CloudWorkspace } from "./workspace";
 import styles from "./unified-web-app.module.css";
@@ -64,7 +64,10 @@ export function UnifiedWebApp({ initialView, initialThreadId, user }: { initialV
     };
   }, []);
   useEffect(() => {
-    const restoreView = () => setView(new URLSearchParams(window.location.search).get("view") === "workspace" ? "workspace" : "chat");
+    const restoreView = () => {
+      const params = new URLSearchParams(window.location.search);
+      setView(params.get("view") === "chat" || (params.has("thread") && params.get("view") !== "workspace") ? "chat" : "workspace");
+    };
     window.addEventListener("popstate", restoreView);
     return () => window.removeEventListener("popstate", restoreView);
   }, []);
@@ -77,14 +80,14 @@ export function UnifiedWebApp({ initialView, initialThreadId, user }: { initialV
   }
 
   return (
-    <div ref={shell} className={styles.shell}>
+    <div ref={shell} className={styles.shell} data-view={view}>
       <header className={styles.topbar}>
         <Link href="/" className={styles.brand} aria-label="Freecoda home">
-          <Mark />
+          <Mark /><span className={styles.wordmark}>Freecoda</span>
         </Link>
         <nav className={styles.views} aria-label="Workspace views">
-          <button type="button" className={view === "chat" ? styles.selected : undefined} aria-pressed={view === "chat"} onClick={() => selectView("chat")}>Chat</button>
-          <button type="button" className={view === "workspace" ? styles.selected : undefined} aria-pressed={view === "workspace"} onClick={() => selectView("workspace")}>Workspace</button>
+          <button type="button" className={view === "chat" ? styles.selected : undefined} aria-pressed={view === "chat"} onClick={() => selectView("chat")}><MessageSquare size={14} aria-hidden="true" /> Chat</button>
+          <button type="button" className={view === "workspace" ? styles.selected : undefined} aria-pressed={view === "workspace"} onClick={() => selectView("workspace")}><Code2 size={15} aria-hidden="true" /> Workspace</button>
         </nav>
         <div className={styles.headerActions}>
           <div className={styles.githubControl}><GitHubStars /></div>
@@ -93,6 +96,18 @@ export function UnifiedWebApp({ initialView, initialThreadId, user }: { initialV
           <Link className={styles.account} href="/settings" aria-label="Account & settings" title="Account & settings"><UserAvatar image={user.image} name={user.name} /></Link>
         </div>
       </header>
+      <nav className={styles.activityRail} aria-label="Application navigation">
+        <button type="button" aria-label="Coding workspace" title="Coding workspace" aria-pressed={view === "workspace"} onClick={() => selectView("workspace")}><Files size={21} /></button>
+        <button type="button" aria-label="General chat" title="General chat" aria-pressed={view === "chat"} onClick={() => selectView("chat")}><MessageSquare size={21} /></button>
+        <div className={styles.railSpacer} />
+        <Link href="/docs" aria-label="Documentation" title="Documentation"><BookOpen size={20} /></Link>
+        <Link href="/settings" aria-label="Settings" title="Settings"><Settings2 size={20} /></Link>
+      </nav>
+      <footer className={styles.statusbar}>
+        <span><Code2 size={12} aria-hidden="true" />{view === "workspace" ? "Cloud workspace" : "General chat"}</span>
+        <span><ShieldCheck size={12} aria-hidden="true" />{view === "workspace" ? "Review before sharing" : "No repository access"}</span>
+        <Link href="/docs">Free & open source</Link>
+      </footer>
       <div id="workspace-panel" className={styles.panels}>
         <CloudWorkspace conversationMode={view === "chat" ? "ask" : "project"} onOpenProject={() => selectView("workspace")} onOpenChat={() => selectView("chat")} />
       </div>
