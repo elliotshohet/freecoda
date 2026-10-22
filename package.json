@@ -32,7 +32,8 @@
     "@types/react-dom": "latest",
     "@types/bun": "latest",
     "@types/pg": "latest",
-    "typescript": "latest"
+    "typescript": "latest",
+    "@tailwindcss/postcss": "^4.3.3"
   },
   "dependencies": {
     "ai": "7.0.143",
