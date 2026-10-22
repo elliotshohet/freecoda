@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { Moon, Sun } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 type Preference = "system" | "light" | "dark";
 type Theme = "light" | "dark";
@@ -78,14 +79,16 @@ export function ThemeControl() {
   const theme = useSyncExternalStore(subscribe, currentTheme, () => "light" as const);
   const label = `Switch to ${theme === "dark" ? "light" : "dark"} mode`;
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="icon-sm"
       className="theme-control"
       aria-label={label}
       title={label}
       onClick={toggleTheme}
     >
       {theme === "dark" ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
-    </button>
+    </Button>
   );
 }

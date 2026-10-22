@@ -26,6 +26,12 @@ import { aiServiceText } from "@/components/ai-service-text";
 import { useModelSelection } from "@/components/use-model-selection";
 import { ThemeControl } from "@/components/theme-control";
 import { SponsorPlacement } from "@/components/sponsor-placement";
+import { AgentMessage } from "@/components/agent-message";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupTextarea, InputGroupAddon, InputGroupButton } from "@/components/ui/input-group";
+import { MessageScrollerProvider, MessageScroller, MessageScrollerViewport, MessageScrollerContent, MessageScrollerItem, MessageScrollerButton } from "@/components/ui/message-scroller";
+import { Trace, TraceLine, TraceIcon, TraceTitle } from "@/components/ui/trace";
 import s from "./chat.module.css";
 import { codexUnsupportedCommand } from "@freecoda/contracts";
 import { interceptWebConversationInput } from "../app/conversation-routing";
@@ -55,7 +61,7 @@ function CopyButton({
 }) {
   const [copied, setCopied] = useState(false);
   return (
-    <button
+    <Button variant="ghost" size="sm"
       className={s.copy}
       aria-label={label}
       onClick={async () => {
@@ -70,7 +76,7 @@ function CopyButton({
     >
       {copied ? <Check size={14} /> : <Copy size={14} />}
       <span>{copied ? "Copied" : label}</span>
-    </button>
+    </Button>
   );
 }
 type ChatProps = {
@@ -102,7 +108,6 @@ export default function Chat({ embedded = false, voiceVisible = true, initialThr
     sendTextRef = useRef<(retry?: boolean, textOverride?: string, queueId?: string, pendingId?: string, modelOverride?: string, observer?: OwnedVoiceTurnObserver) => Promise<boolean>>(() => Promise.resolve(false)),
     owner = useRef<string | undefined>(undefined),
     initialThreadApplied = useRef(false),
-    end = useRef<HTMLDivElement>(null),
     input = useRef<HTMLTextAreaElement>(null),
     search = useRef<HTMLInputElement>(null);
   const selected = chats.find((c) => c.id === active),
@@ -169,9 +174,6 @@ export default function Chat({ embedded = false, voiceVisible = true, initialThr
     initialThreadApplied.current = true;
     if (chats.some((chat) => chat.id === initialThreadId)) setActive(initialThreadId);
   }, [historyReady, chats, initialThreadId]);
-  useEffect(() => {
-    end.current?.scrollIntoView({ behavior: "instant", block: "end" });
-  }, [messages, busy]);
   const newChat = () => {
     if (busy) return;
     setActive(null);
@@ -525,7 +527,7 @@ export default function Chat({ embedded = false, voiceVisible = true, initialThr
   return (
     <main id="main" className={`${s.shell} ${embedded ? s.embedded : ""}`}>
       {sidebar && (
-        <button
+        <Button variant="ghost" size="sm"
           className={s.scrim}
           aria-label="Close sidebar"
           onClick={() => setSidebar(false)}
@@ -536,21 +538,21 @@ export default function Chat({ embedded = false, voiceVisible = true, initialThr
           <Link href="/" aria-label="Freecoda home">
             <Mark />
           </Link>
-          <button
+          <Button variant="ghost" size="sm"
             aria-label="Close sidebar"
             className={s.mobileClose}
             onClick={() => setSidebar(false)}
           >
             <X size={19} />
-          </button>
+          </Button>
         </div>}
-        <button className={s.newChat} onClick={newChat} disabled={busy}>
+        <Button variant="ghost" size="sm" className={s.newChat} onClick={newChat} disabled={busy}>
           <Plus size={18} />
           New chat
-        </button>
+        </Button>
         <label className={s.search}>
           <Search size={16} />
-          <input
+          <Input
             ref={search}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -566,7 +568,7 @@ export default function Chat({ embedded = false, voiceVisible = true, initialThr
                 key={c.id}
                 className={`${s.historyRow} ${c.id === active ? s.active : ""}`}
               >
-                <button
+                <Button variant="ghost" size="sm"
                   disabled={busy}
                   aria-current={c.id === active ? "page" : undefined}
                   title={c.title}
@@ -579,8 +581,8 @@ export default function Chat({ embedded = false, voiceVisible = true, initialThr
                 >
                   <MessageSquare size={14} />
                   <span>{c.mode === "coding" ? "Coding · " : ""}{c.title}</span>
-                </button>
-                <button
+                </Button>
+                <Button variant="ghost" size="sm"
                   disabled={busy}
                   className={s.delete}
                   aria-label={`Delete ${c.title}`}
@@ -592,7 +594,7 @@ export default function Chat({ embedded = false, voiceVisible = true, initialThr
                   }}
                 >
                   <Trash2 size={14} />
-                </button>
+                </Button>
               </div>
             ))
           ) : (
@@ -604,10 +606,10 @@ export default function Chat({ embedded = false, voiceVisible = true, initialThr
           )}
         </div>
         {onOpenWorkspace ? (
-          <button className={s.workspace} type="button" onClick={() => onOpenWorkspace("/project")}>
+          <Button variant="ghost" size="sm" className={s.workspace} type="button" onClick={() => onOpenWorkspace("/project")}>
             <Code2 size={18} />
             <span>Open a workspace</span>
-          </button>
+          </Button>
         ) : (
           <Link className={s.workspace} href="/app">
             <Code2 size={18} />
@@ -621,7 +623,7 @@ export default function Chat({ embedded = false, voiceVisible = true, initialThr
       </aside>
       <section className={s.conversation}>
         <header className={s.topbar}>
-          <button
+          <Button variant="ghost" size="sm"
             className={s.menu}
             aria-label={sidebar ? "Close chat sidebar" : "Open chat sidebar"}
             aria-controls="chat-sidebar"
@@ -629,13 +631,13 @@ export default function Chat({ embedded = false, voiceVisible = true, initialThr
             onClick={() => setSidebar(open => !open)}
           >
             <Menu size={21} />
-          </button>
+          </Button>
           <div className={s.threadHeading}>
             <span>{selected?.title || "New chat"}</span>
             <small>{selected?.mode === "coding" ? "Saved coding conversation" : "Chat · no repository access"}</small>
           </div>
           <div className={s.headerRight}>
-            <button
+            <Button variant="ghost" size="sm"
               type="button"
               className={s.headerNewChat}
               onClick={newChat}
@@ -644,10 +646,10 @@ export default function Chat({ embedded = false, voiceVisible = true, initialThr
               title="New chat"
             >
               <Plus size={18} />
-            </button>
+            </Button>
             {!status && <span className={s.modelState}>Connecting…</span>}
             {!status?.signedIn && status && (
-              <button
+              <Button variant="ghost" size="sm"
                 className={s.signIn}
                 aria-label={signingIn ? "Opening GitHub" : "Sign in"}
                 title={signingIn ? "Opening GitHub…" : "Sign in"}
@@ -655,33 +657,31 @@ export default function Chat({ embedded = false, voiceVisible = true, initialThr
                 onClick={signIn}
               >
                 <LogIn size={18} aria-hidden="true" />
-              </button>
+              </Button>
             )}
           </div>
         </header>
-        <div className={s.scroll}>
+        <MessageScrollerProvider key={`${status?.userId || "guest"}:${active || "new"}`} autoScroll defaultScrollPosition="end">
+        <MessageScroller className={s.scroll}>
+        <MessageScrollerViewport aria-label="Conversation">
+        <MessageScrollerContent className="mx-auto max-w-4xl p-4 sm:p-8" aria-busy={busy}>
           {messages.length || pendingSend || queue.some((item) => !item.sent) ? (
-            <div className={s.messages} aria-label="Conversation">
+            <>
               {messages.map((m, i) => (
-                <div key={i} className={`${s.messageRow} ${m.role === "user" ? s.userRow : s.assistantRow}`}>
-                  {m.role === "user" ? <UserAvatar image={status?.userImage} name={status?.userName} className={`${s.avatar} ${s.userAvatar}`} /> : <span className={`${s.avatar} ${s.assistantAvatar}`} role="img" aria-label="Coda"><Mark /></span>}
-                  <article
-                  className={m.role === "user" ? s.userMessage : s.assistantMessage}
-                  aria-label={m.role === "user" ? "Your message" : "Coda response"}
-                >
-                  {m.role === "assistant" && <div className={s.assistantLabel}>Coda</div>}
+                <MessageScrollerItem key={i} messageId={`message-${i}`} scrollAnchor={m.role === "user"}>
+                  <AgentMessage role={m.role} image={status?.userImage} name={status?.userName}>
                   <MarkdownMessage text={m.content} />
                   {m.role === "user" && queue.find((item) => item.sent && item.messageIndex === i && item.text === m.content) && (() => {
                     const delivery = queue.find((item) => item.sent && item.messageIndex === i && item.text === m.content)!;
                     return <div className={s.deliveryState} role="status">
                       {delivery.status === "failed" ? "Failed" : delivery.status === "accepted" ? "Accepted" : "Sending"}
-                      {delivery.status === "failed" && <button type="button" onClick={retryQueue}>Retry</button>}
-                      <button type="button" onClick={() => setQueue((current) => current.filter((item) => item.id !== delivery.id))}>Remove</button>
+                      {delivery.status === "failed" && <Button variant="ghost" size="sm" type="button" onClick={retryQueue}>Retry</Button>}
+                      <Button variant="ghost" size="sm" type="button" onClick={() => setQueue((current) => current.filter((item) => item.id !== delivery.id))}>Remove</Button>
                     </div>;
                   })()}
                   {m.role === "user" && pendingSend?.inHistory && pendingSend.messageIndex === i && pendingSend.text === m.content && <div className={s.deliveryState} role="status">
                     {pendingSend.status === "failed" ? "Failed" : pendingSend.status === "accepted" ? "Accepted" : "Sending"}
-                    {pendingSend.status === "failed" && <button type="button" onClick={retryPendingSend}>Retry</button>}
+                    {pendingSend.status === "failed" && <Button variant="ghost" size="sm" type="button" onClick={retryPendingSend}>Retry</Button>}
                   </div>}
                   {m.role === "assistant" &&
                     m.status &&
@@ -695,55 +695,55 @@ export default function Chat({ embedded = false, voiceVisible = true, initialThr
                   {m.role === "assistant" && !busy && (
                     <CopyButton text={m.content} label="Copy response" />
                   )}
-                  </article>
-                </div>
+                  </AgentMessage>
+                </MessageScrollerItem>
               ))}
-              {pendingSend && !pendingSend.inHistory && <div className={`${s.messageRow} ${s.userRow}`}><UserAvatar image={status?.userImage} name={status?.userName} className={`${s.avatar} ${s.userAvatar}`} /><article className={s.userMessage} aria-label="Pending message">
+              {pendingSend && !pendingSend.inHistory && <MessageScrollerItem messageId="pending"><AgentMessage role="user" image={status?.userImage} name={status?.userName}>
                 <MarkdownMessage text={pendingSend.text} />
                 <div className={s.deliveryState} role="status">
                   {pendingSend.status === "failed" ? "Failed before send" : "Sending"}
-                  {pendingSend.status === "failed" && <button type="button" onClick={retryPendingSend}>Retry</button>}
+                  {pendingSend.status === "failed" && <Button variant="ghost" size="sm" type="button" onClick={retryPendingSend}>Retry</Button>}
                 </div>
-              </article></div>}
-              {queue.filter((item) => !item.sent).map((item) => <div key={item.id} className={`${s.messageRow} ${s.userRow}`}><UserAvatar image={status?.userImage} name={status?.userName} className={`${s.avatar} ${s.userAvatar}`} /><article className={s.userMessage} aria-label="Queued message">
+              </AgentMessage></MessageScrollerItem>}
+              {queue.filter((item) => !item.sent).map((item) => <MessageScrollerItem key={item.id} messageId={item.id}><AgentMessage role="user" image={status?.userImage} name={status?.userName}>
                 <MarkdownMessage text={item.text} />
                 <div className={s.deliveryState} role="status">
                   {item.status === "failed" ? "Failed" : item.status === "sending" ? "Sending" : "Queued"}
-                  {item.status === "failed" && <button type="button" onClick={retryQueue}>Retry</button>}
-                  <button type="button" onClick={() => setQueue((current) => current.filter((entry) => entry.id !== item.id))}>Remove</button>
+                  {item.status === "failed" && <Button variant="ghost" size="sm" type="button" onClick={retryQueue}>Retry</Button>}
+                  <Button variant="ghost" size="sm" type="button" onClick={() => setQueue((current) => current.filter((entry) => entry.id !== item.id))}>Remove</Button>
                 </div>
-              </article></div>)}
+              </AgentMessage></MessageScrollerItem>)}
               {busy && messages.at(-1)?.role !== "assistant" && (
-                <div role="status" className={s.thinking}>
-                  <Mark />
-                  Thinking…
-                </div>
+                <MessageScrollerItem messageId="thinking"><Trace><TraceLine status="running"><TraceIcon><MessageSquare /></TraceIcon><TraceTitle>Thinking…</TraceTitle></TraceLine></Trace></MessageScrollerItem>
               )}
-              <div ref={end} />
-            </div>
+            </>
           ) : (
-            <div className={s.welcomeContainer}>
+            <MessageScrollerItem messageId="welcome" className={s.welcomeContainer}>
               <WelcomeSurface heading="h1" actions={[
                 { label: "Understand code", description: "Make sense of a function or a tricky concept", onClick: () => { setDraft("Help me understand a piece of code. Ask me to share the code or concept first."); input.current?.focus(); } },
                 { label: "Plan a feature", description: "Turn a rough idea into a clear next step", onClick: () => { setDraft("Help me plan a software feature. Ask what I want to build first."); input.current?.focus(); } },
                 { label: "Explore a project", description: "Choose a repository to get to know its code", ...(onOpenWorkspace ? { onClick: () => onOpenWorkspace("/plan") } : { href: "/app?view=workspace" }) },
                 { label: "Review a project", description: "Look for a concrete bug before making changes", ...(onOpenWorkspace ? { onClick: () => onOpenWorkspace("/review") } : { href: "/app?view=workspace" }) },
               ]} />
-            </div>
+            </MessageScrollerItem>
           )}
-        </div>
+        </MessageScrollerContent>
+        </MessageScrollerViewport>
+        <MessageScrollerButton />
+        </MessageScroller>
+        </MessageScrollerProvider>
         <div className={s.composerArea}>
           {commandNotice && <div className={s.availability} role="status">{aiServiceText(commandNotice, status?.models)}</div>}
           {error && (
             <div className={s.error} role="alert">
               {aiServiceText(error, status?.models)}
               {!busy && messages.length > 0 && !pendingSend && queue.length === 0 && (
-                <button
+                <Button variant="ghost" size="sm"
                   onClick={() => void send(true)}
                   disabled={!status?.available}
                 >
                   Retry
-                </button>
+                </Button>
               )}
             </div>
           )}
@@ -751,9 +751,9 @@ export default function Chat({ embedded = false, voiceVisible = true, initialThr
             <div className={s.availability} role="status">
               {aiServiceText(status.reason || "Chat is currently unavailable.", status.models)}
               {!status.signedIn && (
-                <button onClick={signIn} disabled={signingIn}>
+                <Button variant="ghost" size="sm" onClick={signIn} disabled={signingIn}>
                   Continue with GitHub
-                </button>
+                </Button>
               )}
             </div>
           )}
@@ -781,7 +781,8 @@ export default function Chat({ embedded = false, voiceVisible = true, initialThr
                 return runOwnedVoiceTurn(signal, observer => sendTextRef.current(false, text, undefined, undefined, undefined, observer));
               }} />
             {commands.list}
-            <textarea
+            <InputGroup>
+            <InputGroupTextarea
               {...commands.attributes}
               ref={input}
               value={draft}
@@ -803,35 +804,36 @@ export default function Chat({ embedded = false, voiceVisible = true, initialThr
               rows={2}
               disabled={selected?.mode === "coding" || selected?.cloudDeleted || selected?.cloudLoaded === false}
             />
-            <div className={s.composerActions}>
+            <InputGroupAddon align="block-end" className="flex-wrap">
               <span>{busy ? "Enter queues the next message. Messages run one at a time." : "/ for projects, tools and commands"}</span>
               {busy ? (
                 <>
-                  {draft.trim() && <button type="submit" className={s.queueButton}>Queue</button>}
-                  <button
+                  {draft.trim() && <InputGroupButton type="submit" variant="outline">Queue</InputGroupButton>}
+                  <InputGroupButton
                     type="button"
-                    className={s.send}
+                    size="icon-sm" variant="default"
                     aria-label="Stop response"
                     onClick={() => abort.current?.abort()}
                   >
-                    <Square size={16} fill="currentColor" />
-                  </button>
+                    <Square fill="currentColor" />
+                  </InputGroupButton>
                 </>
               ) : (
-                <button
+                <InputGroupButton
                   type="submit"
-                  className={s.send}
+                  size="icon-sm" variant="default"
                   aria-label="Send message"
                   disabled={
                     !draft.trim() || !status?.available || !historyReady || selected?.mode === "coding" || selected?.cloudDeleted || selected?.cloudLoaded === false
                   }
                 >
-                  <ArrowUp size={21} />
-                </button>
+                  <ArrowUp />
+                </InputGroupButton>
               )}
-            </div>
+            </InputGroupAddon>
+            </InputGroup>
           </form>
-          {queue.length > 0 && <button type="button" className={s.retryQueue} disabled={!status?.available || busy || drainingQueue.current} onClick={retryQueue}>Retry queued messages ({queue.length})</button>}
+          {queue.length > 0 && <Button variant="ghost" size="sm" type="button" className={s.retryQueue} disabled={!status?.available || busy || drainingQueue.current} onClick={retryQueue}>Retry queued messages ({queue.length})</Button>}
           <p className={s.disclaimer}>
             Freecoda can make mistakes. Check important information.{" "}
             <Link href="/privacy">
