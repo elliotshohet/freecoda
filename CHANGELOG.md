@@ -7,11 +7,17 @@ remain under Unreleased until publication and artifact verification are complete
 
 ## Unreleased
 
-Web release publication pending:
+No pending client feature releases.
+
+## Web — 2026-10-23
+
+[Release](https://github.com/elliotshohet/freecoda/releases/tag/web-2026-10-23)
+
+Source: `83c7670f760febdd45436a9dee55c8b5a9527be2`. Exact-source GitHub Checks passed, including database integration suites and CLI checks on Linux, macOS, and Windows. The production deployment was promoted and its public page and health endpoint verified.
 
 - Refresh public pages, navigation, and the browser workspace layout while preserving Freecoda branding and ad-supported positioning.
 - Add explicit project file creation and a project terminal with commands bounded to 30 seconds in the isolated cloud workspace.
-- No desktop or CLI feature release is pending. No database migration is required for these web changes.
+- No desktop or CLI feature release is included. No database migration is required. Authenticated terminal execution against a live cloud project remains unqualified.
 
 ## Desktop 0.1.11 — 2026-10-20
 
