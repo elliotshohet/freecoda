@@ -842,9 +842,9 @@ export default function Chat({ embedded = false, voiceVisible = true, initialThr
           </p>
         </div>
       </section>
-      <div className={s.adDock}>
+      {!embedded && <div className={s.adDock}>
         <SponsorPlacement />
-      </div>
+      </div>}
     </main>
   );
 }

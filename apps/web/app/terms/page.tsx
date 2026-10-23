@@ -1,3 +1,4 @@
+import publicStyles from "@/components/public-page.module.css";
 import { publicPageMetadata } from "@/lib/seo";
 export const metadata = publicPageMetadata({
   title: "Terms of Service",
@@ -6,9 +7,9 @@ export const metadata = publicPageMetadata({
 });
 export default function Terms() {
   return (
-    <main className="page-shell" id="main">
+    <main className={`page-shell ${publicStyles.page}`} id="main">
       <article className="prose">
-        <span className="section-kicker">A straightforward agreement</span>
+        <span className="section-kicker">Terms of service</span>
         <h1>Build thoughtfully.</h1>
         <p className="legal-updated">Preview terms · October 17, 2026</p>
         <p>

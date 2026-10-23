@@ -193,6 +193,17 @@ export async function projectFiles(userId: string, id: string) {
           hash: digest(file.content),
         }));
 }
+export async function runTerminalCommand(userId: string, id: string, command: string) {
+  return store.withProjectOperation(userId, id, async () => {
+    const project = await activate(userId, id);
+    const result = await vm.runProjectCommand(project, { command, timeoutMs: 30_000 });
+    await getPool().query(
+      "UPDATE cloud_projects SET updated_at=now(),expires_at=now()+interval '7 days' WHERE id=$1 AND user_id=$2",
+      [id, userId],
+    );
+    return { ...result, cwd: project.appDirectory || "/home/project/app" };
+  });
+}
 export async function readFile(userId: string, id: string, path: string) {
   if (!allowedSource(path))
     throw new ApiError(403, "This file path is excluded.");

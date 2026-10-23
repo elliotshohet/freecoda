@@ -67,12 +67,13 @@ export function Header() {
     pathname.startsWith("/app/")
   ) return null;
   const links = [
-    { href: "/download", label: "Desktop" },
-    { href: "/docs#installation", label: "CLI" },
-    { href: "/app?view=chat", label: "Chat" },
-    { href: "/app?view=workspace", label: "Web" },
-    { href: "/pricing", label: "Pricing" },
-    { href: "/advertise", label: "Advertise" },
+    { href: "/download", label: "Desktop", isActive: pathname === "/download" },
+    { href: "/docs#installation", label: "CLI", isActive: false },
+    { href: "/app?view=workspace", label: "Web", isActive: false },
+    { href: "/pricing", label: "Pricing", isActive: pathname === "/pricing" },
+    { href: "/docs", label: "Docs", isActive: pathname === "/docs" },
+    { href: "https://github.com/elliotshohet/freecoda", label: "GitHub", isActive: false },
+    { href: "/advertise", label: "Advertise", isActive: pathname === "/advertise" },
   ];
   return (
     <header className={styles.header}>
@@ -85,8 +86,8 @@ export function Header() {
           <NavigationMenuList className="m-0 p-0">
             {links.map(link => (
               <NavigationMenuItem key={link.href}>
-                <NavigationMenuLink asChild active={pathname === link.href} className="min-h-11 justify-center">
-                  <Link href={link.href}>{link.label}</Link>
+                <NavigationMenuLink asChild active={link.isActive} className="min-h-11 justify-center">
+                  <Link href={link.href} aria-current={link.isActive ? "page" : undefined}>{link.label}</Link>
                 </NavigationMenuLink>
               </NavigationMenuItem>
             ))}
@@ -114,7 +115,7 @@ export function Header() {
               {links.map(link => (
                 <SheetClose asChild key={link.href}>
                   <Button asChild variant="ghost" className="min-h-11 justify-start">
-                    <Link href={link.href} aria-current={pathname === link.href ? "page" : undefined}>{link.label}</Link>
+                  <Link href={link.href} aria-current={link.isActive ? "page" : undefined}>{link.label}</Link>
                   </Button>
                 </SheetClose>
               ))}

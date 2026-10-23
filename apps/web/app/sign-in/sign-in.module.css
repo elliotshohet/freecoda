@@ -4,10 +4,10 @@
 .brand { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 28px; }
 .brand img { display: block; width: 52px; height: 52px; border-radius: 13px; }
 .brand span { color: var(--ink); font-size: 23px; font-weight: 600; letter-spacing: -.7px; }
-.card h1 { margin: 0; color: var(--ink); font-size: clamp(28px, 4vw, 38px); font-weight: 500; letter-spacing: -1.2px; line-height: 1.2; text-wrap: balance; }
+.card h1 { margin: 0; color: var(--ink); font-size: clamp(28px, 4vw, 38px); font-weight: 650; letter-spacing: -.045em; line-height: 1.2; text-wrap: balance; }
 .card > p { color: var(--muted); margin: 16px auto 0; font-size: 14px; line-height: 1.8; text-wrap: pretty; }
 .card :global(.entry-sign-in) { margin: 30px 0 0; }
-.card :global(.entry-sign-in .button) { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 46px; width: min(100%, 320px); padding: 12px 18px; border: 1px solid var(--ink); border-radius: 10px; background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 550; transition: opacity 160ms ease, transform 120ms ease; }
+.card :global(.entry-sign-in .button) { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 46px; width: min(100%, 320px); padding: 12px 18px; border: 1px solid transparent; border-radius: 10px; background: var(--action-bg); color: var(--action-fg); font-size: 13px; font-weight: 550; transition: opacity 160ms ease, transform 120ms ease; }
 .card :global(.entry-sign-in .button > svg) { width: 17px; height: 17px; flex: 0 0 17px; }
 .card :global(.entry-sign-in .button:hover:not(:disabled)) { opacity: .85; }
 .card :global(.entry-sign-in .button:active:not(:disabled)) { transform: translateY(1px); }

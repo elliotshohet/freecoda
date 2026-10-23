@@ -14,7 +14,7 @@ export default function Pricing() {
     <main className={s.page} id="main">
       <header className={s.hero}>
         <span className={s.eyebrow}>Pricing</span>
-        <h1>More room for your next idea.</h1>
+        <h1>Free to build. Backed by ads.</h1>
         <p>One free account for desktop, web, and terminal. Supported by clearly labeled sponsors, with no subscription or card required.</p>
       </header>
       <section className={s.plan} aria-labelledby="free-plan-title">

@@ -1,3 +1,4 @@
+import publicStyles from "@/components/public-page.module.css";
 import { publicPageMetadata } from "@/lib/seo";
 import { FeatureOverview } from "@/components/feature-overview";
 import { DesktopDownloads } from "@/components/desktop-downloads";
@@ -11,7 +12,7 @@ export const metadata = publicPageMetadata({
 });
 export default function Docs() {
   return (
-    <main className="page-shell docs-layout" id="main">
+    <main className={`page-shell docs-layout ${publicStyles.page}`} id="main">
       <nav className="docs-nav" aria-label="Documentation">
         <a href="#features">Features by client</a>
         <a href="#installation">Installation</a>
@@ -23,16 +24,12 @@ export default function Docs() {
         <a href="#permissions">Permissions</a>
       </nav>
       <article className="prose">
-        <span className="section-kicker">A small guide to getting started</span>
+        <span className="section-kicker">Documentation</span>
         <h1>
-          Make yourself
-          <br />
-          at home.
+          Start building with Freecoda.
         </h1>
         <p>
-          Freecoda runs in your terminal, alongside the editor and tools you
-          already use. Start with an existing Git repository on macOS, Linux, or
-          Windows. Node.js 22 or newer is required for the CLI.
+          Choose your browser, desktop, or terminal. Get set up, connect a project, and choose what your coding agent can access. The CLI requires Node.js 22 or newer.
         </p>
         <h2 id="installation">Installation</h2>
         {!CLI_PUBLISHED && (

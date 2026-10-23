@@ -7,7 +7,11 @@ remain under Unreleased until publication and artifact verification are complete
 
 ## Unreleased
 
-No pending client feature releases.
+Web release publication pending:
+
+- Refresh public pages, navigation, and the browser workspace layout while preserving Freecoda branding and ad-supported positioning.
+- Add explicit project file creation and a project terminal with commands bounded to 30 seconds in the isolated cloud workspace.
+- No desktop or CLI feature release is pending. No database migration is required for these web changes.
 
 ## Desktop 0.1.11 — 2026-10-20
 

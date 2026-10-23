@@ -45,6 +45,7 @@ const filesSchema = z
       .nullable(),
   })
   .strict();
+const terminalSchema = z.object({ command: z.string().trim().min(1).max(4000) }).strict();
 const runSchema = z
   .object({
     requestId: z.uuid().optional(),
@@ -383,6 +384,12 @@ export async function cloudRoute(req: Request) {
     }
     if (record.project.status === "creating")
       throw new ApiError(409, "Repository import is still running.");
+    if (path[2] === "terminal" && method === "POST") {
+      const body = await jsonBody(req, terminalSchema);
+      const result = await service.runTerminalCommand(user.id, id, body.command);
+      await lifecycle(id);
+      return json(result);
+    }
     if (path[2] === "files") {
       if (method === "GET") {
         const path = new URL(req.url).searchParams.get("path");

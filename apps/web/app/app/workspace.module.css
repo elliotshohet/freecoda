@@ -2026,6 +2026,65 @@
 .welcomeLinks { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 32px; }
 .welcomeLinks a, .welcomeLinks button { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); background: transparent; border: 0; padding: 0; font: inherit; font-size: 11px; text-decoration: none; cursor: pointer; }
 .welcomeLinks a:hover, .welcomeLinks button:hover { color: var(--purple); }
+
+/* A calm, focused project start screen inside the unified app shell. */
+.shell[data-conversation-mode="ask"] .workspaceSettings,
+.shell[data-conversation-mode="ask"] .workbench > .projects { display: none; }
+.shell[data-conversation-mode="ask"] .workbench { grid-template-columns: minmax(0, 1fr); }
+:global(#workspace-panel) .workbench { background: var(--paper); }
+:global(#workspace-panel) .projects { border-right-color: var(--line); background: color-mix(in srgb, var(--muted) 6%, var(--paper)); }
+:global(#workspace-panel) .sectionHead { min-height: 38px; color: var(--ink); font-size: 11px; font-weight: 620; letter-spacing: 0; }
+:global(#workspace-panel) .workspaceButton { border-radius: 8px; }
+:global(#workspace-panel) .projects .workspaceButton { height: auto; min-height: 48px; align-items: flex-start; white-space: normal; }
+:global(#workspace-panel) .projects .workspaceButton > span { line-height: 1.4; }
+:global(#workspace-panel) .projects .workspaceButton small { line-height: 1.45; overflow-wrap: anywhere; }
+:global(#workspace-panel) .projects .importButton { height: auto; min-height: 40px; }
+:global(#workspace-panel) .workspaceButton.selected { background: var(--pale); border-color: color-mix(in srgb, var(--purple) 16%, var(--line)); }
+:global(#workspace-panel) .workspaceButton:hover { background: var(--surface-muted); }
+:global(#workspace-panel) .welcomeStart { padding-inline: clamp(20px, 4vw, 64px); }
+:global(#workspace-panel) .codingWelcome { width: min(100%, 820px); }
+:global(#workspace-panel) .codingWelcome h2 { margin: 18px 0 12px; font-size: clamp(34px, 4vw, 52px); line-height: 1.08; letter-spacing: -.055em; }
+:global(#workspace-panel) .codingWelcome > p { max-width: 560px; font-size: 13px; line-height: 1.7; }
+:global(#workspace-panel) .codingWelcome > div.my-8 { gap: 14px; margin-block: 30px; }
+:global(#workspace-panel) .codingWelcome [data-slot="card"] { gap: 16px; border-color: var(--line); border-radius: 14px; background: var(--surface); box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 5%, transparent); transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease; }
+:global(#workspace-panel) .codingWelcome [data-slot="card"]:hover { border-color: color-mix(in srgb, var(--purple) 35%, var(--line)); box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 7%, transparent); transform: translateY(-1px); }
+:global(#workspace-panel) .codingWelcome [data-slot="card-header"] { gap: 6px; padding-inline: 20px; }
+:global(#workspace-panel) .codingWelcome [data-slot="card-title"] { font-size: 14px; }
+:global(#workspace-panel) .codingWelcome [data-slot="card-description"] { font-size: 11px; line-height: 1.5; }
+:global(#workspace-panel) .codingWelcome [data-slot="card-content"] { padding-inline: 20px; color: var(--muted); font-size: 11px; line-height: 1.65; }
+:global(#workspace-panel) .codingWelcome [data-slot="card-footer"] { padding-inline: 20px; }
+:global(#workspace-panel) .workflowSteps { gap: 16px 24px; padding-top: 18px; }
+:global(#workspace-panel) .welcomeLinks { margin-top: 24px; }
+:global(#workspace-panel) .projectTop { border-bottom: 1px solid var(--line); }
+:global(#workspace-panel) .projectTop strong { font-size: 13px; }
+:global(#workspace-panel) .projectStatus { padding: 4px 7px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-muted); }
+:global(#workspace-panel) .tabs { border-bottom: 1px solid var(--line); }
+:global(#workspace-panel) .composer { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: 0 6px 22px color-mix(in srgb, var(--ink) 5%, transparent); }
+.fileActions { display: flex; align-items: center; gap: 5px; }
+.terminalPanel { display: flex; flex-direction: column; gap: 14px; min-height: 100%; padding: 20px; background: light-dark(#fbfbfd, #18181d); color: var(--ink); }
+.terminalHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.terminalHeader div { display: grid; gap: 4px; }
+.terminalHeader strong { font-size: 13px; }
+.terminalHeader span, .terminalHint, .terminalMuted { color: var(--muted); font-size: 11px; }
+.terminalForm { display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.terminalForm > span { padding-left: 7px; color: var(--purple); font: 600 13px var(--mono); }
+.terminalForm input { flex: 1; min-width: 0; border: 0; box-shadow: none; font-family: var(--mono); }
+.terminalHint { margin: -8px 0 0; }
+.terminalEmpty { min-height: 180px; border: 1px dashed var(--line); border-radius: 10px; }
+.terminalEmpty [data-slot="empty-title"] { font-size: 13px; }
+.terminalEmpty [data-slot="empty-description"] { font-size: 11px; }
+.terminalResult { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: light-dark(#fff, #121316); }
+.terminalCommand { display: flex; justify-content: space-between; align-items: center; gap: 12px; font: 11px var(--mono); overflow-wrap: anywhere; }
+.terminalResult pre { margin: 0; max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: light-dark(#242331, #e4e2eb); font: 11px/1.7 var(--mono); }
+.terminalResult .terminalError { color: light-dark(#a23a48, #ff9ba5); }
+.agentOutput { border-top: 1px solid var(--line); padding-top: 12px; }
+.agentOutput summary { color: var(--muted); font-size: 11px; cursor: pointer; margin-bottom: 10px; }
+@media (max-width: 650px) {
+  :global(#workspace-panel) .codingWelcome h2 { font-size: 36px; }
+  :global(#workspace-panel) .codingWelcome > div.my-8 { grid-template-columns: 1fr; margin-block: 22px; }
+  :global(#workspace-panel) .workflowSteps { gap: 10px 14px; }
+  :global(#workspace-panel) .projectStatus { font-size: 9px; }
+}
 @media (min-width: 901px) {
   :global(#workspace-panel) .taskLayout { grid-template-columns: minmax(0, 1fr) minmax(300px, 36%); }
   :global(#workspace-panel) .bottom { grid-column: 1; grid-row: 1; border-left: 0; border-right: 1px solid var(--line); }

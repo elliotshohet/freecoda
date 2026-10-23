@@ -227,6 +227,11 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
   );
   const [changes, setChanges] = useState<Changes | null>(null);
   const [output, setOutput] = useState("");
+  const [terminalCommand, setTerminalCommand] = useState("");
+  const [terminalBusy, setTerminalBusy] = useState(false);
+  const [terminalResult, setTerminalResult] = useState<{ command: string; exitCode: number; stdout: string; stderr: string; cwd: string } | null>(null);
+  const [newFilePath, setNewFilePath] = useState("");
+  const [newFileOpen, setNewFileOpen] = useState(false);
   const [preview, setPreview] = useState<{
     url: string;
     expiresAt?: string;
@@ -492,6 +497,52 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
       setError(errorMessage(e));
     } finally {
       setBusy(false);
+    }
+  }
+  async function createFile(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!project || !consent) return;
+    const path = newFilePath.trim().replace(/^\/+/, "");
+    setBusy(true);
+    setError("");
+    try {
+      const data = await api<{ hash: string }>(`projects/${project.id}/files`, "PUT", {
+        path,
+        content: "",
+        expectedHash: null,
+      });
+      setFile({ path, content: "", hash: data.hash });
+      setDraft("");
+      setNewFilePath("");
+      setNewFileOpen(false);
+      await refreshFiles(project.id);
+      setNotice("File created in your cloud workspace.");
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function runTerminal(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!project || !consent || !terminalCommand.trim()) return;
+    const command = terminalCommand.trim();
+    setTerminalBusy(true);
+    setError("");
+    setTerminalResult(null);
+    try {
+      const result = await api<{ exitCode: number; stdout: string; stderr: string; cwd: string }>(
+        `projects/${project.id}/terminal`, "POST", { command },
+      );
+      setTerminalResult({ command, ...result });
+      setTerminalCommand("");
+      setTab("output");
+      setNotice(result.exitCode === 0 ? "Command finished." : `Command exited with code ${result.exitCode}.`);
+      await refreshFiles(project.id);
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setTerminalBusy(false);
     }
   }
   function applyEvents(events: RunEvent[]) {
@@ -1377,19 +1428,19 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
             {!project ? (
               <section className={styles.welcomeStart} data-conversation-slot aria-label="Start a workspace">
                 <div className={styles.codingWelcome}>
-                  <Badge variant="outline">YOUR NEXT PROJECT STARTS HERE</Badge>
-                  <h2>A little spark.<br /><span>A whole new build.</span></h2>
-                  <p>Your code, your agent, one workspace. Open a repository or start fresh, then build alongside Freecoda.</p>
+                  <Badge variant="outline"><FolderGit2 data-icon="inline-start" /> YOUR PROJECT, YOUR CALL</Badge>
+                  <h2>What are we<br /><span>building today?</span></h2>
+                  <p>Start with a clean project or bring a repository you choose. Freecoda works alongside you, and every change stays yours to review.</p>
                   <div className="my-8 grid gap-4 sm:grid-cols-2">
                     <Card size="sm">
-                      <CardHeader><CardTitle>New project</CardTitle><CardDescription>A clean starting point for your next idea.</CardDescription></CardHeader>
-                      <CardContent>Start with Next.js or Vite in a cloud workspace.</CardContent>
-                      <CardFooter><Button disabled={!consent || busy || running} onClick={() => setDialog("create")}><Plus data-icon="inline-start" />Create project</Button></CardFooter>
+                      <CardHeader><CardTitle>Start from an idea</CardTitle><CardDescription>A clean, ready-to-build workspace.</CardDescription></CardHeader>
+                      <CardContent>Choose a starter and let your project take shape in the cloud.</CardContent>
+                      <CardFooter><Button disabled={!consent || busy || running} onClick={() => setDialog("create")}><Plus data-icon="inline-start" />Create a project</Button></CardFooter>
                     </Card>
                     <Card size="sm">
-                      <CardHeader><CardTitle>Open repository</CardTitle><CardDescription>Pick up where you left off on GitHub.</CardDescription></CardHeader>
-                      <CardContent>Choose a repository you have granted access to.</CardContent>
-                      <CardFooter><Button variant="outline" disabled={!consent || busy || running} onClick={() => void showImport()}><FolderGit2 data-icon="inline-start" />Browse repositories</Button></CardFooter>
+                      <CardHeader><CardTitle>Continue with a repo</CardTitle><CardDescription>Bring in a project you already own.</CardDescription></CardHeader>
+                      <CardContent>Select a GitHub repository you have granted Freecoda access to.</CardContent>
+                      <CardFooter><Button variant="outline" disabled={!consent || busy || running} onClick={() => void showImport()}><FolderGit2 data-icon="inline-start" />Choose a repository</Button></CardFooter>
                     </Card>
                   </div>
                   <div className={styles.workflowSteps} aria-label="How it works"><span><b>01</b> Open a project</span><span><b>02</b> Build with your agent</span><span><b>03</b> Review every change</span></div>
@@ -1621,19 +1672,10 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                             <div className={styles.files} role="region" aria-label="Project files" tabIndex={0}>
                               <div className={styles.sectionHead}>
                                 <strong>Files</strong>
-                                <Button
-                                  aria-label="Refresh files"
-                                  disabled={busy || running || inactive}
-                                  onClick={async () => {
-                                    try {
-                                      await refreshFiles(project.id);
-                                    } catch (e) {
-                                      setError(errorMessage(e));
-                                    }
-                                  }}
-                                >
-                                  <RefreshCw size={13} />
-                                </Button>
+                                <div className={styles.fileActions}>
+                                  <Button size="sm" variant="outline" disabled={busy || running || inactive || !consent} onClick={() => setNewFileOpen(true)}><Plus size={13} /> New file</Button>
+                                  <Button aria-label="Refresh files" disabled={busy || running || inactive} onClick={async () => { try { await refreshFiles(project.id); } catch (e) { setError(errorMessage(e)); } }}><RefreshCw size={13} /></Button>
+                                </div>
                               </div>
                               <Input
                                 className={styles.fileFilter}
@@ -1770,13 +1812,24 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
                         </div>
                       )}
                       {tab === "output" && (
-                        <div className={styles.output}>
-                          <p>Command output from this run</p>
-                          {output ? (
-                            <CodeBlock><CodeBlockHeader><CodeBlockTitle>Output</CodeBlockTitle><CodeBlockActions><CodeBlockCopyButton value={output} /></CodeBlockActions></CodeBlockHeader><CodeBlockContent wrap>{output}</CodeBlockContent></CodeBlock>
-                          ) : (
-                            <span>No command output yet.</span>
-                          )}
+                        <div className={styles.terminalPanel}>
+                          <div className={styles.terminalHeader}>
+                            <div><strong>Project terminal</strong><span>Commands run in the isolated workspace sandbox.</span></div>
+                            <Badge variant="outline">{terminalResult?.cwd || project.appDirectory || "/home/project/app"}</Badge>
+                          </div>
+                          <form className={styles.terminalForm} onSubmit={runTerminal}>
+                            <span aria-hidden="true">$</span>
+                            <Input aria-label="Terminal command" value={terminalCommand} onChange={event => setTerminalCommand(event.target.value)} placeholder="bun run build" maxLength={4000} disabled={!consent || inactive || terminalBusy || running} />
+                            <Button type="submit" disabled={!consent || inactive || terminalBusy || running || !terminalCommand.trim()}>{terminalBusy ? <Loader2 className="animate-spin" /> : <Play />} Run</Button>
+                          </form>
+                          <p className={styles.terminalHint}>Each command runs for up to 30 seconds. Files and package changes stay in this project.</p>
+                          {terminalResult ? <div className={styles.terminalResult}>
+                            <div className={styles.terminalCommand}><span>$ {terminalResult.command}</span><Badge variant={terminalResult.exitCode === 0 ? "secondary" : "destructive"}>Exit {terminalResult.exitCode}</Badge></div>
+                            {terminalResult.stdout && <pre>{terminalResult.stdout}</pre>}
+                            {terminalResult.stderr && <pre className={styles.terminalError}>{terminalResult.stderr}</pre>}
+                            {!terminalResult.stdout && !terminalResult.stderr && <span className={styles.terminalMuted}>Command completed with no output.</span>}
+                          </div> : <Empty className={styles.terminalEmpty}><EmptyHeader><EmptyTitle>Run a project command</EmptyTitle><EmptyDescription>Try a build, inspect files, or install a package in the sandbox.</EmptyDescription></EmptyHeader></Empty>}
+                          {output && <details className={styles.agentOutput}><summary>Latest agent command output</summary><CodeBlock><CodeBlockHeader><CodeBlockTitle>Agent output</CodeBlockTitle><CodeBlockActions><CodeBlockCopyButton value={output} /></CodeBlockActions></CodeBlockHeader><CodeBlockContent wrap>{output}</CodeBlockContent></CodeBlock></details>}
                         </div>
                       )}
                       {tab === "preview" && (
@@ -1841,6 +1894,18 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
           </div>
         </>
       )}
+      <Dialog open={newFileOpen} onOpenChange={open => { if (!busy) setNewFileOpen(open); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogTitle>Create a project file</DialogTitle>
+          <form onSubmit={createFile}>
+            <FieldGroup>
+              <p className={styles.footnote}>Choose a path inside this project, such as <code>src/components/Hello.tsx</code>.</p>
+              <Field><FieldLabel htmlFor="new-project-file">File path</FieldLabel><Input id="new-project-file" autoFocus value={newFilePath} onChange={event => setNewFilePath(event.target.value)} placeholder="src/new-file.ts" maxLength={500} required disabled={busy} /></Field>
+              <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setNewFileOpen(false)} disabled={busy}>Cancel</Button><Button type="submit" disabled={busy || !newFilePath.trim() || !consent}>{busy ? <Loader2 className="animate-spin" /> : <Plus />} Create file</Button></div>
+            </FieldGroup>
+          </form>
+        </DialogContent>
+      </Dialog>
       <Dialog open={!!dialog} onOpenChange={open => { if (!open && !busy) setDialog(null); }}>
         {dialog && <DialogContent showCloseButton={!busy} className="max-h-[85dvh] overflow-y-auto sm:max-w-xl">
           <DialogTitle>{dialog === "create" ? "A fresh place to start." : dialog === "import" ? "Open a GitHub repository" : dialog === "publish" ? "Create a draft pull request" : "Delete cloud project"}</DialogTitle>

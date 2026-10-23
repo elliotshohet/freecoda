@@ -2551,7 +2551,7 @@ body:has(.marketing-home) { --paper: light-dark(#fafafa, #1d1d1d); --line: light
 .marketing-product-frame img { display: block; width: 100%; height: auto; border-radius: 7px; }
 .marketing-product figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; margin: 16px 5px 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
 .marketing-welcome > .open-source-banner { width: 100%; margin-top: 44px; margin-bottom: 0; border-radius: 7px; background: transparent; }
-.site-footer { max-width: 1120px; border: 1px solid var(--line); border-bottom: 0; padding: 32px 40px; flex-wrap: wrap; }
+.site-footer { width: min(100%, 1200px); max-width: 1200px; margin-inline: auto; border: 0; padding: 32px clamp(18px, 3vw, 40px); flex-wrap: wrap; }
 .marketing-welcome :is(a, button):focus-visible { outline: 2px solid var(--purple); outline-offset: 4px; }
 .download-page { padding-top: 40px; }
 .download-back { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; margin-bottom: 38px; color: var(--muted); font-size: 12px; }

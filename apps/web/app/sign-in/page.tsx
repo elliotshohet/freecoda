@@ -37,7 +37,7 @@ export default async function SignInPage({ searchParams }: {
       <Link className={styles.back} href="/"><ArrowLeft size={15} aria-hidden="true" />Back to Freecoda</Link>
       <section className={styles.card} aria-labelledby="sign-in-title">
         <div className={styles.brand}><img src="/brand/freecoda-mark.svg" alt="" width="52" height="52" /><span>Freecoda</span></div>
-        <h1 id="sign-in-title">Your next idea starts here.</h1>
+        <h1 id="sign-in-title">Let’s build your next idea.</h1>
         <p>Your free, open-source coding agent. Sign in with GitHub to start building.</p>
         {auth ? <GitHubSignIn callbackURL={returnTo} label="Sign in with GitHub" /> : <p className={styles.problem} role="status">Sign-in is not configured on this instance yet.</p>}
         {(unavailable || params.reason === "unavailable") && <div className={styles.problem} role="status">We could not verify your session. Try signing in, or <Link href={signInPath(returnTo)}>check again</Link>.</div>}

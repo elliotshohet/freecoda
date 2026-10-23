@@ -26,10 +26,10 @@ export default function Home() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(homeStructuredData).replace(/</g, "\\u003c") }} />
       <section className={styles.hero} aria-labelledby="welcome-title">
         <div className={styles.intro}>
-          <Badge variant="outline"><Code2 data-icon="inline-start" /> Open source. Open possibilities.</Badge>
-          <h1 id="welcome-title">Your next idea.<br /><span>Let’s build it.</span></h1>
-          <p className={styles.lead}>A free, open-source coding agent.<br />Supported by ads. Built for you.</p>
-          <p className={styles.description}>Ask questions, explore a codebase, and turn ideas into working software. One agent, wherever you like to code.</p>
+          <Badge variant="outline"><Code2 data-icon="inline-start" /> Your open-source coding agent</Badge>
+          <h1 id="welcome-title">Free to build.<br /><span>Backed by ads.</span></h1>
+          <p className={styles.lead}>Turn your next idea into working software.</p>
+          <p className={styles.description}>Explore your code, fix bugs, and build something new with an AI coding agent in your browser, desktop, or terminal. Ads help keep it free.</p>
           <div className={styles.actions}>
             <Link className={buttonVariants({ size: "lg" })} href="/app">Start building <ArrowRight data-icon="inline-end" /></Link>
             <Link className={buttonVariants({ size: "lg", variant: "outline" })} href="/download"><ArrowDownToLine data-icon="inline-start" /> Download desktop</Link>

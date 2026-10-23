@@ -6,11 +6,10 @@ import { Mark } from "@/components/chrome";
 import { GitHubStars } from "@/components/github-stars";
 import { ThemeControl } from "@/components/theme-control";
 import { UserAvatar } from "@/components/user-avatar";
-import { Code2, MessageSquare, PanelLeft } from "lucide-react";
+import { BookOpen, Code2, FolderKanban, MessageSquare, Plus, Settings2, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Files, Settings2, BookOpen, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import Chat from "../chat/chat";
 import { CloudWorkspace } from "./workspace";
 import styles from "./unified-web-app.module.css";
@@ -89,27 +88,34 @@ export function UnifiedWebApp({ initialView, initialThreadId, user }: { initialV
         <Link href="/" className={styles.brand} aria-label="Freecoda home">
           <Mark /><span className={styles.wordmark}>Freecoda</span>
         </Link>
-        <nav className={styles.views} aria-label="Workspace views">
-          <ToggleGroup value={[view]} onValueChange={(values) => { if (values[0] === "chat" || values[0] === "workspace") selectView(values[0]); }} aria-label="Conversation mode">
-            <ToggleGroupItem className={view === "chat" ? styles.selected : undefined} value="chat"><MessageSquare data-icon="inline-start" /> Chat</ToggleGroupItem>
-            <ToggleGroupItem className={view === "workspace" ? styles.selected : undefined} value="workspace"><Code2 data-icon="inline-start" /> Workspace</ToggleGroupItem>
-          </ToggleGroup>
-        </nav>
-        <div className={styles.accessState}><Badge variant="outline">{view === "chat" ? "No repository access" : "Project workspace"}</Badge></div>
+        <div className={styles.context}>
+          <span className={styles.contextEyebrow}>YOUR WORKSPACE</span>
+          <span className={styles.contextTitle}>{view === "chat" ? "Ask anything" : "Build something"}</span>
+        </div>
+        <Badge className={styles.accessState} variant="outline"><ShieldCheck data-icon="inline-start" />{view === "chat" ? "Private chat · no repo access" : "Project access by choice"}</Badge>
         <div className={styles.headerActions}>
           <div className={styles.githubControl}><GitHubStars /></div>
-          {view === "chat" && <Button variant="ghost" size="icon" aria-label="Open chat history" title="Chat history" onClick={() => window.dispatchEvent(new CustomEvent("freecoda:chat-sidebar"))}><PanelLeft aria-hidden="true" /></Button>}
           <ThemeControl />
           <Link className={styles.account} href="/settings" aria-label="Account & settings" title="Account & settings"><UserAvatar image={user.image} name={user.name} /></Link>
         </div>
       </header>
-      <nav className={styles.activityRail} aria-label="Application navigation">
-        <button type="button" aria-label="Coding workspace" title="Coding workspace" aria-pressed={view === "workspace"} onClick={() => selectView("workspace")}><Files size={21} /></button>
-        <button type="button" aria-label="General chat" title="General chat" aria-pressed={view === "chat"} onClick={() => selectView("chat")}><MessageSquare size={21} /></button>
+      <aside className={styles.activityRail} aria-label="Application navigation">
+        <Button className={styles.newChat} onClick={() => { selectView("chat"); window.dispatchEvent(new CustomEvent("freecoda:new-chat")); }}>
+          <Plus data-icon="inline-start" /> New chat
+        </Button>
+        <div className={styles.navLabel}>WORKSPACE</div>
+        <Button variant="ghost" className={view === "chat" ? styles.navActive : styles.navItem} aria-current={view === "chat" ? "page" : undefined} onClick={() => selectView("chat")}>
+          <MessageSquare data-icon="inline-start" /> Chat <span className={styles.navHint}>Private</span>
+        </Button>
+        <Button variant="ghost" className={view === "workspace" ? styles.navActive : styles.navItem} aria-current={view === "workspace" ? "page" : undefined} onClick={() => selectView("workspace")}>
+          <FolderKanban data-icon="inline-start" /> Projects <span className={styles.navHint}>Cloud</span>
+        </Button>
         <div className={styles.railSpacer} />
-        <Link href="/docs" aria-label="Documentation" title="Documentation"><BookOpen size={20} /></Link>
-        <Link href="/settings" aria-label="Settings" title="Settings"><Settings2 size={20} /></Link>
-      </nav>
+        <div className={styles.sidebarNote}><Sparkles data-icon="inline-start" /><span>Free, open source,<br />and yours to shape.</span></div>
+        <div className={styles.navLabel}>RESOURCES</div>
+        <Link className={styles.navLink} href="/docs"><BookOpen data-icon="inline-start" /> Documentation</Link>
+        <Link className={styles.navLink} href="/settings"><Settings2 data-icon="inline-start" /> Settings</Link>
+      </aside>
       <footer className={styles.statusbar}>
         <span><Code2 size={12} aria-hidden="true" />{view === "workspace" ? "Cloud workspace" : "General chat"}</span>
         <span><ShieldCheck size={12} aria-hidden="true" />{view === "workspace" ? "Review before sharing" : "No repository access"}</span>

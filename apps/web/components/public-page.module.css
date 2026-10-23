@@ -1,0 +1,38 @@
+.page {
+  width: min(100%, 1200px);
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: 72px clamp(18px, 3vw, 40px) 80px;
+}
+.page h1 {
+  max-width: 850px;
+  margin: 0 0 24px;
+  font-size: clamp(40px, 5.2vw, 64px);
+  font-weight: 650;
+  line-height: 1.08;
+  letter-spacing: -.055em;
+  text-wrap: balance;
+}
+.page :global(.prose) { width: 100%; max-width: 760px; margin-inline: 0; }
+.page :global(.section-kicker), .page :global(.download-eyebrow) {
+  display: block;
+  margin-bottom: 20px;
+  color: var(--purple);
+  font-size: 12px;
+  font-weight: 600;
+}
+.page :global(.prose) p, .page :global(.prose) li { color: var(--muted); font-size: 14px; line-height: 1.85; }
+.page :global(.prose) h2 { margin-top: 44px; font-size: 28px; font-weight: 600; letter-spacing: -.035em; }
+.page:global(.docs-layout) { grid-template-columns: 190px minmax(0, 1fr); gap: 52px; }
+.page :global(.docs-nav) { gap: 6px; padding-right: 20px; border-right: 1px solid var(--line); }
+.page :global(.docs-nav) a { padding: 10px 12px; border-radius: 8px; line-height: 1.5; }
+.page :global(.docs-nav) a:hover { color: var(--purple); background: var(--pale); }
+.page :global(.download-intro) { max-width: 57ch; color: var(--muted); font-size: 16px; }
+.page :global(.download-back) { text-decoration: none; }
+.page :global(.panel) { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+@media (max-width: 760px) {
+  .page { padding-top: 40px; padding-bottom: 52px; }
+  .page:global(.docs-layout) { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  .page :global(.docs-nav) { position: static; flex-direction: row; flex-wrap: wrap; gap: 4px; padding: 0 0 20px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .page :global(.docs-nav) a { padding: 9px 10px; }
+}

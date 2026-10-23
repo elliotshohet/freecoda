@@ -1,3 +1,4 @@
+import publicStyles from "@/components/public-page.module.css";
 import { publicPageMetadata } from "@/lib/seo";
 export const metadata = publicPageMetadata({
   title: "Privacy Policy & Data Use",
@@ -6,13 +7,11 @@ export const metadata = publicPageMetadata({
 });
 export default function Privacy() {
   return (
-    <main className="page-shell" id="main">
+    <main className={`page-shell ${publicStyles.page}`} id="main">
       <article className="prose">
-        <span className="section-kicker">Our promise</span>
+        <span className="section-kicker">Privacy policy</span>
         <h1>
-          Your ideas belong
-          <br />
-          to you.
+          Your code. Your conversations. Your control.
         </h1>
         <p className="legal-updated">Preview policy · October 19, 2026</p>
         <p>
