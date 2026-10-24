@@ -129,6 +129,12 @@ export default function Privacy() {
           measurement and does not include prompts, source code, or conversation
           content.
         </p>
+        <p>
+          Google Analytics measures website visits and interactions using
+          cookies and device and browser information. Advertising
+          personalization and Google signals are disabled. We do not send
+          prompts, source code, or conversation content to Google Analytics.
+        </p>
         <h2>Accounts and usage</h2>
         <p>
           We retain your GitHub identity and email, authorized device records,

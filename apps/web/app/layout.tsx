@@ -6,6 +6,7 @@ import "@fontsource/ibm-plex-mono/400.css";
 import "./globals.css";
 import { Header, Footer } from "@/components/chrome";
 import { SITE_DESCRIPTION, SITE_URL } from "@/lib/seo";
+import { GoogleAnalytics } from "@/components/google-analytics";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   applicationName: "Freecoda",
@@ -33,6 +34,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {children}
         <Footer />
         <Analytics />
+        <GoogleAnalytics />
         <SpeedInsights />
       </body>
     </html>
