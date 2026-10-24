@@ -28,6 +28,7 @@
     "diff": "^9.0.0",
     "drizzle-orm": "latest",
     "lucide-react": "latest",
+    "motion": "^12.23.12",
     "next": "latest",
     "pg": "latest",
     "radix-ui": "^1.8.1",

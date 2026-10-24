@@ -48,6 +48,7 @@ import { Badge } from "@/components/ui/badge";
 import styles from "./workspace.module.css";
 import { Mark } from "@/components/chrome";
 import { UserAvatar } from "@/components/user-avatar";
+import { BrandSplash } from "@/components/brand-splash";
 import { WelcomeIdentity, WelcomeSurface } from "@/components/welcome-surface";
 import { MarkdownMessage } from "@/components/markdown-message";
 import { aiServiceText } from "@/components/ai-service-text";
@@ -1226,8 +1227,7 @@ export function CloudWorkspace({ conversationMode = "project", onOpenProject, on
       )}
       {loading ? (
         <div className={styles.empty} role="status">
-          <Loader2 size={24} className={styles.spin} />
-          <h2>Opening your workspace…</h2>
+          <BrandSplash loading />
         </div>
       ) : !available ? (
         <div className={styles.workbench}>

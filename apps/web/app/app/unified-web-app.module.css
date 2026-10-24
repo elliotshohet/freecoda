@@ -4,8 +4,8 @@
   inset: 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: 236px minmax(0, 1fr);
-  grid-template-rows: 62px minmax(0, 1fr) 27px;
+  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-rows: 64px minmax(0, 1fr) 29px;
   height: var(--app-height);
   min-height: 0;
   overflow: hidden;
@@ -103,7 +103,7 @@
   gap: 5px;
   padding: 16px 12px 12px;
   border-right: 1px solid var(--line);
-  background: color-mix(in srgb, var(--muted) 8%, var(--paper));
+  background: var(--paper);
 }
 
 .newChat { width: 100%; justify-content: flex-start; margin-bottom: 18px; }
@@ -186,3 +186,20 @@
   .newChat :global(svg) { margin: 0; }
   .navItem, .navActive { min-width: 74px; font-size: 11px; }
 }
+
+.topbar { background: var(--surface); padding-inline: 24px; }
+.brand { flex-basis: 176px; font-size: 18px; }
+.activityRail { padding: 22px 14px 16px; gap: 7px; }
+.newChat { min-height: 44px; border-radius: 12px; margin-bottom: 22px; box-shadow: 0 5px 12px #6853d816; }
+.navLabel { font-size: 10px; letter-spacing: .02em; font-weight: 550; margin-bottom: 6px; }
+.navItem, .navActive { min-height: 42px; border-radius: 10px; font-size: 12px; }
+.navActive { background: var(--pale); border-color: transparent; color: var(--purple); }
+.sidebarNote { border: 0; border-radius: 14px; background: var(--pale); padding: 16px 12px; font-size: 11px; }
+.contextEyebrow { font-size: 10px; letter-spacing: 0; font-weight: 500; }
+.contextTitle { font-size: 14px; }
+.accessState { border-radius: 30px; font-size: 10px; padding: 6px 10px; background: var(--paper); }
+.account { box-shadow: 0 0 0 3px var(--paper); }
+.statusbar { background: var(--paper); font-size: 10px; }
+@media(max-width:900px) { .brand { flex-basis: 140px; } }
+@media(max-width:650px) { .brand { flex-basis: auto; font-size: 15px; } .topbar { padding-inline: 12px; } .activityRail { padding: 8px 10px max(8px,env(safe-area-inset-bottom)); gap: 5px; } .newChat { margin: 0; min-height: 40px; } .navItem,.navActive { min-height: 40px; } .sidebarNote { display: none; } }
+@media(max-width:650px) { .shell { grid-template-rows: 56px minmax(0,1fr) 64px; } .newChat, .navItem, .navActive { min-height: 44px; } }

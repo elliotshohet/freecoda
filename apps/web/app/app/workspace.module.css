@@ -2100,3 +2100,18 @@
 @media (max-width: 650px) {
   .codingWelcome { box-sizing: border-box; padding-inline: 18px; }
 }
+
+/* Cohesive Freecoda studio theme, including the embedded project workbench. */
+.shell, :global(#workspace-panel) .shell { --paper: light-dark(#f8f7fc,#17141f); --ink: light-dark(#282337,#eee9fa); --line: light-dark(#e7e2f0,#383044); --muted: light-dark(#716a83,#b6adc8); --pale: light-dark(#efedfb,#30263f); }
+:global(#workspace-panel) .projects { background: var(--paper); padding: 20px 14px; }
+:global(#workspace-panel) .workspaceButton { border-radius: 10px; padding: 12px; }
+:global(#workspace-panel) .workspaceButton.selected { background: var(--pale); color: var(--purple); }
+:global(#workspace-panel) .workbench { background: var(--surface); }
+.welcomeStart { background: radial-gradient(ellipse at 50% 25%,color-mix(in srgb,var(--purple) 5%,var(--surface)),var(--surface) 65%); }
+.setup, .empty { background: var(--surface); }
+.setup h2 { font-weight: 550; font-size: clamp(28px,3vw,40px); letter-spacing: -.055em; }
+.composer { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 7px 25px #6853d80a; }
+.composer:focus-within { border-color: var(--purple); box-shadow: 0 0 0 3px color-mix(in srgb,var(--purple) 9%,transparent); }
+.projectSearch input { min-height: 40px; border-radius: 10px; background: var(--surface-muted); }
+.projectTop, .editorBar { background: var(--paper); }
+.empty:has([data-loading]) { border: 0; }

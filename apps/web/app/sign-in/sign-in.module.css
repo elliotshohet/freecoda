@@ -19,3 +19,11 @@
 .page :is(a, button):focus-visible { outline: 2px solid var(--purple); outline-offset: 4px; }
 @media (max-width: 600px) { .page { padding: 18px 20px 40px; } .card { margin-top: 35px; } }
 @media (prefers-reduced-motion: reduce) { .card :global(.entry-sign-in .button) { transition: none; } .card :global(.entry-sign-in .button:active:not(:disabled)) { transform: none; } }
+
+.page { position: relative; width: min(100%, 1000px); padding-top: 32px; }
+.card { max-width: 540px; border: 1px solid var(--line); border-radius: 28px; padding: 38px 38px 28px; margin-top: 32px; background: var(--surface); box-shadow: 0 20px 70px -35px #6853d837; }
+.brand { margin-bottom: 8px; }
+.card h1 { font-size: clamp(32px,4vw,43px); font-weight: 550; letter-spacing: -.055em; }
+.card > p { max-width: 36ch; }
+.card :global(.entry-sign-in .button) { min-height: 50px; border-radius: 12px; }
+@media(max-width:600px) { .page { padding: 18px 20px 40px; } .card { padding: 22px 20px; margin-top: 20px; border-radius: 22px; } }

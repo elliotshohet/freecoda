@@ -40,3 +40,15 @@
 .help a { text-decoration: underline; text-underline-offset: 3px; }
 @media (max-width: 900px) { .layout { grid-template-columns: 190px minmax(0, 1fr); } .content { padding: 26px 22px 36px; } .usage :global(.workspace-grid) { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 640px) { .topbar { padding: 0 16px; } .layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); } .navigation { flex-direction: row; flex-wrap: nowrap; overflow-x: auto; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); gap: 4px; } .navLabel { display: none; } .navigation a { white-space: nowrap; padding: 10px; } .content { padding: 24px 16px 32px; } .card, .repositories :global(.panel), .usage :global(.panel) { padding: 20px 16px; } .profile { grid-template-columns: minmax(0, 1fr); gap: 16px; } .preference { flex-wrap: wrap; } }
+
+.shell { background: var(--paper); }
+.topbar { height: 64px; background: var(--surface); }
+.shell { grid-template-rows: 64px minmax(0,1fr); }
+.navigation { background: var(--paper); padding-top: 30px; }
+.navigation a { border-radius: 11px; }
+.content { padding-top: 46px; }
+.intro h1 { font-size: clamp(30px,3.4vw,42px); font-weight: 550; letter-spacing: -.055em; }
+.intro p { max-width: 55ch; }
+.card, .repositories :global(.panel), .usage :global(.panel) { background: var(--surface); border-radius: 18px; padding: 28px; box-shadow: 0 4px 20px #6853d805; }
+.card h2, .repositories h2, .usage h2 { font-weight: 600; }
+@media(max-width:640px) { .navigation { padding: 8px 12px; } .content { padding-top: 28px; } .card, .repositories :global(.panel), .usage :global(.panel) { padding: 21px; } }

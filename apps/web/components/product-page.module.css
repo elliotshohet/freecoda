@@ -32,3 +32,20 @@
 .inquiry :global(.advertiser-form h2) { font-size: 22px; letter-spacing: -.6px; line-height: 1.4; }
 @media (max-width: 760px) { .hero, .section, .preview, .inquiry, .plan { padding: 32px 0; } .plan, .inquiry, .questions { grid-template-columns: minmax(0, 1fr); gap: 30px; } .placements { grid-template-columns: 1fr 1fr; } .price { font-size: 64px; } }
 @media (max-width: 420px) { .placements { grid-template-columns: minmax(0, 1fr); } }
+
+.hero { padding: 70px 0 50px; }
+.hero h1 { font-size: clamp(42px,5.2vw,70px); font-weight: 550; max-width: 15ch; letter-spacing: -.06em; }
+.eyebrow { font-size: 12px; font-weight: 600; }
+.hero > p { max-width: 54ch; font-size: 15px; }
+.actions a { border-radius: 11px; min-height: 46px; padding-inline: 20px; }
+.plan { margin-block: 38px; border: 1px solid var(--line); background: var(--surface); border-radius: 22px; padding: 38px; gap: 60px; }
+.price { color: var(--purple); font-weight: 550; }
+.plan h2 { font-weight: 600; }
+.section { padding-block: 54px; }
+.section h2, .inquiry h2 { font-weight: 550; letter-spacing: -.045em; }
+.questions { gap: 22px; }
+.questions > div, .questions > article { padding: 25px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.placements { gap: 22px; }
+.placements > div, .placements > article { padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.inquiry :global(.panel) { border-radius: 18px; }
+@media(max-width:760px) { .hero { padding-top: 36px; } .plan { padding: 25px; gap: 28px; } .section { padding-block: 34px; } }

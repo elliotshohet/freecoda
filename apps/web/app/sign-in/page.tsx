@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { BrandSplash } from "@/components/brand-splash";
 import { GitHubSignIn } from "@/components/github-sign-in";
 import { canonicalLocalAuthOrigin } from "@/lib/browser-session";
 import { appUrl } from "@/lib/config";
@@ -36,7 +37,7 @@ export default async function SignInPage({ searchParams }: {
     <main id="main" className={styles.page}>
       <Link className={styles.back} href="/"><ArrowLeft size={15} aria-hidden="true" />Back to Freecoda</Link>
       <section className={styles.card} aria-labelledby="sign-in-title">
-        <div className={styles.brand}><img src="/brand/freecoda-mark.svg" alt="" width="52" height="52" /><span>Freecoda</span></div>
+        <div className={styles.brand}><BrandSplash /></div>
         <h1 id="sign-in-title">Let’s build your next idea.</h1>
         <p>Your free, open-source coding agent. Sign in with GitHub to start building.</p>
         {auth ? <GitHubSignIn callbackURL={returnTo} label="Sign in with GitHub" /> : <p className={styles.problem} role="status">Sign-in is not configured on this instance yet.</p>}

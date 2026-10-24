@@ -957,3 +957,15 @@
 .welcomeContainer { max-width: 740px; }
 .composerArea { max-width: 820px; }
 @media(max-width:460px) { .welcomeContainer { padding: 24px 18px; } .composerArea { padding-inline: 14px; } }
+
+/* Conversation studio: theme-aligned canvas and a distinct writing surface. */
+.shell, :global([data-theme="dark"]) .shell { --chat-bg: var(--surface); --rail-bg: var(--paper); --chat-text: var(--ink); --chat-muted: var(--muted); --chat-line: var(--line); --chat-hover: var(--pale); --chat-composer: var(--surface); }
+.topbar { border-bottom-color: var(--line); padding-inline: 28px; }
+.welcome { width: min(100%,780px); max-width: 780px; padding-top: clamp(24px,5vh,64px); }
+.composerArea { width: min(100%,850px); padding-inline: 28px; }
+.composer { border: 1px solid var(--line); border-radius: 20px; box-shadow: 0 8px 35px #6853d80b; padding: 19px 20px 13px; transition: box-shadow 180ms,border-color 180ms; }
+.composer:focus-within { border-color: var(--purple); box-shadow: 0 0 0 3px color-mix(in srgb,var(--purple) 9%,transparent), 0 8px 35px #6853d80b; }
+.send { border-radius: 11px; background: var(--action-bg); color: var(--action-fg) !important; }
+.historyRow.active { background: var(--pale); }
+.userRow .bubble { border-radius: 18px 18px 5px 18px; background: var(--pale); }
+@media(max-width:650px) { .composerArea { padding-inline: 14px; } .welcome { padding-inline: 20px; padding-top: 12px; } }

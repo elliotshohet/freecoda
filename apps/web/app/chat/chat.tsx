@@ -799,7 +799,7 @@ export default function Chat({ embedded = false, voiceVisible = true, initialThr
                   submitMessage();
                 }
               }}
-              placeholder={busy ? "Write a message to queue…" : "Ask Coda anything, or / for commands"}
+              placeholder={busy ? "Write a message to queue…" : "Ask Freecoda anything, or / for commands"}
               aria-label="Message Freecoda"
               rows={2}
               disabled={selected?.mode === "coding" || selected?.cloudDeleted || selected?.cloudLoaded === false}

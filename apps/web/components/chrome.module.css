@@ -1,5 +1,5 @@
-.header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 18px; width: min(100%, 1200px); min-height: 96px; margin: 0 auto; padding: 16px clamp(18px, 3vw, 40px); border: 0; color: var(--ink); }
-.brand { display: inline-flex; align-items: center; gap: 9px; min-height: 44px; color: inherit; font-size: 21px; font-weight: 650; letter-spacing: -.75px; text-decoration: none; }
+.header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 18px; width: min(100%, 1360px); min-height: 88px; margin: 0 auto; padding: 16px clamp(18px, 3vw, 40px); border: 0; border-bottom: 1px solid var(--line); color: var(--ink); }
+.brand { display: inline-flex; align-items: center; gap: 9px; min-height: 44px; color: inherit; font-size: 21px; font-weight: 700; letter-spacing: -.85px; text-decoration: none; }
 .brand img { display: block; width: 30px; height: 30px; flex: 0 0 30px; border-radius: 8px; }
 .desktopNavigation { display: flex; justify-content: center; min-width: 0; }
 .actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -36,3 +36,11 @@
   .accountLink > span:not(.avatar), .accountLink > svg { display: none; }
   .accountLink:not(:has(.avatar)) > svg { display: block; }
 }
+
+.header { background: color-mix(in srgb,var(--paper) 88%,transparent); }
+.desktopNavigation { justify-content: flex-start; padding-left: 24px; }
+.desktopNavigation :global([data-slot="navigation-menu-link"]) { font-size: 12px; border-radius: 9px; }
+.downloadAction { border-radius: 11px; padding-inline: 18px; }
+.signIn :global(.entry-sign-in .button) { background: transparent; color: var(--ink); border-color: transparent; }
+.accountLink { border-radius: 11px; }
+@media (max-width:1100px) { .desktopNavigation { padding: 0; } }

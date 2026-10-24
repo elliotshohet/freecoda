@@ -36,3 +36,16 @@
   .page :global(.docs-nav) { position: static; flex-direction: row; flex-wrap: wrap; gap: 4px; padding: 0 0 20px; border-right: 0; border-bottom: 1px solid var(--line); }
   .page :global(.docs-nav) a { padding: 9px 10px; }
 }
+
+.page { max-width: 1180px; padding-top: 70px; padding-bottom: 90px; }
+.page h1 { font-size: clamp(40px,5.3vw,70px); font-weight: 550; max-width: 14ch; letter-spacing: -.06em; }
+.page :global(.prose) { max-width: 760px; }
+.page :global(.prose) h2 { font-size: 27px; letter-spacing: -.045em; font-weight: 550; }
+.page:global(.docs-layout) { grid-template-columns: 210px minmax(0,1fr); gap: 70px; }
+.page :global(.docs-nav) { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 15px; height: fit-content; }
+.page :global(.docs-nav) a { padding: 11px 12px; font-size: 12px; border-radius: 9px; }
+.page :global(.panel) { padding: 28px; border-radius: 20px; box-shadow: 0 6px 24px #6853d807; }
+.page :global(.download-eyebrow) { margin-top: 32px; }
+.page :global(.download-intro) { max-width: 51ch; line-height: 1.8; }
+.page :global(.download-back) { display: inline-flex; gap: 8px; align-items: center; color: var(--muted); font-size: 12px; }
+@media(max-width:760px) { .page { padding-top: 36px; padding-bottom: 55px; } .page:global(.docs-layout) { grid-template-columns: 1fr; gap: 34px; } .page :global(.docs-nav) { padding: 10px; border: 1px solid var(--line); } .page :global(.panel) { padding: 22px; } }

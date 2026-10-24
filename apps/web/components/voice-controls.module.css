@@ -6,3 +6,6 @@
 .status { margin: 7px 0; line-height: 1.5; overflow-wrap: anywhere; }
 .voice summary { cursor: pointer; font-size: 11px; }
 .voice details p { max-width: 70ch; line-height: 1.6; margin: 8px 0 0; }
+
+.actions button { border-color: var(--line); border-radius: 10px; background: var(--surface); }
+.actions button:hover:not(:disabled) { background: var(--pale); color: var(--purple); }

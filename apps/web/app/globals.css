@@ -35,24 +35,24 @@
   --radius-xl: .875rem;
 }
 :root {
-  --surface: light-dark(#ffffff, #1c1b20);
-  --surface-muted: light-dark(#f1f0f4, #27262c);
+  --surface: light-dark(#ffffff, #211e2e);
+  --surface-muted: light-dark(#f0eef8, #2a2638);
   --danger: light-dark(#b42335, #ff8996);
   --radius: .625rem;
 }
 :root {
   color-scheme: light dark;
-  --action-bg: light-dark(#6853d8, #7255c6);
+  --action-bg: light-dark(#6853d8, #8d74e8);
   --action-fg: #fff;
   --button-dark-bg: light-dark(#262536, #ddd0f7);
   --button-dark-fg: light-dark(#fff, #251b35);
-  --paper: light-dark(#fafbfe, #17151f);
-  --ink: light-dark(#262536, #eee8f5);
-  --muted: light-dark(#666779, #b1a6c0);
+  --paper: light-dark(#f8f7fc, #17141f);
+  --ink: light-dark(#282337, #eee9fa);
+  --muted: light-dark(#716a83, #b6adc8);
   --focus-ring: light-dark(#6853d8, #b19aef);
   --purple: light-dark(#6853d8, #b19aef);
   --pale: light-dark(#efedfb, #30263f);
-  --line: light-dark(#e4e5ee, #393143);
+  --line: light-dark(#e7e2f0, #383044);
   --mono: "IBM Plex Mono", monospace;
   --sans: "Manrope Variable", sans-serif;
 }
@@ -1892,14 +1892,7 @@ input:-webkit-autofill {
   }
 }
 
-/* Product-first Freecoda surfaces: neutral canvas, precise violet identity. */
-:root {
-  --paper: light-dark(#ffffff, #212121);
-  --ink: light-dark(#242424, #ececec);
-  --muted: light-dark(#747474, #a4a4a4);
-  --line: light-dark(#e8e8e8, #383838);
-  --pale: light-dark(#f1eef9, #302b3b);
-}
+/* All surfaces inherit the shared studio tokens defined above. */
 .product-home {
   max-width: 1600px;
   margin: 0 auto;
@@ -2664,3 +2657,19 @@ body:has(.marketing-home) { --paper: light-dark(#fafafa, #1d1d1d); --line: light
   .marketing-client-list a > svg:last-child { grid-column: 3; grid-row: 1; }
 }
 @media (prefers-reduced-motion: reduce) { .marketing-client-list a { transition: none; } }
+
+/* Shared studio surfaces for the website and browser client. */
+::selection { background: color-mix(in srgb,var(--purple) 22%,transparent); }
+.brand-loading { min-height: 70svh; display: grid; place-items: center; }
+.site-footer { max-width: 1280px; margin-inline: auto; border-top: 1px solid var(--line); padding: 48px 40px 30px; background: transparent; }
+.site-footer .brand { font-size: 23px; font-weight: 650; }
+.site-footer p { color: var(--muted); font-size: 12px; max-width: 28ch; }
+.site-footer .footer-links { gap: 14px 24px; font-size: 12px; }
+.site-footer .footer-note { color: var(--muted); font-size: 10px; }
+.panel { background: var(--surface); border-color: var(--line); border-radius: 16px; box-shadow: 0 3px 15px #6853d805; }
+.brand-symbol span { transform-origin: left center; }
+.brand-symbol:hover span:nth-child(2) { transform: translateX(3px); }
+.brand-symbol:hover span:nth-child(3) { transform: translateX(6px); }
+.brand-symbol span { transition: transform 220ms ease; }
+@media(max-width:650px) { .site-footer { padding: 35px 22px 25px; } }
+@media(prefers-reduced-motion:reduce) { html { scroll-behavior: auto; } *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }

@@ -89,7 +89,7 @@ export function UnifiedWebApp({ initialView, initialThreadId, user }: { initialV
           <Mark /><span className={styles.wordmark}>Freecoda</span>
         </Link>
         <div className={styles.context}>
-          <span className={styles.contextEyebrow}>YOUR WORKSPACE</span>
+          <span className={styles.contextEyebrow}>Your workspace</span>
           <span className={styles.contextTitle}>{view === "chat" ? "Ask anything" : "Build something"}</span>
         </div>
         <Badge className={styles.accessState} variant="outline"><ShieldCheck data-icon="inline-start" />{view === "chat" ? "Private chat · no repo access" : "Project access by choice"}</Badge>
@@ -103,7 +103,7 @@ export function UnifiedWebApp({ initialView, initialThreadId, user }: { initialV
         <Button className={styles.newChat} onClick={() => { selectView("chat"); window.dispatchEvent(new CustomEvent("freecoda:new-chat")); }}>
           <Plus data-icon="inline-start" /> New chat
         </Button>
-        <div className={styles.navLabel}>WORKSPACE</div>
+        <div className={styles.navLabel}>Workspace</div>
         <Button variant="ghost" className={view === "chat" ? styles.navActive : styles.navItem} aria-current={view === "chat" ? "page" : undefined} onClick={() => selectView("chat")}>
           <MessageSquare data-icon="inline-start" /> Chat <span className={styles.navHint}>Private</span>
         </Button>
@@ -112,7 +112,7 @@ export function UnifiedWebApp({ initialView, initialThreadId, user }: { initialV
         </Button>
         <div className={styles.railSpacer} />
         <div className={styles.sidebarNote}><Sparkles data-icon="inline-start" /><span>Free, open source,<br />and yours to shape.</span></div>
-        <div className={styles.navLabel}>RESOURCES</div>
+        <div className={styles.navLabel}>Resources</div>
         <Link className={styles.navLink} href="/docs"><BookOpen data-icon="inline-start" /> Documentation</Link>
         <Link className={styles.navLink} href="/settings"><Settings2 data-icon="inline-start" /> Settings</Link>
       </aside>

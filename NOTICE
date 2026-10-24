@@ -9,3 +9,8 @@ licensed under Apache License 2.0. See vendor/codebuff/NOTICE and LICENSE.
 Upstream: https://github.com/CodebuffAI/freebuff
 Commit: 645290efd76451a9e15a6924817689946ca06cd4
 Changes: local exact-replacement adapter, with ambiguity rejection.
+
+The web client includes adapted Blur Text and Spotlight Card components from
+React Bits, Copyright (c) 2026 David Haz, under the upstream
+MIT + Commons Clause License Condition v1.0. These files are not Apache-2.0.
+See apps/web/components/react-bits/LICENSE.md for the complete terms.
